@@ -18,5 +18,8 @@ jobs:
           key: ${{ secrets.AZURE_SSH_KEY }}
           capture_stdout: true
           script: |
-           powershell -Command "Get-Location; where.exe git; git --version; Set-Location 'C:\Users\rabel798679\Projects\lab-project'; git log --oneline -1"
-            
+            powershell -Command "
+              Set-Location 'C:\Users\rabel798679\Projects\lab-project'
+              git pull origin main
+              git log --oneline -1
+            "
