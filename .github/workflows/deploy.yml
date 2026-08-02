@@ -17,5 +17,4 @@ jobs:
           username: rabel798679
           key: ${{ secrets.AZURE_SSH_KEY }}
           script: |
-            cd C:/Users/rabel798679/Projects/lab-project
-            git pull origin main
+            dir C:\Users\rabel798679\Projects
