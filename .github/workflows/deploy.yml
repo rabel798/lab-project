@@ -16,6 +16,29 @@ jobs:
           host: ${{ secrets.AZURE_HOST }}
           username: rabel798679
           key: ${{ secrets.AZURE_SSH_KEY }}
+          capture_stdout: true
           script: |
-           cd C:\Users\rabel798679\Projects\lab-project
-           git log --oneline -1
+            echo ===== DEBUG START =====
+
+            echo Current directory:
+            cd
+            pwd
+
+            echo.
+            echo Git location:
+            where.exe git
+
+            echo.
+            echo Git version:
+            git --version
+
+            echo.
+            echo Project directory:
+            cd C:\Users\rabel798679\Projects\lab-project
+
+            echo.
+            echo Latest commit on VM:
+            git log --oneline -1
+
+            echo ===== DEBUG END =====
+            
