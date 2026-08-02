@@ -16,6 +16,6 @@ jobs:
           host: ${{ secrets.AZURE_HOST }}
           username: rabel798679
           key: ${{ secrets.AZURE_SSH_KEY }}
-          sscript: |
+          script: |
            cd C:\Users\rabel798679\Projects\lab-project
            git log --oneline -1
