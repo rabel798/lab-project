@@ -17,4 +17,4 @@ jobs:
           username: rabel798679
           key: ${{ secrets.AZURE_SSH_KEY }}
           script: |
-            dir C:\Users\rabel798679\Projects
+             where.exe git
