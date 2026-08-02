@@ -20,5 +20,8 @@ jobs:
           script: |
            powershell -Command "
            Set-Location 'C:\Users\rabel798679\Projects\lab-project'
-           git pull origin main
-            "
+           git fetch origin
+           git status
+           git reset --hard origin/main
+           git log --oneline -1
+           "
