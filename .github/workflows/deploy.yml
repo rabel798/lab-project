@@ -18,8 +18,8 @@ jobs:
           key: ${{ secrets.AZURE_SSH_KEY }}
           capture_stdout: true
           script: |
-            cd C:/Users/rabel798679/Projects/lab-project
+            whoami
+             cd C:/Users/rabel798679/Projects/lab-project
             "C:/Program Files/Git/cmd/git.exe" fetch origin
-            "C:/Program Files/Git/cmd/git.exe" status
-            "C:/Program Files/Git/cmd/git.exe" reset --hard origin/main
-            "C:/Program Files/Git/cmd/git.exe" log --oneline -1
+              "C:/Program Files/Git/cmd/git.exe" reset --hard origin/main
+                "C:/Program Files/Git/cmd/git.exe" log --oneline -1
