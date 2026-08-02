@@ -18,11 +18,4 @@ jobs:
           key: ${{ secrets.AZURE_SSH_KEY }}
           capture_stdout: true
           script: |
-             whoami
-             cd C:/Users/rabel798679/Projects/lab-project
-             "C:/Program Files/Git/cmd/git.exe" fetch origin
-             echo FETCH_DONE
-             "C:/Program Files/Git/cmd/git.exe" rev-parse origin/main
-             "C:/Program Files/Git/cmd/git.exe" reset --hard origin/main
-             echo RESET_DONE
-             "C:/Program Files/Git/cmd/git.exe" rev-parse HEAD
+           powershell -Command "whoami; cd 'C:\Users\rabel798679\Projects\lab-project'; & 'C:\Program Files\Git\cmd\git.exe' fetch origin; & 'C:\Program Files\Git\cmd\git.exe' reset --hard origin/main; & 'C:\Program Files\Git\cmd\git.exe' log --oneline -1"
