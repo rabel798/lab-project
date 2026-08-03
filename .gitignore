@@ -1,0 +1,7 @@
+.env
+/instance 
+.vscode
+.cursor 
+labvenv/
+.log
+.github/
