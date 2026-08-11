@@ -1,60 +1,529 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lab Project</title>
-
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #0f172a;
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-
-        .card {
-            text-align: center;
-            padding: 40px;
-            border-radius: 16px;
-            background: #1e293b;
-            box-shadow: 0 0 25px rgba(0,0,0,.35);
-        }
-
-        h1 {
-            margin-bottom: 10px;
-        }
-
-        button {
-            margin-top: 20px;
-            padding: 10px 18px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saturn5</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+    :root { --ink:#111111; --paper:#f7f5ef; --acid:#d7ff34; --violet:#a98cff; --coral:#ff785a; --blue:#3b6bff; --line:#191919; --muted:#77736c; }
+    * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; background:var(--paper); color:var(--ink); font-family:Manrope, sans-serif; overflow-x:hidden; }
+    .grid { background-image:linear-gradient(rgba(17,17,17,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(17,17,17,.08) 1px,transparent 1px); background-size:32px 32px; }
+    nav { height:80px; padding:0 5.5vw; display:flex; align-items:center; justify-content:space-between; border-bottom:1.5px solid var(--line); position:sticky; top:0; z-index:20; background:rgba(247,245,239,.94); backdrop-filter:blur(12px); }
+    .logo { font:700 26px 'Space Grotesk'; letter-spacing:-1.5px; text-decoration:none; color:var(--ink); display:flex; align-items:center; gap:8px; }.logo b { display:grid; place-items:center; width:25px;height:25px;border-radius:50%;background:var(--ink); color:var(--acid);font:15px 'DM Mono'; }
+    .links { display:flex; align-items:center; gap:27px; }.links a { font:700 12px Manrope; text-transform:uppercase; letter-spacing:.04em; color:var(--ink); text-decoration:none; }.links a:hover { text-decoration:underline; text-underline-offset:5px; }.button { border:1.5px solid var(--ink); background:var(--acid); box-shadow:4px 4px 0 var(--ink); padding:11px 16px; font-weight:800; font-size:12px; cursor:pointer; text-transform:uppercase; letter-spacing:.04em; transition:.15s; }.button:hover{ transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink);}.button.dark{background:var(--ink);color:var(--paper);box-shadow:4px 4px 0 var(--violet)}
+    section { min-height:100vh; padding:76px 5.5vw; border-bottom:1.5px solid var(--line); position:relative; }.eyebrow { font:500 11px 'DM Mono'; text-transform:uppercase; letter-spacing:.09em; display:flex; align-items:center; gap:8px; }.dot{width:8px;height:8px;background:var(--coral);border-radius:50%;display:inline-block;}.hero { padding-top:58px; display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:5vw; }.hero h1 { font:700 clamp(62px,9.2vw,148px)/.86 'Space Grotesk'; letter-spacing:-.09em; margin:19px 0 27px; max-width:820px; }.highlight{background:var(--acid);padding:0 .07em;}.hero p{max-width:540px;font-size:18px;line-height:1.6;margin:0 0 30px;}.tagrow{display:flex;gap:9px;flex-wrap:wrap}.tag{border:1.5px solid var(--ink);padding:8px 11px;font:500 11px 'DM Mono';background:#fff}.security-card{background:var(--ink);color:var(--paper);padding:25px;border:1.5px solid var(--ink); box-shadow:11px 11px 0 var(--violet); transform:rotate(2deg); min-height:410px; display:flex; flex-direction:column;justify-content:space-between;}.card-top{display:flex;justify-content:space-between;font:12px 'DM Mono';color:#c8c8c8}.shield{width:105px;height:130px;background:var(--acid);clip-path:polygon(50% 0,96% 18%,88% 72%,50% 100%,12% 72%,4% 18%);display:grid;place-items:center;color:var(--ink);font-size:46px;align-self:center}.amount{font:700 54px 'Space Grotesk';letter-spacing:-.07em}.scan{height:6px;background:repeating-linear-gradient(90deg,var(--acid) 0 3px,transparent 3px 6px)}
+    .section-title{font:700 clamp(42px,6vw,82px)/.95 'Space Grotesk';letter-spacing:-.07em;margin:18px 0 42px}.intro-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.panel{border:1.5px solid var(--ink);padding:24px;background:#fff}.panel.acid{background:var(--acid)}.panel.violet{background:#fff}.panel h3{font:700 25px 'Space Grotesk';letter-spacing:-.05em;margin:5px 0 12px}.panel p{font-size:14px;line-height:1.6;margin:0}.statline{margin-top:25px;border-top:1px solid;padding-top:13px;font:500 12px 'DM Mono';display:flex;justify-content:space-between}.members{display:grid;grid-template-columns:repeat(4,1fr);border:1.5px solid var(--ink)}.member{padding:20px;min-height:190px;border-right:1.5px solid var(--ink);background:#fff;display:flex;flex-direction:column;justify-content:space-between}.member:last-child{border:0}.avatar{width:46px;height:46px;border:1.5px solid var(--ink);background:var(--acid);display:grid;place-items:center;font:700 16px 'Space Grotesk';}.member:nth-child(2) .avatar,.member:nth-child(3) .avatar,.member:nth-child(4) .avatar{background:var(--paper);color:var(--ink)}.member h4{font:700 19px 'Space Grotesk';letter-spacing:-.04em;margin:10px 0 2px}.member small{font:11px 'DM Mono';text-transform:uppercase}.deliverable-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:30px}.deliverable-header p{max-width:420px;line-height:1.6}.deck{display:grid;grid-template-columns:1.15fr .85fr;border:1.5px solid var(--ink);background:#fff;min-height:370px}.deck.deck--full{grid-template-columns:1fr;min-height:auto}.deck-copy{padding:32px;display:flex;flex-direction:column;justify-content:space-between}.deck-copy h3{font:700 clamp(34px,5vw,60px)/.93 'Space Grotesk';letter-spacing:-.07em;margin:10px 0}.deck-visual{padding:25px;background:var(--acid);border-left:1.5px solid var(--ink);display:flex;flex-direction:column;justify-content:space-between}.mock-window{background:var(--paper);border:1.5px solid var(--ink);padding:15px}.windowbar{display:flex;gap:5px;border-bottom:1px solid;padding-bottom:9px}.windowbar i{width:8px;height:8px;border-radius:50%;background:var(--ink)}.windowbar i:nth-child(2),.windowbar i:nth-child(3){background:var(--ink)}.chart{height:115px;display:flex;align-items:end;gap:10px;padding:18px 4px 0}.chart b{width:17%;background:var(--ink);display:block}.chart b:nth-child(1){height:36%}.chart b:nth-child(2){height:65%}.chart b:nth-child(3){height:48%}.chart b:nth-child(4){height:90%;background:var(--ink)}.chart b:nth-child(5){height:72%}.meta{display:flex;flex-wrap:wrap;gap:8px}.meta span{border:1px solid;padding:7px 9px;font:11px 'DM Mono';}.version-bar{margin-top:14px;border:1.5px solid var(--ink);display:flex;background:#fff}.version-bar div{padding:15px;flex:1;border-right:1.5px solid var(--ink);font:12px 'DM Mono'}.version-bar div:last-child{border:0}.version-bar strong{font-family:Manrope;font-size:12px;display:block;margin-bottom:4px}.timeline{border-left:1.5px solid var(--ink);margin:0 0 0 14px;padding-left:32px}.event{position:relative;padding:0 0 30px}.event:before{content:'';position:absolute;width:11px;height:11px;border:1.5px solid var(--ink);background:var(--acid);left:-39px;top:3px;border-radius:50%}.event h3{font:700 23px 'Space Grotesk';margin:0 0 4px;letter-spacing:-.05em}.event p{margin:0;line-height:1.6;font-size:14px}.event small{font:11px 'DM Mono';color:var(--muted)}.timeline-controls{margin-top:24px;padding:18px;border:1.5px solid var(--paper);background:#212121}.timeline-controls h4{margin:0 0 12px;font:700 18px 'Space Grotesk';}.timeline-controls input,.timeline-controls textarea{margin-bottom:8px}.timeline-controls textarea{width:100%;min-height:70px;padding:12px;font:14px Manrope;resize:vertical}.timeline-controls .button{margin-top:3px}
+    .pdf-viewer-wrap{width:100%;border:1.5px solid var(--ink);margin-top:22px;background:#fff;display:flex;flex-direction:column}
+    .pdf-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1.5px solid var(--ink);background:var(--paper);font:500 11px 'DM Mono'}
+    .pdf-toolbar .nav{display:flex;align-items:center;gap:8px}
+    .pdf-toolbar button{padding:6px 10px;border:1.5px solid var(--ink);background:#fff;font:500 11px 'DM Mono';cursor:pointer}
+    .pdf-toolbar button:hover{background:var(--acid)}
+    .pdf-toolbar button:disabled{opacity:.4;cursor:not-allowed}
+    .pdf-canvas-wrap{overflow:auto;background:#e8e6df;min-height:420px;max-height:620px;display:flex;justify-content:center;padding:16px}
+    .pdf-canvas-wrap canvas{display:block;box-shadow:4px 4px 0 var(--ink);background:#fff;max-width:100%;height:auto}
+    .pdf-viewer-wrap:fullscreen{width:100vw;height:100vh;margin:0;border:0;display:flex;flex-direction:column;background:var(--paper)}
+    .pdf-viewer-wrap:-webkit-full-screen{width:100vw;height:100vh;margin:0;border:0;display:flex;flex-direction:column;background:var(--paper)}
+    .pdf-viewer-wrap:fullscreen .pdf-toolbar{flex-shrink:0}
+    .pdf-viewer-wrap:-webkit-full-screen .pdf-toolbar{flex-shrink:0}
+    .pdf-viewer-wrap:fullscreen .pdf-canvas-wrap{flex:1;max-height:none;min-height:0;align-items:flex-start}
+    .pdf-viewer-wrap:-webkit-full-screen .pdf-canvas-wrap{flex:1;max-height:none;min-height:0;align-items:flex-start}
+    #admin{min-height:100vh;background:var(--ink);color:var(--paper)}.admin-shell{max-width:980px;margin:0 auto}.admin-shell h2{font:700 clamp(43px,6vw,86px)/.9 'Space Grotesk';letter-spacing:-.075em;margin:18px 0 42px}.login-box{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--paper)}.login-box>div{padding:30px}.login-box>div+div{border-left:1.5px solid var(--paper);background:#212121}.login-box h3{font:700 28px 'Space Grotesk';letter-spacing:-.05em;margin:0 0 16px}.login-box p{font-size:14px;line-height:1.6;color:#d1d1d1}.login-box input,.form-grid input,.form-grid textarea{width:100%;padding:13px;border:1.5px solid var(--ink);font:14px Manrope;margin-bottom:10px;background:var(--paper)}.admin .button{box-shadow:4px 4px 0 var(--violet)}.hidden{display:none!important}.upload-area{border:2px dashed var(--ink);background:var(--paper);color:var(--ink);padding:45px 25px;text-align:center;cursor:pointer;transition:.2s}.upload-area.drag{background:var(--acid);transform:scale(.99)}.upload-area h3{font:700 28px 'Space Grotesk';letter-spacing:-.05em;margin:7px 0}.upload-area p{font-size:13px}.upload-area.secondary{margin-top:14px;padding:28px 20px;background:#212121;color:var(--paper);border-color:var(--paper)}.upload-area.secondary.drag{background:#333}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:17px}.form-grid textarea{grid-column:1/-1;min-height:93px;resize:vertical}.publish{margin-top:9px}.notice{font:12px 'DM Mono';color:var(--acid);min-height:20px;margin-top:14px}.published-list{margin-top:25px;border-top:1px solid #555;padding-top:20px}.published-list h4{font:12px 'DM Mono';text-transform:uppercase;letter-spacing:.06em}.record{display:flex;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid #555;font-size:13px}.record small{font:11px 'DM Mono';color:#aaa}.footer{padding:20px 5.5vw;background:var(--acid);font:12px 'DM Mono';display:flex;justify-content:space-between;border-top:1.5px solid var(--ink)}
+    @media(max-width:780px){nav{height:auto;padding:17px 5vw}.links a:not(.admin-link){display:none}.hero,.intro-grid,.deck,.login-box{grid-template-columns:1fr}.hero{padding-top:55px}.security-card{min-height:330px}.members{grid-template-columns:1fr 1fr}.member:nth-child(2){border-right:0}.member:nth-child(-n+2){border-bottom:1.5px solid var(--ink)}.deck-visual,.login-box>div+div{border-left:0;border-top:1.5px solid var(--ink)}.deliverable-header{display:block}.form-grid{grid-template-columns:1fr}.footer{display:block;line-height:2}.ribbon{display:none}}
+    .team-card{border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);padding:26px;min-height:410px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:8px 8px 0 var(--acid)}.team-card .card-top{color:var(--paper)}.team-stamp{font:700 clamp(58px,7vw,88px)/.8 'Space Grotesk';letter-spacing:-.09em;border-bottom:1px solid #666;padding:15px 0 20px}.team-stamp span{color:var(--acid)}.team-list{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid #666;border-left:1px solid #666}.team-list div{padding:11px;border-right:1px solid #666;border-bottom:1px solid #666;font:11px 'DM Mono';display:flex;justify-content:space-between;gap:7px}.team-list b{color:var(--acid);font-weight:500}.empay-details{margin-top:18px;display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.flow-panel,.security-panel{border:1.5px solid var(--ink);background:#fff;padding:25px}.flow-panel h3,.security-panel h3{font:700 26px 'Space Grotesk';letter-spacing:-.05em;margin:7px 0 18px}.payment-flow{display:flex;align-items:center;gap:9px}.flow-node{flex:1;border:1.5px solid var(--ink);padding:16px 11px;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;background:var(--paper)}.flow-node b{font:700 19px 'Space Grotesk';letter-spacing:-.05em}.flow-node small{font:10px 'DM Mono'}.flow-node.active{background:var(--acid)}.flow-arrow{font:700 21px 'DM Mono'}.security-panel{background:var(--ink);color:var(--paper)}.security-panel .eyebrow{color:var(--acid)}.protection-list{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #555;border-left:1px solid #555}.protection-list div{padding:12px;border-right:1px solid #555;border-bottom:1px solid #555;font:11px 'DM Mono'}.protection-list b{color:var(--acid);font-weight:500;display:block;margin-bottom:4px}.security-note{font-size:13px;line-height:1.6;color:#d5d5d5;margin:18px 0 0}@media(max-width:780px){.empay-details{grid-template-columns:1fr}.payment-flow{flex-direction:column;align-items:stretch}.flow-arrow{text-align:center;transform:rotate(90deg)}.flow-node{min-height:75px}}
+    .document-thumbnail{width:100%;display:block;border:1.5px solid var(--ink);background:#fff;box-shadow:6px 6px 0 var(--ink);aspect-ratio:16/9;object-fit:cover}
+    .manage-list{margin-top:18px;border-top:1px solid #555}.manage-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #555;font-size:13px}.manage-item small{font:11px 'DM Mono';color:#aaa}.manage-actions{display:flex;gap:7px}.manage-actions button{padding:6px 8px;border:1px solid var(--paper);background:transparent;color:var(--paper);font:10px 'DM Mono';cursor:pointer}.manage-actions button:hover{background:var(--acid);color:var(--ink)}
+  </style>
 </head>
 <body>
+  <nav><a class="logo" href="#home"><b>₿</b>Saturn V</a><div class="links"><a href="#team">Team</a><a href="#projects">Projects</a><a href="#planning-v1">Planning v1</a><a href="#deliverables">Deliverables</a><a href="#history">Archive</a><a class="admin-link button" href="#admin">Admin sign in ↗</a></div></nav>
+  <main>
+    <section id="home" class="hero grid"><div><div class="eyebrow"><span class="dot"></span> Saturn V · Team portfolio</div><h1>We build <span class="highlight">secure</span><br>digital experiences.</h1><p>Saturn V is a collaborative student team bringing research, design, development and clear communication together in every project.</p><div class="tagrow"><span class="tag">#OUR_TEAM</span><span class="tag">#COLLABORATION</span><span class="tag">#2026</span></div></div><aside class="team-card"><div class="card-top"><span>SATURN V / OUR METHOD</span><span>2026</span></div><div class="team-stamp">SATURN<br><span>05</span></div><div class="team-list"><div><b>01</b><span>PLAN</span></div><div><b>02</b><span>DESIGN</span></div><div><b>03</b><span>BUILD</span></div><div><b>04</b><span>VERIFY</span></div></div></aside></section>
+    <section id="team"><div class="eyebrow">01 / THE TEAM</div><h2 class="section-title">The people<br>behind the work.</h2><div class="intro-grid"><article class="panel acid"><div class="eyebrow">HOW WE WORK</div><h3>Different roles. One goal.</h3><p>We combine planning, technical delivery, visual clarity and user research to turn an idea into a reliable outcome.</p><div class="statline"><span>TEAM: SATURN V</span><span>4 MEMBERS</span></div></article><article class="panel violet"><div class="eyebrow">OUR APPROACH</div><h3>Thoughtful by default.</h3><p>Every decision is shared, documented and tested. That is how we keep our work focused and dependable.</p><div class="statline"><span>FOCUS: PEOPLE</span><span>BUILD TOGETHER</span></div></article></div><div class="members" style="margin-top:20px"><article class="member"><div class="avatar">NJ</div><div><h4>Navdeep Jain</h4><small>Team Lead</small></div></article><article class="member"><div class="avatar">RS</div><div><h4>Rahul Singh</h4><small>Backend Developer</small></div></article><article class="member"><div class="avatar">RPS</div><div><h4>Rhythmpreet Singh</h4><small>Designer</small></div></article><article class="member"><div class="avatar">KD</div><div><h4>Krrish Dhaneja</h4><small>UX & Research</small></div></article></div></section>
+    <section id="projects" class="grid"><div class="eyebrow">02 / OUR PROJECTS</div><h2 class="section-title">What Saturn V<br>is building.</h2><article class="deck"><div class="deck-copy"><div><div class="eyebrow">CURRENT PROJECT / EMPAY</div><h3>Offline payments,<br>with proof.</h3><p style="line-height:1.6">EmPay is an offline payment protocol simulator for secure local transfers when internet access is unavailable. It models and verifies Bluetooth-based exchanges between payer, merchant and issuer.</p><div class="meta"><span>BLUETOOTH PAYMENTS</span><span>FORMAL VERIFICATION</span><span>2026</span></div></div><a class="button dark" href="#planning-v1" style="text-decoration:none;width:max-content">View project plan →</a></div><div class="deck-visual" style="background:var(--paper);padding:0"><aside class="security-card" style="transform:none;box-shadow:none;border:0;min-height:100%;height:100%"><div class="card-top"><span>EMPAY / SECURE WALLET</span><span>● LIVE</span></div><div class="shield">✓</div><div><div class="amount">₹ 24,690<small style="font-size:15px;letter-spacing:0">.00</small></div><p style="font:12px 'DM Mono';color:#c8c8c8">Protected by layered verification</p><div class="scan"></div></div></aside></div></article><div class="empay-details"><article class="flow-panel"><div class="eyebrow">HOW A LOCAL PAYMENT MOVES</div><h3>Secure transfer, even offline.</h3><div class="payment-flow"><div class="flow-node"><b>Payer</b><small>Signs the payment packet</small></div><span class="flow-arrow">→</span><div class="flow-node active"><b>Bluetooth</b><small>Local encrypted exchange</small></div><span class="flow-arrow">→</span><div class="flow-node"><b>Merchant</b><small>Verifies before accepting</small></div><span class="flow-arrow">→</span><div class="flow-node"><b>Issuer</b><small>Reconciles when online</small></div></div></article><article class="security-panel"><div class="eyebrow">SECURITY COVERAGE</div><h3>Designed to fail safely.</h3><div class="protection-list"><div><b>01 / SIGNATURES</b>Authenticity and integrity</div><div><b>02 / NONCES</b>Replay prevention</div><div><b>03 / UNIQUE IDS</b>Duplicate detection</div><div><b>04 / RECOVERY</b>Safe interrupted transfers</div></div><p class="security-note">EmPay tests replay attacks, double spending, cloned device states, rollback attempts and partial Bluetooth transfers before settlement.</p></article></div></section>
+    <section id="planning-v1" class="grid"><div class="deliverable-header"><div><div class="eyebrow"><span class="dot"></span> 03 / FIRST MILESTONE</div><h2 class="section-title" style="margin-bottom:0">Planning<br>Document v1.</h2></div><p>Our initial plan: what we are building, why it matters, and how our team will deliver it securely.</p></div><article class="deck"><div class="deck-copy"><div><div class="eyebrow">DELIVERABLE / PP-01</div><h3>Making every payment feel safe.</h3><div class="meta"><span>VERSION: 1.0</span><span>DATE: 12 AUG 2026</span><span>AUTHORS: SATURN V</span></div></div><a class="button dark" style="text-decoration:none;width:max-content" href="#planning-v1-viewer">Read full document ↓</a></div><div class="deck-visual"><div class="eyebrow">DOCUMENT PREVIEW / v1</div><img class="document-thumbnail" id="planningV1Thumbnail" alt="First page of the Planning Document v1"><div style="font:500 12px 'DM Mono'">UCS503 · EMPAY · SATURN V</div></div></article><div class="version-bar"><div><strong>Document date</strong>12 August 2026</div><div><strong>Version</strong>v1.0 · Original plan</div><div><strong>Authors</strong>Rhythmpreet, Rahul, Krrish, Navdeep</div></div><div id="planning-v1-viewer" class="pdf-viewer-wrap"></div></section>
+    <section id="deliverables"><div class="eyebrow">03 / WHAT'S NEXT</div><h2 class="section-title">Every stage has<br>its own <span class="highlight">record.</span></h2><div class="intro-grid"><article class="panel"><div class="eyebrow">PLANNING / V2</div><h3>Planning Document v2</h3><p>Reserved for plan revisions. When published, this gets its own permanent page and never overwrites Planning v1.</p><div class="statline"><span>STATUS: READY FOR REVISION</span><span>→</span></div></article><article class="panel"><div class="eyebrow">LATER MILESTONES</div><h3>Build, test & demo</h3><p>Separate deliverable pages will document the design review, development document, testing report and final project demonstration.</p><div class="statline"><span>STATUS: COMING SOON</span><span>→</span></div></article></div><div id="publishedPages"></div></section>
+    <section id="history" class="grid"><div class="eyebrow">04 / PROJECT TIMELINE</div><h2 class="section-title">The work,<br>with its <i>history.</i></h2><p style="max-width:560px;margin:-20px 0 35px;line-height:1.6">Timeline milestones are managed from the administrator console. Published documents are always kept as separate records.</p><div class="timeline" id="timeline"></div></section>
+    <section id="admin"><div class="admin-shell"><div class="eyebrow"><span class="dot"></span> Instructor / administrator console</div><h2>Publish without<br>erasing history.</h2><div id="login" class="login-box"><div><h3>Admin access</h3><p>Sign in to publish a document, project demo, or supporting material to a permanent portfolio record.</p><p style="font:11px 'DM Mono';color:var(--acid);margin-top:30px">DEMO LOGIN<br>admin@empay.dev<br>secure2026</p></div><div><input id="email" placeholder="Email address" type="email"><input id="password" placeholder="Password" type="password"><button class="button" onclick="signIn()">Sign in →</button><p id="loginMsg" class="notice"></p></div></div><div id="dashboard" class="hidden"><div class="upload-area secondary" id="v1DropZone"><div class="eyebrow" style="justify-content:center">PLANNING DOCUMENT V1</div><h3>Drop a .pdf to replace Planning Document v1</h3><p>Updates the v1 thumbnail and on-page viewer. The original record stays permanent.</p><input id="v1FileInput" type="file" accept=".pdf,application/pdf" style="display:none"></div><p class="notice" id="v1UploadMsg"></p><div class="upload-area" id="dropZone"><div class="eyebrow" style="justify-content:center">PDF UPLOAD</div><h3>Drop a .pdf file here</h3><p>or click to select one PDF document</p><input id="fileInput" type="file" accept=".pdf,application/pdf" style="display:none"></div><div class="form-grid"><input id="title" placeholder="Deliverable title (e.g. Planning Document v2)"><input id="version" placeholder="Document version (e.g. v2.0)"><input id="date" type="date"><textarea id="summary" placeholder="Change summary — what changed and why?"></textarea></div><button class="button publish" onclick="publish()">Publish permanent page →</button><p class="notice" id="uploadMsg"></p><div class="timeline-controls"><h4>Edit project timeline</h4><input id="timelineDate" type="date"><input id="timelineTitle" placeholder="Milestone title"><textarea id="timelineSummary" placeholder="Milestone details"></textarea><button class="button" onclick="addTimelineItem()">Add timeline milestone →</button><p id="timelineMsg" class="notice"></p></div><div class="published-list"><h4>Published in this browser session</h4><div id="records"><div class="record"><span>Planning Document v1 <small>v1.0 · 12 Aug 2026</small></span><small>PERMANENT</small></div></div></div></div></div></section>
+  </main><footer class="footer"><span>© 2026 EMPAY TEAM · SECURE BY DESIGN</span><span>TEAM PORTFOLIO / VERSIONED FOREVER</span></footer>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-<div class="card">
-    <h1> Flask is Running</h1>
-    <p>Your deployment pipeline is ready.</p>
+    const PLANNING_V1_DEFAULT = 'assets/planning-v1/Planning-Presentation-v1.pdf';
+    const PDF_DB = 'empayPdfDb';
+    const PDF_STORE = 'pdfs';
+    const PLANNING_V1_KEY = 'planning-v1';
 
-    <button onclick="sayHello()">
-        Click Me
-    </button>
-</div>
+    let selectedFiles = [];
+    let editableDeliverables = JSON.parse(localStorage.getItem('empayDeliverables') || '[]');
+    const defaultTimeline = [
+      { id: 'planning-v1', date: '2026-08-18', title: 'Planning Document v1', summary: 'Original product strategy, delivery roadmap and security approach. Authors: Rhythmpreet Singh, Rahul Singh, Krrish Dhaneja and Navdeep Jain.' },
+      { id: 'timeline-1', date: '2026-09-01', title: 'Design review', summary: 'Initial EmPay user flows and payment-security screens reviewed.' },
+      { id: 'timeline-2', date: '2026-10-15', title: 'Project demonstration', summary: 'Working payment experience and security controls demonstrated.' }
+    ];
+    let timelineItems = JSON.parse(localStorage.getItem('empayTimeline') || 'null') || defaultTimeline;
+    timelineItems = timelineItems.map((item, index) => ({ ...item, id: item.id || `timeline-${index}` }));
 
-<script>
-function sayHello() {
-    alert("Hello from Flask!");
-}
-</script>
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
 
-</body>
-</html>
+    function formatDate(date) {
+      return new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function openPdfDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(PDF_DB, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(PDF_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function savePdfBlob(key, blob) {
+      const db = await openPdfDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PDF_STORE, 'readwrite');
+        tx.objectStore(PDF_STORE).put(blob, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function getPdfBlob(key) {
+      const db = await openPdfDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PDF_STORE, 'readonly');
+        const req = tx.objectStore(PDF_STORE).get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function deletePdfBlob(key) {
+      const db = await openPdfDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PDF_STORE, 'readwrite');
+        tx.objectStore(PDF_STORE).delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function loadPdfSource(keyOrUrl) {
+      if (keyOrUrl === PLANNING_V1_KEY) {
+        const stored = await getPdfBlob(PLANNING_V1_KEY);
+        if (stored) return { data: await stored.arrayBuffer() };
+        return { url: PLANNING_V1_DEFAULT };
+      }
+      const blob = await getPdfBlob(keyOrUrl);
+      if (!blob) return null;
+      return { data: await blob.arrayBuffer() };
+    }
+
+    async function renderPdfThumbnail(targetEl, keyOrUrl) {
+      const source = await loadPdfSource(keyOrUrl);
+      if (!source || !targetEl) return null;
+      const pdf = await pdfjsLib.getDocument(source).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(640 / viewport.width, 360 / viewport.height, 1.5);
+      const scaled = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = scaled.width;
+      canvas.height = scaled.height;
+      await page.render({ canvasContext: ctx, viewport: scaled }).promise;
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      targetEl.src = dataUrl;
+      targetEl.alt = 'First page preview';
+      return dataUrl;
+    }
+
+    async function mountPdfViewer(container, keyOrUrl, title) {
+      if (!container) return;
+      container.innerHTML = '<div class="pdf-toolbar"><span>Loading document…</span></div><div class="pdf-canvas-wrap"><p style="padding:24px;font:13px DM Mono">Loading PDF…</p></div>';
+      const source = await loadPdfSource(keyOrUrl);
+      if (!source) {
+        container.innerHTML = '<div class="pdf-toolbar"><span>Document unavailable</span></div><div class="pdf-canvas-wrap"><p style="padding:24px;font:13px DM Mono">No PDF found for this deliverable.</p></div>';
+        return;
+      }
+      const pdf = await pdfjsLib.getDocument(source).promise;
+      let pageNum = 1;
+      let currentScale = 1.2;
+
+      container.innerHTML = `
+        <div class="pdf-toolbar">
+          <span>${escapeHtml(title || 'Document')}</span>
+          <div class="nav">
+            <button type="button" data-action="prev">← Prev</button>
+            <span data-role="page-info">Page 1 / ${pdf.numPages}</span>
+            <button type="button" data-action="next">Next →</button>
+            <button type="button" data-action="zoom-out">−</button>
+            <button type="button" data-action="zoom-in">+</button>
+            <button type="button" data-action="fullscreen">Fullscreen</button>
+          </div>
+        </div>
+        <div class="pdf-canvas-wrap"><canvas></canvas></div>
+      `;
+
+      const canvas = container.querySelector('canvas');
+      const ctx = canvas.getContext('2d');
+      const canvasWrap = container.querySelector('.pdf-canvas-wrap');
+      const pageInfo = container.querySelector('[data-role="page-info"]');
+      const prevBtn = container.querySelector('[data-action="prev"]');
+      const nextBtn = container.querySelector('[data-action="next"]');
+      const fullscreenBtn = container.querySelector('[data-action="fullscreen"]');
+      const defaultScale = currentScale;
+      let wasFullscreen = false;
+
+      async function renderPage() {
+        const page = await pdf.getPage(pageNum);
+        const viewport = page.getViewport({ scale: currentScale });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        pageInfo.textContent = `Page ${pageNum} / ${pdf.numPages}`;
+        prevBtn.disabled = pageNum <= 1;
+        nextBtn.disabled = pageNum >= pdf.numPages;
+      }
+
+      async function renderPageFit() {
+        const page = await pdf.getPage(pageNum);
+        const base = page.getViewport({ scale: 1 });
+        const padding = 32;
+        const maxW = Math.max(canvasWrap.clientWidth - padding, 200);
+        const maxH = Math.max(canvasWrap.clientHeight - padding, 200);
+        currentScale = Math.min(maxW / base.width, maxH / base.height, 3);
+        await renderPage();
+      }
+
+      function updateFullscreenButton() {
+        const isFullscreen = document.fullscreenElement === container || document.webkitFullscreenElement === container;
+        fullscreenBtn.textContent = isFullscreen ? 'Exit fullscreen' : 'Fullscreen';
+      }
+
+      function handleFullscreenChange() {
+        const isFullscreen = document.fullscreenElement === container || document.webkitFullscreenElement === container;
+        updateFullscreenButton();
+        if (isFullscreen) {
+          wasFullscreen = true;
+          renderPageFit();
+        } else if (wasFullscreen) {
+          wasFullscreen = false;
+          currentScale = defaultScale;
+          renderPage();
+        }
+      }
+
+      prevBtn.addEventListener('click', () => { if (pageNum > 1) { pageNum--; wasFullscreen ? renderPageFit() : renderPage(); } });
+      nextBtn.addEventListener('click', () => { if (pageNum < pdf.numPages) { pageNum++; wasFullscreen ? renderPageFit() : renderPage(); } });
+      container.querySelector('[data-action="zoom-in"]').addEventListener('click', () => { currentScale = Math.min(currentScale + 0.15, 3); renderPage(); });
+      container.querySelector('[data-action="zoom-out"]').addEventListener('click', () => { currentScale = Math.max(currentScale - 0.15, 0.5); renderPage(); });
+      fullscreenBtn.addEventListener('click', async () => {
+        const isFullscreen = document.fullscreenElement === container || document.webkitFullscreenElement === container;
+        if (isFullscreen) {
+          if (document.exitFullscreen) await document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        } else if (container.requestFullscreen) {
+          await container.requestFullscreen();
+        } else if (container.webkitRequestFullscreen) {
+          container.webkitRequestFullscreen();
+        }
+      });
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+      await renderPage();
+    }
+
+    async function initPlanningV1() {
+      const thumb = document.getElementById('planningV1Thumbnail');
+      const viewer = document.getElementById('planning-v1-viewer');
+      try {
+        await renderPdfThumbnail(thumb, PLANNING_V1_KEY);
+        await mountPdfViewer(viewer, PLANNING_V1_KEY, 'Planning Document v1');
+      } catch (err) {
+        if (thumb) thumb.alt = 'Planning Document v1 preview unavailable';
+        if (viewer) viewer.innerHTML = '<div class="pdf-toolbar"><span>Planning Document v1</span></div><div class="pdf-canvas-wrap"><p style="padding:24px;font:13px DM Mono">Could not load the PDF. Upload one from the admin console.</p></div>';
+      }
+    }
+
+    function persistTimeline() {
+      localStorage.setItem('empayTimeline', JSON.stringify(timelineItems));
+    }
+
+    function persistDeliverables() {
+      localStorage.setItem('empayDeliverables', JSON.stringify(editableDeliverables));
+    }
+
+    function renderTimeline() {
+      const list = document.getElementById('timeline');
+      list.innerHTML = [...timelineItems]
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .map(item => `<article class="event"><small>${formatDate(item.date)}</small><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.summary)}</p></article>`)
+        .join('');
+      renderManagers();
+    }
+
+    function buildDeliverableDeck(item) {
+      const niceDate = formatDate(item.date);
+      return `
+        <article id="${item.id}" class="deck deck--full" style="margin-top:32px">
+          <div class="deck-copy">
+            <div>
+              <div class="eyebrow">PUBLISHED DELIVERABLE</div>
+              <h3>${escapeHtml(item.title)}</h3>
+              <p style="line-height:1.6">${escapeHtml(item.summary)}</p>
+              <div class="meta">
+                <span>VERSION: ${escapeHtml(item.version)}</span>
+                <span>DATE: ${niceDate}</span>
+                <span>AUTHORS: SATURN V</span>
+              </div>
+              <div class="pdf-viewer-wrap" data-viewer-for="${item.id}"></div>
+            </div>
+            <a class="button dark" href="#history" style="text-decoration:none;width:max-content">View timeline →</a>
+          </div>
+        </article>
+      `;
+    }
+
+    async function renderDeliverables() {
+      const pages = document.getElementById('publishedPages');
+      const records = document.getElementById('records');
+      pages.innerHTML = editableDeliverables.map(buildDeliverableDeck).join('');
+      records.innerHTML = '<div class="record"><span>Planning Document v1 <small>v1.0 · 12 Aug 2026</small></span><small>LOCKED</small></div>';
+      editableDeliverables.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'record';
+        row.innerHTML = `<span><a href="#${item.id}" style="color:var(--acid)">${escapeHtml(item.title)}</a> <small>${escapeHtml(item.version)} · ${formatDate(item.date)}</small></span><small>PUBLISHED</small>`;
+        records.prepend(row);
+      });
+
+      for (const item of editableDeliverables) {
+        const viewerEl = pages.querySelector(`[data-viewer-for="${item.id}"]`);
+        await mountPdfViewer(viewerEl, item.pdfKey, item.title);
+      }
+      renderManagers();
+    }
+
+    function adminTools() {
+      let tools = document.getElementById('management');
+      if (!tools) {
+        tools = document.createElement('div');
+        tools.id = 'management';
+        tools.className = 'timeline-controls';
+        document.querySelector('.published-list').before(tools);
+      }
+      tools.innerHTML = `
+        <h4>Manage website content</h4>
+        <p style="font-size:13px;line-height:1.5;color:#d1d1d1">Edit or remove uploaded deliverables and timeline milestones here.</p>
+        <div id="deliverableManager" class="manage-list"></div>
+        <div id="timelineManager" class="manage-list"></div>
+      `;
+      renderManagers();
+    }
+
+    function renderManagers() {
+      const d = document.getElementById('deliverableManager');
+      const t = document.getElementById('timelineManager');
+      if (!d || !t) return;
+      d.innerHTML = '<h4 style="margin:12px 0;font:11px DM Mono">UPLOADED DELIVERABLES</h4>' + (
+        editableDeliverables.length
+          ? editableDeliverables.map(item => `<div class="manage-item"><span>${escapeHtml(item.title)} <small>${escapeHtml(item.version)} · ${formatDate(item.date)}</small></span><div class="manage-actions"><button onclick="editDeliverable('${item.id}')">EDIT</button><button onclick="removeDeliverable('${item.id}')">REMOVE</button></div></div>`).join('')
+          : '<small>No uploaded deliverables yet.</small>'
+      );
+      t.innerHTML = '<h4 style="margin:18px 0 12px;font:11px DM Mono">TIMELINE MILESTONES</h4>' + timelineItems.map(item =>
+        `<div class="manage-item"><span>${escapeHtml(item.title)} <small>${formatDate(item.date)}</small></span><div class="manage-actions"><button onclick="editTimelineItem('${item.id}')">EDIT</button><button onclick="removeTimelineItem('${item.id}')">REMOVE</button></div></div>`
+      ).join('');
+    }
+
+    function signIn() {
+      const e = document.getElementById('email').value;
+      const p = document.getElementById('password').value;
+      const msg = document.getElementById('loginMsg');
+      if (e === 'admin@empay.dev' && p === 'secure2026') {
+        document.getElementById('login').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+        msg.textContent = '';
+        adminTools();
+        renderDeliverables();
+        renderTimeline();
+      } else {
+        msg.textContent = 'Access denied — use the demo credentials shown.';
+      }
+    }
+
+    const zone = document.getElementById('dropZone');
+    const input = document.getElementById('fileInput');
+    const v1Zone = document.getElementById('v1DropZone');
+    const v1Input = document.getElementById('v1FileInput');
+
+    function bindDropZone(area, fileInput, onFile) {
+      area.addEventListener('click', () => fileInput.click());
+      ['dragenter', 'dragover'].forEach(evt => area.addEventListener(evt, e => { e.preventDefault(); area.classList.add('drag'); }));
+      ['dragleave', 'drop'].forEach(evt => area.addEventListener(evt, e => { e.preventDefault(); area.classList.remove('drag'); }));
+      area.addEventListener('drop', e => onFile(e.dataTransfer.files));
+      fileInput.addEventListener('change', e => onFile(e.target.files));
+    }
+
+    function setFiles(files) {
+      const file = [...files][0];
+      const msg = document.getElementById('uploadMsg');
+      if (!file) return;
+      if (!/\.pdf$/i.test(file.name)) {
+        selectedFiles = [];
+        input.value = '';
+        msg.textContent = 'Only .pdf files can be uploaded.';
+        return;
+      }
+      selectedFiles = [file];
+      msg.textContent = file.name + ' is ready for publishing. Complete the metadata below.';
+    }
+
+    async function setV1File(files) {
+      const file = [...files][0];
+      const msg = document.getElementById('v1UploadMsg');
+      if (!file) return;
+      if (!/\.pdf$/i.test(file.name)) {
+        v1Input.value = '';
+        msg.textContent = 'Only .pdf files can be used for Planning Document v1.';
+        return;
+      }
+      await savePdfBlob(PLANNING_V1_KEY, file);
+      const thumb = document.getElementById('planningV1Thumbnail');
+      await renderPdfThumbnail(thumb, PLANNING_V1_KEY);
+      await mountPdfViewer(document.getElementById('planning-v1-viewer'), PLANNING_V1_KEY, 'Planning Document v1');
+      msg.textContent = '✓ Planning Document v1 updated. Thumbnail and viewer now show the uploaded PDF.';
+      v1Input.value = '';
+    }
+
+    bindDropZone(zone, input, setFiles);
+    bindDropZone(v1Zone, v1Input, setV1File);
+
+    async function publish() {
+      const title = document.getElementById('title').value.trim();
+      const version = document.getElementById('version').value.trim();
+      const date = document.getElementById('date').value;
+      const summary = document.getElementById('summary').value.trim();
+      const msg = document.getElementById('uploadMsg');
+      if (!selectedFiles.length || !title || !version || !date || !summary) {
+        msg.textContent = 'Add one PDF file and complete title, version, date and change summary.';
+        return;
+      }
+      const id = `deliverable-${Date.now()}`;
+      const pdfKey = id;
+      await savePdfBlob(pdfKey, selectedFiles[0]);
+      const item = {
+        id,
+        title,
+        version,
+        date,
+        summary,
+        fileName: selectedFiles[0].name,
+        pdfKey
+      };
+      editableDeliverables.push(item);
+      timelineItems.push({ id: `timeline-${Date.now()}`, date, title, summary: `${title} (${version}): ${summary}` });
+      persistDeliverables();
+      persistTimeline();
+      await renderDeliverables();
+      renderTimeline();
+      msg.textContent = '✓ Published with embedded PDF viewer. v1 remains available.';
+      ['title', 'version', 'date', 'summary'].forEach(id => document.getElementById(id).value = '');
+      input.value = '';
+      selectedFiles = [];
+    }
+
+    function addTimelineItem() {
+      const date = document.getElementById('timelineDate').value;
+      const title = document.getElementById('timelineTitle').value.trim();
+      const summary = document.getElementById('timelineSummary').value.trim();
+      const msg = document.getElementById('timelineMsg');
+      if (!date || !title || !summary) {
+        msg.textContent = 'Add a date, milestone title and details.';
+        return;
+      }
+      timelineItems.push({ id: `timeline-${Date.now()}`, date, title, summary });
+      persistTimeline();
+      renderTimeline();
+      msg.textContent = '✓ Timeline milestone added.';
+      document.getElementById('timelineDate').value = '';
+      document.getElementById('timelineTitle').value = '';
+      document.getElementById('timelineSummary').value = '';
+    }
+
+    function editTimelineItem(id) {
+      const item = timelineItems.find(x => x.id === id);
+      if (!item) return;
+      const title = prompt('Milestone title', item.title);
+      if (title === null) return;
+      const date = prompt('Date (YYYY-MM-DD)', item.date);
+      if (date === null) return;
+      const summary = prompt('Milestone details', item.summary);
+      if (summary === null) return;
+      Object.assign(item, { title: title.trim() || item.title, date: date.trim() || item.date, summary: summary.trim() || item.summary });
+      persistTimeline();
+      renderTimeline();
+    }
+
+    function removeTimelineItem(id) {
+      if (confirm('Remove this timeline milestone?')) {
+        timelineItems = timelineItems.filter(x => x.id !== id);
+        persistTimeline();
+        renderTimeline();
+      }
+    }
+
+    function editDeliverable(id) {
+      const item = editableDeliverables.find(x => x.id === id);
+      if (!item) return;
+      const title = prompt('Deliverable title', item.title);
+      if (title === null) return;
+      const version = prompt('Document version', item.version);
+      if (version === null) return;
+      const date = prompt('Date (YYYY-MM-DD)', item.date);
+      if (date === null) return;
+      const summary = prompt('Change summary', item.summary);
+      if (summary === null) return;
+      Object.assign(item, {
+        title: title.trim() || item.title,
+        version: version.trim() || item.version,
+        date: date.trim() || item.date,
+        summary: summary.trim() || item.summary
+      });
+      persistDeliverables();
+      renderDeliverables();
+    }
+
+    async function removeDeliverable(id) {
+      if (!confirm('Remove this uploaded deliverable from the website?')) return;
+      const item = editableDeliverables.find(x => x.id === id);
+      editableDeliverables = editableDeliverables.filter(x => x.id !== id);
+      if (item) {
+        timelineItems = timelineItems.filter(x => !(x.title === item.title && x.date === item.date));
+        await deletePdfBlob(item.pdfKey);
+      }
+      persistDeliverables();
+      persistTimeline();
+      renderDeliverables();
+      renderTimeline();
+    }
+
+    window.signIn = signIn;
+    window.publish = publish;
+    window.addTimelineItem = addTimelineItem;
+    window.editTimelineItem = editTimelineItem;
+    window.removeTimelineItem = removeTimelineItem;
+    window.editDeliverable = editDeliverable;
+    window.removeDeliverable = removeDeliverable;
+
+    initPlanningV1();
+    renderDeliverables();
+    renderTimeline();
+  </script>
+</body></html>
