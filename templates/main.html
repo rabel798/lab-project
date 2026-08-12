@@ -509,6 +509,7 @@
         await deletePdfBlob(item.pdfKey);
       }
       persistDeliverables();
+      
       persistTimeline();
       renderDeliverables();
       renderTimeline();
