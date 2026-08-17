@@ -18,4 +18,4 @@ jobs:
           key: ${{ secrets.AZURE_SSH_KEY }}
           capture_stdout: true
           script: |
-           powershell -Command "whoami; cd 'C:\Users\rabel798679\Projects\lab-project'; & 'C:\Program Files\Git\cmd\git.exe' fetch origin; & 'C:\Program Files\Git\cmd\git.exe' reset --hard origin/main; & 'C:\Program Files\Git\cmd\git.exe' log --oneline -1"
+            powershell -Command "whoami; cd 'C:\Users\rabel798679\Projects\lab-project'; & 'C:\Program Files\Git\cmd\git.exe' fetch origin; & 'C:\Program Files\Git\cmd\git.exe' reset --hard origin/main; Restart-Service FlaskApp; & 'C:\Program Files\Git\cmd\git.exe' log --oneline -1"
