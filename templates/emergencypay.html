@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>EmergencyPay - Offline UPI Payments</title>
-  <!-- Google Fonts & Remixicon -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -22,20 +21,13 @@
       --text-muted: #9ca3af;
       --border-color: rgba(255, 255, 255, 0.08);
       --border-active: rgba(16, 185, 129, 0.4);
-      --danger: #ef4444;
-      --warning: #f59e0b;
       --radius-sm: 8px;
       --radius-md: 14px;
       --radius-lg: 20px;
       --font-family: 'Exo 2', sans-serif;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: var(--font-family);
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); }
 
     body {
       background-color: var(--bg-dark);
@@ -66,7 +58,6 @@
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
-      backdrop-filter: blur(10px);
     }
 
     .brand {
@@ -109,12 +100,6 @@
       border-radius: 50%;
       background-color: var(--emerald-primary);
       box-shadow: 0 0 8px var(--emerald-primary);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
     }
 
     /* Balance Banner */
@@ -128,59 +113,49 @@
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
     }
 
-    .balance-card::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      right: -20%;
-      width: 200px;
-      height: 200px;
-      background: radial-gradient(circle, var(--emerald-glow) 0%, transparent 70%);
-      pointer-events: none;
+    .balance-title { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+    .balance-amount { font-size: 2.2rem; font-weight: 800; margin: 8px 0; color: #fff; display: flex; align-items: baseline; gap: 4px; }
+    .balance-amount small { font-size: 1.2rem; color: var(--text-muted); }
+    .card-footer-info { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted); }
+
+    /* Quick Action Grid */
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
     }
 
-    .balance-title {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      font-weight: 600;
-    }
-
-    .balance-amount {
-      font-size: 2.2rem;
-      font-weight: 800;
-      margin: 8px 0;
-      color: #fff;
+    .action-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px 12px;
       display: flex;
-      align-items: baseline;
-      gap: 4px;
-    }
-
-    .balance-amount small {
-      font-size: 1.2rem;
-      color: var(--text-muted);
-    }
-
-    .card-footer-info {
-      display: flex;
-      justify-content: space-between;
+      flex-direction: column;
       align-items: center;
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border-color);
-      font-size: 0.8rem;
-      color: var(--text-muted);
+      gap: 8px;
+      text-decoration: none;
+      color: var(--text-main);
+      transition: all 0.2s ease;
     }
 
-    .secure-tag {
-      display: flex;
-      align-items: center;
-      gap: 4px;
+    .action-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--emerald-primary);
+      transform: translateY(-2px);
+    }
+
+    .action-btn i {
+      font-size: 1.5rem;
       color: var(--emerald-primary);
     }
 
-    /* Main Form Card */
+    .action-btn span {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* Form Card */
     .action-card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
@@ -191,91 +166,8 @@
       gap: 16px;
     }
 
-    .card-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .card-title i {
-      color: var(--emerald-primary);
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .form-label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .input-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-
-    .input-icon {
-      position: absolute;
-      left: 14px;
-      color: var(--text-muted);
-      font-size: 1.1rem;
-    }
-
-    .form-input {
-      width: 100%;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 12px 14px 12px 42px;
-      color: #fff;
-      font-size: 0.95rem;
-      outline: none;
-      transition: all 0.2s ease;
-    }
-
-    .form-input:focus {
-      border-color: var(--emerald-primary);
-      background: rgba(255, 255, 255, 0.07);
-      box-shadow: 0 0 0 3px var(--emerald-glow);
-    }
-
-    .mode-selector {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-
-    .mode-option {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      transition: all 0.2s;
-    }
-
-    .mode-option i {
-      font-size: 1.2rem;
-    }
-
-    .mode-option.active {
-      border-color: var(--emerald-primary);
-      background: rgba(16, 185, 129, 0.12);
-      color: var(--emerald-primary);
-    }
+    .card-title { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .card-title i { color: var(--emerald-primary); }
 
     .btn-pay {
       width: 100%;
@@ -291,473 +183,61 @@
       justify-content: center;
       align-items: center;
       gap: 8px;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 15px var(--emerald-glow);
-    }
-
-    .btn-pay:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px var(--emerald-glow);
-    }
-
-    .btn-pay:active {
-      transform: translateY(0);
-    }
-
-    /* History & Log Section */
-    .history-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg);
-      padding: 20px;
-    }
-
-    .history-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-    }
-
-    .history-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .history-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-    }
-
-    .tx-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--emerald-primary);
-      display: grid;
-      place-items: center;
-      font-size: 1.1rem;
-    }
-
-    .tx-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .tx-title {
-      font-size: 0.9rem;
-      font-weight: 600;
-    }
-
-    .tx-meta {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    .tx-amount {
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: var(--emerald-primary);
-    }
-
-    /* PIN Modal */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(8px);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-
-    .modal-overlay.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .pin-modal {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg);
-      padding: 28px 24px;
-      width: 90%;
-      max-width: 380px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 20px;
-      box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-    }
-
-    .pin-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      text-align: center;
-    }
-
-    .pin-subtitle {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-top: -12px;
-    }
-
-    .pin-dots {
-      display: flex;
-      gap: 14px;
-      margin: 10px 0;
-    }
-
-    .pin-dot {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      border: 2px solid var(--border-color);
-      transition: all 0.2s;
-    }
-
-    .pin-dot.filled {
-      background: var(--emerald-primary);
-      border-color: var(--emerald-primary);
-      box-shadow: 0 0 10px var(--emerald-glow);
-    }
-
-    .keypad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      width: 100%;
-    }
-
-    .key-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 14px;
-      font-size: 1.2rem;
-      font-weight: 700;
-      color: #fff;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-
-    .key-btn:active {
-      background: rgba(16, 185, 129, 0.2);
-    }
-
-    /* Toast Notification */
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      background: var(--bg-card);
-      border: 1px solid var(--border-active);
-      color: #fff;
-      padding: 12px 20px;
-      border-radius: var(--radius-md);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-      transform: translateY(100px);
-      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      z-index: 1100;
-    }
-
-    .toast.show {
-      transform: translateY(0);
-    }
-
-    .toast-icon {
-      color: var(--emerald-primary);
-      font-size: 1.2rem;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
-
   <div class="app-container">
-    <!-- Header -->
     <header>
       <div class="brand">
         <div class="brand-icon"><i class="ri-flashlight-fill"></i></div>
         <span>EmergencyPay</span>
       </div>
-      <div class="status-badge" id="statusBadge">
+      <div class="status-badge">
         <span class="status-dot"></span>
-        <span id="statusText">Offline Ready</span>
+        <span>Offline Active</span>
       </div>
     </header>
 
-    <!-- Balance Banner -->
     <div class="balance-card">
       <div class="balance-title">Offline Wallet Balance</div>
-      <div class="balance-amount">₹ <span id="walletBalance">5,000</span><small>.00</small></div>
+      <div class="balance-amount">₹ 5,000<small>.00</small></div>
       <div class="card-footer-info">
-        <span>Encrypted Peer Protocol</span>
-        <span class="secure-tag"><i class="ri-shield-check-fill"></i> Verified Token</span>
+        <span>Encrypted Peer Mesh</span>
+        <span style="color:var(--emerald-primary)"><i class="ri-shield-check-fill"></i> Verified Token</span>
       </div>
     </div>
 
-    <!-- Payment Action Card -->
+    <!-- Quick Action Navigation Hub -->
+    <div class="action-grid">
+      <a href="/pay" class="action-btn">
+        <i class="ri-send-plane-fill"></i>
+        <span>Send Money</span>
+      </a>
+      <a href="/receive" class="action-btn">
+        <i class="ri-qr-code-line"></i>
+        <span>Receive QR</span>
+      </a>
+      <a href="/history" class="action-btn">
+        <i class="ri-history-line"></i>
+        <span>History</span>
+      </a>
+    </div>
+
     <div class="action-card">
       <div class="card-title">
-        <i class="ri-send-plane-fill"></i>
-        <span>Offline UPI Transfer</span>
+        <i class="ri-flashlight-line"></i>
+        <span>Quick Pay Access</span>
       </div>
-
-      <form id="paymentForm" onsubmit="handleFormSubmit(event)">
-        <div class="form-group">
-          <label class="form-label" for="payee">Recipient VPA / Mobile</label>
-          <div class="input-wrapper">
-            <i class="ri-user-3-line input-icon"></i>
-            <input type="text" id="payee" class="form-input" placeholder="merchant@upi or 9876543210" required />
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="amount">Amount (₹)</label>
-          <div class="input-wrapper">
-            <i class="ri-money-rupee-circle-line input-icon"></i>
-            <input type="number" id="amount" class="form-input" min="1" max="5000" placeholder="0.00" required />
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="note">Note (Optional)</label>
-          <div class="input-wrapper">
-            <i class="ri-chat-1-line input-icon"></i>
-            <input type="text" id="note" class="form-input" placeholder="Store purchase, groceries..." />
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Transfer Channel</label>
-          <div class="mode-selector">
-            <div class="mode-option active" onclick="selectMode(this, 'bluetooth')">
-              <i class="ri-bluetooth-line"></i>
-              <span>Bluetooth</span>
-            </div>
-            <div class="mode-option" onclick="selectMode(this, 'mesh')">
-              <i class="ri-wifi-off-line"></i>
-              <span>Local Mesh</span>
-            </div>
-            <div class="mode-option" onclick="selectMode(this, 'sms')">
-              <i class="ri-message-3-line"></i>
-              <span>SMS Token</span>
-            </div>
-          </div>
-        </div>
-
-        <button type="submit" class="btn-pay">
-          <span>Pay Securely Offline</span>
-          <i class="ri-arrow-right-line"></i>
-        </button>
-      </form>
-    </div>
-
-    <!-- History / Logs Card -->
-    <div class="history-card">
-      <div class="history-header">
-        <div class="card-title">
-          <i class="ri-history-line"></i>
-          <span>Recent Transactions</span>
-        </div>
-      </div>
-      <div class="history-list" id="txHistory">
-        <!-- Dynamic History Items -->
-      </div>
+      <p style="font-size:0.85rem; color: var(--text-muted);">
+        EmergencyPay lets you send and receive UPI payments locally via Bluetooth and mesh protocol even when you have no internet access.
+      </p>
+      <a href="/pay" class="btn-pay">
+        <span>Start Offline Transfer</span>
+        <i class="ri-arrow-right-line"></i>
+      </a>
     </div>
   </div>
-
-  <!-- Interactive PIN Modal -->
-  <div class="modal-overlay" id="pinModal">
-    <div class="pin-modal">
-      <div class="pin-title">Enter UPI PIN</div>
-      <div class="pin-subtitle" id="pinSubtitle">Authorizing Offline Transfer</div>
-      <div class="pin-dots">
-        <div class="pin-dot"></div>
-        <div class="pin-dot"></div>
-        <div class="pin-dot"></div>
-        <div class="pin-dot"></div>
-      </div>
-      <div class="keypad">
-        <button class="key-btn" onclick="enterDigit('1')">1</button>
-        <button class="key-btn" onclick="enterDigit('2')">2</button>
-        <button class="key-btn" onclick="enterDigit('3')">3</button>
-        <button class="key-btn" onclick="enterDigit('4')">4</button>
-        <button class="key-btn" onclick="enterDigit('5')">5</button>
-        <button class="key-btn" onclick="enterDigit('6')">6</button>
-        <button class="key-btn" onclick="enterDigit('7')">7</button>
-        <button class="key-btn" onclick="enterDigit('8')">8</button>
-        <button class="key-btn" onclick="enterDigit('9')">9</button>
-        <button class="key-btn" onclick="clearPin()"><i class="ri-close-line"></i></button>
-        <button class="key-btn" onclick="enterDigit('0')">0</button>
-        <button class="key-btn" onclick="closePinModal()"><i class="ri-arrow-left-line"></i></button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast Notification -->
-  <div class="toast" id="toast">
-    <i class="ri-checkbox-circle-fill toast-icon"></i>
-    <span id="toastMsg">Payment Successful!</span>
-  </div>
-
-  <script>
-    let currentBalance = 5000;
-    let selectedChannel = 'bluetooth';
-    let pinInput = '';
-    let pendingPayment = null;
-
-    const defaultTransactions = [
-      { payee: 'grocery@upi', amount: 350, note: 'Daily Market', date: 'Just now', channel: 'Bluetooth' },
-      { payee: 'pharmacy@okicici', amount: 120, note: 'Medicines', date: '2 hours ago', channel: 'Local Mesh' }
-    ];
-
-    let transactions = JSON.parse(localStorage.getItem('ep_tx_history')) || defaultTransactions;
-
-    function renderHistory() {
-      const container = document.getElementById('txHistory');
-      container.innerHTML = transactions.map(tx => `
-        <div class="history-item">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="tx-icon"><i class="ri-arrow-up-line"></i></div>
-            <div class="tx-info">
-              <span class="tx-title">${tx.payee}</span>
-              <span class="tx-meta">${tx.date} • ${tx.channel}</span>
-            </div>
-          </div>
-          <div class="tx-amount">- ₹${tx.amount}</div>
-        </div>
-      `).join('');
-    }
-
-    function selectMode(element, mode) {
-      document.querySelectorAll('.mode-option').forEach(el => el.classList.remove('active'));
-      element.classList.add('active');
-      selectedChannel = mode;
-    }
-
-    function handleFormSubmit(e) {
-      e.preventDefault();
-      const payee = document.getElementById('payee').value;
-      const amount = parseFloat(document.getElementById('amount').value);
-      const note = document.getElementById('note').value || 'Offline Transfer';
-
-      if (amount > currentBalance) {
-        showToast('Insufficient wallet balance', true);
-        return;
-      }
-
-      pendingPayment = { payee, amount, note, channel: selectedChannel };
-      openPinModal();
-    }
-
-    function openPinModal() {
-      pinInput = '';
-      updatePinDots();
-      document.getElementById('pinModal').classList.add('active');
-    }
-
-    function closePinModal() {
-      document.getElementById('pinModal').classList.remove('active');
-      pendingPayment = null;
-    }
-
-    function enterDigit(digit) {
-      if (pinInput.length < 4) {
-        pinInput += digit;
-        updatePinDots();
-        if (pinInput.length === 4) {
-          setTimeout(processPayment, 200);
-        }
-      }
-    }
-
-    function clearPin() {
-      pinInput = '';
-      updatePinDots();
-    }
-
-    function updatePinDots() {
-      const dots = document.querySelectorAll('.pin-dot');
-      dots.forEach((dot, index) => {
-        if (index < pinInput.length) {
-          dot.classList.add('filled');
-        } else {
-          dot.classList.remove('filled');
-        }
-      });
-    }
-
-    async function processPayment() {
-      if (!pendingPayment) return;
-
-      const formData = new FormData();
-      formData.append('payee', pendingPayment.payee);
-      formData.append('amount', pendingPayment.amount);
-      formData.append('note', pendingPayment.note);
-      formData.append('channel', pendingPayment.channel);
-
-      try {
-        const response = await fetch('/insert', {
-          method: 'POST',
-          body: formData
-        });
-
-        // Deduct local balance
-        currentBalance -= pendingPayment.amount;
-        document.getElementById('walletBalance').textContent = currentBalance.toLocaleString();
-
-        // Add to history
-        transactions.unshift({
-          payee: pendingPayment.payee,
-          amount: pendingPayment.amount,
-          note: pendingPayment.note,
-          date: 'Just now',
-          channel: pendingPayment.channel
-        });
-        localStorage.setItem('ep_tx_history', JSON.stringify(transactions));
-        renderHistory();
-
-        closePinModal();
-        showToast(`Paid ₹${pendingPayment.amount} to ${pendingPayment.payee} offline!`);
-        document.getElementById('paymentForm').reset();
-      } catch (err) {
-        console.error('Submission error:', err);
-        closePinModal();
-        showToast('Offline payload generated locally!');
-      }
-    }
-
-    function showToast(message, isError = false) {
-      const toast = document.getElementById('toast');
-      const toastMsg = document.getElementById('toastMsg');
-      toastMsg.textContent = message;
-      toast.style.borderColor = isError ? 'var(--danger)' : 'var(--border-active)';
-      toast.classList.add('show');
-      setTimeout(() => {
-        toast.classList.remove('show');
-      }, 3000);
-    }
-
-    // Initialize
-    renderHistory();
-  </script>
 </body>
 </html>
