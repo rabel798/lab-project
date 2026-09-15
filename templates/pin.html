@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>EmergencyPay - Enter UPI PIN</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: #131b2e;
+      --emerald-primary: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --font-family: 'Exo 2', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); }
+    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
+    
+    .pin-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 32px 24px; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; gap: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+    .pin-header { text-align: center; }
+    .pin-title { font-size: 1.2rem; font-weight: 700; }
+    .pin-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+    .payment-summary { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 20px; text-align: center; width: 100%; font-weight: 700; font-size: 1.1rem; color: var(--emerald-primary); }
+
+    .pin-dots { display: flex; gap: 14px; margin: 10px 0; }
+    .pin-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border-color); transition: all 0.2s; }
+    .pin-dot.filled { background: var(--emerald-primary); border-color: var(--emerald-primary); box-shadow: 0 0 10px var(--emerald-glow); }
+
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
+    .key-btn { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; font-size: 1.3rem; font-weight: 700; color: #fff; cursor: pointer; transition: background 0.15s; }
+    .key-btn:active { background: rgba(16, 185, 129, 0.2); }
+  </style>
+</head>
+<body>
+  <div class="pin-card">
+    <div class="pin-header">
+      <div class="pin-title">Enter 4-Digit UPI PIN</div>
+      <div class="pin-subtitle">Authenticating Encrypted Transfer</div>
+    </div>
+
+    <div class="payment-summary" id="paymentSummary">
+      Paying ₹0.00
+    </div>
+
+    <div class="pin-dots">
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+    </div>
+
+    <div class="keypad">
+      <button class="key-btn" onclick="enterDigit('1')">1</button>
+      <button class="key-btn" onclick="enterDigit('2')">2</button>
+      <button class="key-btn" onclick="enterDigit('3')">3</button>
+      <button class="key-btn" onclick="enterDigit('4')">4</button>
+      <button class="key-btn" onclick="enterDigit('5')">5</button>
+      <button class="key-btn" onclick="enterDigit('6')">6</button>
+      <button class="key-btn" onclick="enterDigit('7')">7</button>
+      <button class="key-btn" onclick="enterDigit('8')">8</button>
+      <button class="key-btn" onclick="enterDigit('9')">9</button>
+      <button class="key-btn" onclick="clearPin()"><i class="ri-close-line"></i></button>
+      <button class="key-btn" onclick="enterDigit('0')">0</button>
+      <button class="key-btn" onclick="window.location.href='/pay'"><i class="ri-arrow-left-line"></i></button>
+    </div>
+  </div>
+
+  <script>
+    let pinInput = '';
+    const pendingPayment = JSON.parse(sessionStorage.getItem('ep_pending_payment') || 'null');
+
+    if (!pendingPayment) {
+      window.location.href = '/pay';
+    } else {
+      document.getElementById('paymentSummary').textContent = `Paying ₹${pendingPayment.amount} to ${pendingPayment.payee}`;
+    }
+
+    function enterDigit(digit) {
+      if (pinInput.length < 4) {
+        pinInput += digit;
+        updateDots();
+        if (pinInput.length === 4) {
+          setTimeout(submitPayment, 250);
+        }
+      }
+    }
+
+    function clearPin() {
+      pinInput = '';
+      updateDots();
+    }
+
+    function updateDots() {
+      const dots = document.querySelectorAll('.pin-dot');
+      dots.forEach((dot, index) => {
+        if (index < pinInput.length) {
+          dot.classList.add('filled');
+        } else {
+          dot.classList.remove('filled');
+        }
+      });
+    }
+
+    async function submitPayment() {
+      const formData = new FormData();
+      formData.append('payee', pendingPayment.payee);
+      formData.append('amount', pendingPayment.amount);
+      formData.append('note', pendingPayment.note);
+      formData.append('channel', pendingPayment.channel);
+
+      try {
+        const response = await fetch('/insert', { method: 'POST', body: formData });
+        const result = await response.json();
+
+        // Store transaction receipt payload
+        const receipt = {
+          txId: 'EMP' + Math.floor(100000 + Math.random() * 900000),
+          payee: pendingPayment.payee,
+          amount: pendingPayment.amount,
+          note: pendingPayment.note,
+          channel: pendingPayment.channel,
+          timestamp: new Date().toLocaleString(),
+          token: 'EP-MESH-' + Math.random().toString(36).substring(2, 10).toUpperCase()
+        };
+
+        sessionStorage.setItem('ep_last_receipt', JSON.stringify(receipt));
+        
+        // Save to persistent local transaction history
+        let history = JSON.parse(localStorage.getItem('ep_tx_history') || '[]');
+        history.unshift(receipt);
+        localStorage.setItem('ep_tx_history', JSON.stringify(history));
+
+        window.location.href = '/receipt';
+      } catch (err) {
+        console.error('Error processing payment:', err);
+        window.location.href = '/receipt';
+      }
+    }
+  </script>
+</body>
+</html>
