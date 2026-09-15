@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>EmergencyPay - Offline UPI Payments</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: #131b2e;
+      --bg-card-hover: #1a243d;
+      --emerald-primary: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --teal-accent: #06b6d4;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(16, 185, 129, 0.4);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --font-family: 'Exo 2', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      overflow-x: hidden;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding-bottom: 40px;
+    }
+
+    /* Top Bar */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: #fff;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--emerald-primary), var(--teal-accent));
+      border-radius: var(--radius-sm);
+      display: grid;
+      place-items: center;
+      color: #000;
+      font-size: 1.2rem;
+      box-shadow: 0 0 12px var(--emerald-glow);
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid var(--border-active);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--emerald-primary);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--emerald-primary);
+      box-shadow: 0 0 8px var(--emerald-primary);
+    }
+
+    /* Balance Banner */
+    .balance-card {
+      background: linear-gradient(135deg, #131b2e 0%, #1e2942 100%);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .balance-title { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+    .balance-amount { font-size: 2.2rem; font-weight: 800; margin: 8px 0; color: #fff; display: flex; align-items: baseline; gap: 4px; }
+    .balance-amount small { font-size: 1.2rem; color: var(--text-muted); }
+    .card-footer-info { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted); }
+
+    /* Quick Action Grid */
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .action-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--text-main);
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--emerald-primary);
+      transform: translateY(-2px);
+    }
+
+    .action-btn i {
+      font-size: 1.5rem;
+      color: var(--emerald-primary);
+    }
+
+    .action-btn span {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* Form Card */
+    .action-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .card-title i { color: var(--emerald-primary); }
+
+    .btn-pay {
+      width: 100%;
+      background: linear-gradient(135deg, var(--emerald-primary), var(--teal-accent));
+      color: #000;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <div class="brand">
+        <div class="brand-icon"><i class="ri-flashlight-fill"></i></div>
+        <span>EmergencyPay</span>
+      </div>
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span>Offline Active</span>
+      </div>
+    </header>
+
+    <div class="balance-card">
+      <div class="balance-title">Offline Wallet Balance</div>
+      <div class="balance-amount">₹ 5,000<small>.00</small></div>
+      <div class="card-footer-info">
+        <span>Encrypted Peer Mesh</span>
+        <span style="color:var(--emerald-primary)"><i class="ri-shield-check-fill"></i> Verified Token</span>
+      </div>
+    </div>
+
+    <!-- Quick Action Navigation Hub -->
+    <div class="action-grid">
+      <a href="/pay" class="action-btn">
+        <i class="ri-send-plane-fill"></i>
+        <span>Send Money</span>
+      </a>
+      <a href="/receive" class="action-btn">
+        <i class="ri-qr-code-line"></i>
+        <span>Receive QR</span>
+      </a>
+      <a href="/history" class="action-btn">
+        <i class="ri-history-line"></i>
+        <span>History</span>
+      </a>
+    </div>
+
+    <div class="action-card">
+      <div class="card-title">
+        <i class="ri-flashlight-line"></i>
+        <span>Quick Pay Access</span>
+      </div>
+      <p style="font-size:0.85rem; color: var(--text-muted);">
+        EmergencyPay lets you send and receive UPI payments locally via Bluetooth and mesh protocol even when you have no internet access.
+      </p>
+      <a href="/pay" class="btn-pay">
+        <span>Start Offline Transfer</span>
+        <i class="ri-arrow-right-line"></i>
+      </a>
+    </div>
+  </div>
+</body>
+</html>
