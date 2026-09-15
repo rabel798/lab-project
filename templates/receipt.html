@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>EmergencyPay - Payment Receipt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: #131b2e;
+      --emerald-primary: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --teal-accent: #06b6d4;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --font-family: 'Exo 2', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); }
+    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
+    
+    .container { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 20px; }
+    
+    .receipt-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); text-align: center; }
+
+    .status-badge { width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 2px solid var(--emerald-primary); color: var(--emerald-primary); display: grid; place-items: center; font-size: 2rem; box-shadow: 0 0 20px var(--emerald-glow); }
+
+    .receipt-title { font-size: 1.4rem; font-weight: 800; color: #fff; }
+    .amount-display { font-size: 2.2rem; font-weight: 800; color: var(--emerald-primary); margin: 6px 0; }
+
+    .details-table { width: 100%; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 16px 0; display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem; }
+    .detail-row { display: flex; justify-content: space-between; color: var(--text-muted); }
+    .detail-value { color: var(--text-main); font-weight: 600; }
+
+    .token-box { width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 12px; font-family: monospace; font-size: 0.85rem; color: var(--teal-accent); word-break: break-all; }
+
+    .btn-home { width: 100%; background: linear-gradient(135deg, var(--emerald-primary), var(--teal-accent)); color: #000; border: none; border-radius: var(--radius-md); padding: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; text-decoration: none; display: flex; justify-content: center; align-items: center; gap: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="receipt-card">
+      <div class="status-badge"><i class="ri-checkbox-circle-fill"></i></div>
+      
+      <div>
+        <div class="receipt-title">Payment Successful!</div>
+        <div style="font-size:0.85rem; color: var(--text-muted);">Encrypted Offline Transfer Verified</div>
+      </div>
+
+      <div class="amount-display">₹<span id="rcAmount">0.00</span></div>
+
+      <div class="details-table">
+        <div class="detail-row"><span>Recipient</span><span class="detail-value" id="rcPayee">-</span></div>
+        <div class="detail-row"><span>Ref TX ID</span><span class="detail-value" id="rcTxId">-</span></div>
+        <div class="detail-row"><span>Channel</span><span class="detail-value" id="rcChannel">-</span></div>
+        <div class="detail-row"><span>Note</span><span class="detail-value" id="rcNote">-</span></div>
+        <div class="detail-row"><span>Date & Time</span><span class="detail-value" id="rcTime">-</span></div>
+      </div>
+
+      <div style="width: 100%; text-align: left;">
+        <span style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">Offline Verification Payload</span>
+      </div>
+      <div class="token-box" id="rcToken">EP-MESH-000000</div>
+
+      <a href="/emergencypay" class="btn-home">
+        <span>Back to Dashboard</span>
+        <i class="ri-home-5-line"></i>
+      </a>
+    </div>
+  </div>
+
+  <script>
+    const receipt = JSON.parse(sessionStorage.getItem('ep_last_receipt') || 'null');
+
+    if (receipt) {
+      document.getElementById('rcAmount').textContent = receipt.amount;
+      document.getElementById('rcPayee').textContent = receipt.payee;
+      document.getElementById('rcTxId').textContent = receipt.txId;
+      document.getElementById('rcChannel').textContent = receipt.channel;
+      document.getElementById('rcNote').textContent = receipt.note || 'None';
+      document.getElementById('rcTime').textContent = receipt.timestamp;
+      document.getElementById('rcToken').textContent = receipt.token;
+    }
+  </script>
+</body>
+</html>
