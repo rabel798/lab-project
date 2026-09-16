@@ -5,6 +5,8 @@ app = Flask(__name__, static_folder="templates/assets", static_url_path="/assets
 
 
 @app.route("/")
+def emerg_pay():
+    return render_template("main.html")
 @app.route("/emergencypay")
 def emergency_pay():
     return render_template("emergencypay.html")
