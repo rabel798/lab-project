@@ -104,14 +104,12 @@ def init_db():
                 VALUES (?, ?, ?, ?)
             """, (d_name, d_phone, d_bal, d_emg))
 
-    # Ensure any groceries or pharmacy merchants are removed
-    cursor.execute("DELETE FROM merchants WHERE category LIKE '%groc%' OR category LIKE '%pharm%' OR name LIKE '%pizza%' OR name LIKE '%pharmacy%'")
-
     # Seed default merchants if empty
     cursor.execute("SELECT COUNT(*) as cnt FROM merchants")
     if cursor.fetchone()["cnt"] == 0:
         default_merchants = [
             ("S.H.I.E.L.D Daycare", "9876543211", "Healthcare", 1, 1.2, "Sector 17, Main Market"),
+            ("Spidey Pizza Service", "9876543212", "Groceries", 1, 0.8, "Queens Main Street"),
             ("Widow Spa", "9876543213", "Healthcare", 1, 1.5, "Red Room Avenue"),
             ("Panther Jewellers", "9876543214", "Retail", 0, 2.4, "Wakanda Plaza"),
             ("Electrician(God of Hammers) Services", "9876543215", "Emergency Services", 1, 1.8, "Asgardian Junction")
@@ -120,6 +118,14 @@ def init_db():
             INSERT INTO merchants (name, phone, category, is_essential, distance, address)
             VALUES (?, ?, ?, ?, ?, ?)
         """, default_merchants)
+
+    # Ensure Spidey Pizza Service is present
+    cursor.execute("SELECT id FROM merchants WHERE name = 'Spidey Pizza Service'")
+    if not cursor.fetchone():
+        cursor.execute("""
+            INSERT INTO merchants (name, phone, category, is_essential, distance, address)
+            VALUES ('Spidey Pizza Service', '9876543212', 'Groceries', 1, 0.8, 'Queens Main Street')
+        """)
 
     conn.commit()
     conn.close()
