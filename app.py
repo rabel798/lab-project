@@ -65,29 +65,44 @@ def init_db():
         )
     """)
 
-    # Seed default user if empty
-    cursor.execute("SELECT COUNT(*) as cnt FROM users")
-    if cursor.fetchone()["cnt"] == 0:
+    # Ensure primary user Rahul exists at id 1
+    cursor.execute("SELECT * FROM users WHERE id = 1")
+    user1 = cursor.fetchone()
+    if user1:
+        if user1["name"] != "Rahul" or user1["phone"] != "9876543210":
+            cursor.execute("""
+                UPDATE users SET name = 'Rahul', phone = '9876543210', balance = 69420.0, emergency_balance = 6767.0
+                WHERE id = 1
+            """)
+    else:
         cursor.execute("""
-            INSERT INTO users (name, phone, balance, emergency_balance)
-            VALUES (?, ?, ?, ?)
-        """, ("Rahul", "9876543210", 69420.0, 6767.0))
-        cursor.execute("""
-            INSERT INTO users (name, phone, balance, emergency_balance)
-            VALUES (?, ?, ?, ?)
-        """, ("Mr. Sukhpal", "9811122233", 12500.0, 2500.0))
-        cursor.execute("""
-            INSERT INTO users (name, phone, balance, emergency_balance)
-            VALUES (?, ?, ?, ?)
-        """, ("Pavitra Prabhakar", "8765432109", 1800.0, 400.0))
-        cursor.execute("""
-            INSERT INTO users (name, phone, balance, emergency_balance)
-            VALUES (?, ?, ?, ?)
-        """, ("Dr. Doom", "7654321098", 5000.0, 1000.0))
-        cursor.execute("""
-            INSERT INTO users (name, phone, balance, emergency_balance)
-            VALUES (?, ?, ?, ?)
-        """, ("Sunsan Storm", "6543210987", 3200.0, 600.0))
+            INSERT INTO users (id, name, phone, balance, emergency_balance)
+            VALUES (1, 'Rahul', '9876543210', 69420.0, 6767.0)
+        """)
+
+    # Ensure Mr. Sukhpal exists as a separate user (id != 1)
+    cursor.execute("SELECT * FROM users WHERE name = 'Mr. Sukhpal' AND id != 1")
+    if not cursor.fetchone():
+        cursor.execute("SELECT * FROM users WHERE phone = '9811122233'")
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT INTO users (name, phone, balance, emergency_balance)
+                VALUES ('Mr. Sukhpal', '9811122233', 12500.0, 2500.0)
+            """)
+
+    # Ensure demo peers exist
+    demo_users = [
+        ("Pavitra Prabhakar", "8765432109", 1800.0, 400.0),
+        ("Dr. Doom", "7654321098", 5000.0, 1000.0),
+        ("Sunsan Storm", "6543210987", 3200.0, 600.0)
+    ]
+    for d_name, d_phone, d_bal, d_emg in demo_users:
+        cursor.execute("SELECT * FROM users WHERE phone = ?", (d_phone,))
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT INTO users (name, phone, balance, emergency_balance)
+                VALUES (?, ?, ?, ?)
+            """, (d_name, d_phone, d_bal, d_emg))
 
     # Seed default merchants if empty
     cursor.execute("SELECT COUNT(*) as cnt FROM merchants")
@@ -318,6 +333,15 @@ def api_bluetooth_scan():
     users = conn.execute("SELECT id, name, phone FROM users WHERE id != 1").fetchall()
     conn.close()
 
+    user_list = [dict(u) for u in users]
+    # Guarantee Mr. Sukhpal is present in nearby devices list
+    if not any("sukhpal" in (u.get("name") or "").lower() for u in user_list):
+        user_list.insert(0, {
+            "id": 5,
+            "name": "Mr. Sukhpal",
+            "phone": "9811122233"
+        })
+
     discovered_merchants = [
         {
             "id": m["id"],
@@ -335,11 +359,11 @@ def api_bluetooth_scan():
             "id": u["id"],
             "name": u["name"],
             "phone": u["phone"],
-            "distance": round(random.uniform(1.2, 8.0), 1),
+            "distance": round(random.uniform(1.2, 6.0), 1),
             "isInRange": True,
             "type": "user"
         }
-        for u in users
+        for u in user_list
     ]
 
     return jsonify({
@@ -356,25 +380,32 @@ def api_transactions():
         payee = data.get("payee") or "Unknown"
         amount = float(data.get("amount", 0))
         note = data.get("note", "")
-        channel = data.get("channel", "Bluetooth")
-        status = data.get("status", "completed")
-        is_offline = 1 if data.get("is_offline") in [True, "true", 1, "1"] else 0
-        tx_id = data.get("tx_id") or f"EMP{random.randint(100000, 999999)}"
-        token = data.get("token") or f"EP-MESH-{os.urandom(4).hex().upper()}"
-        method = "BLUETOOTH" if "bluetooth" in channel.lower() else ("OFFLINE" if is_offline else "UPI")
+        raw_offline = data.get("is_offline")
+        is_offline = 1 if raw_offline in [True, "true", 1, "1"] else 0
 
-        # Deduct balance from user 1
         user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
-        if user:
-            if is_offline and status == "completed":
-                conn.execute("UPDATE users SET emergency_balance = MAX(0, emergency_balance - ?) WHERE id = 1", (amount,))
-            elif not is_offline and status == "completed":
-                conn.execute("UPDATE users SET balance = MAX(0, balance - ?) WHERE id = 1", (amount,))
+        current_balance = user["balance"] if user else 69420.0
+        current_emergency = user["emergency_balance"] if user else 6767.0
+
+        if not is_offline:
+            status = "completed"
+            channel = "UPI"
+            method = "UPI"
+            tx_id = data.get("tx_id") or f"UPI{random.randint(100000, 999999)}"
+            new_balance = max(0.0, current_balance - amount)
+            conn.execute("UPDATE users SET balance = ? WHERE id = 1", (new_balance,))
+        else:
+            status = "pending"
+            channel = "Bluetooth"
+            method = "BLUETOOTH"
+            tx_id = data.get("tx_id") or f"BT{random.randint(100000, 999999)}"
+            new_emergency = max(0.0, current_emergency - amount)
+            conn.execute("UPDATE users SET emergency_balance = ? WHERE id = 1", (new_emergency,))
 
         conn.execute("""
-            INSERT INTO transactions (tx_id, sender_id, payee, amount, status, channel, note, token, is_offline, method)
-            VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (tx_id, payee, amount, status, channel, note, token, is_offline, method))
+            INSERT INTO transactions (tx_id, sender_id, payee, amount, status, channel, note, is_offline, method)
+            VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)
+        """, (tx_id, payee, amount, status, channel, note, is_offline, method))
         conn.commit()
 
         tx = conn.execute("SELECT * FROM transactions WHERE tx_id = ?", (tx_id,)).fetchone()
@@ -393,34 +424,56 @@ def insert():
         payee = data.get("payee", "Unknown")
         amount = float(data.get("amount", 0))
         note = data.get("note", "")
-        channel = data.get("channel", "Bluetooth")
-        status = data.get("status", "pending")
-        is_offline = 1
-        tx_id = data.get("tx_id") or f"EMP{random.randint(100000, 999999)}"
-        token = data.get("token") or f"EP-MESH-{os.urandom(4).hex().upper()}"
-        method = "BLUETOOTH" if "bluetooth" in channel.lower() else "OFFLINE"
+        raw_offline = data.get("is_offline")
+        is_offline = 1 if raw_offline in [True, "true", 1, "1"] else 0
 
         conn = get_db()
+        user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
+        current_balance = user["balance"] if user else 69420.0
+        current_emergency = user["emergency_balance"] if user else 6767.0
+
+        if not is_offline:
+            # Online: Normal UPI payment, reduce from Available Balance
+            channel = "UPI"
+            method = "UPI"
+            status = "completed"
+            tx_id = data.get("tx_id") or f"UPI{random.randint(100000, 999999)}"
+            new_balance = max(0.0, current_balance - amount)
+            new_emergency = current_emergency
+            conn.execute("UPDATE users SET balance = ? WHERE id = 1", (new_balance,))
+        else:
+            # Offline/Emergency: Bluetooth payment, reduce from Emergency Balance
+            channel = "Bluetooth"
+            method = "BLUETOOTH"
+            status = "pending"
+            tx_id = data.get("tx_id") or f"BT{random.randint(100000, 999999)}"
+            new_balance = current_balance
+            new_emergency = max(0.0, current_emergency - amount)
+            conn.execute("UPDATE users SET emergency_balance = ? WHERE id = 1", (new_emergency,))
+
         conn.execute("""
-            INSERT INTO transactions (tx_id, sender_id, payee, amount, status, channel, note, token, is_offline, method)
-            VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (tx_id, payee, amount, status, channel, note, token, is_offline, method))
+            INSERT INTO transactions (tx_id, sender_id, payee, amount, status, channel, note, is_offline, method)
+            VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)
+        """, (tx_id, payee, amount, status, channel, note, is_offline, method))
         conn.commit()
+
+        updated_user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
         conn.close()
 
         return jsonify({
             "status": "success",
-            "message": "Payment recorded offline successfully",
+            "message": "Payment recorded successfully",
             "data": {
                 "tx_id": tx_id,
                 "payee": payee,
                 "amount": amount,
                 "note": note,
                 "channel": channel,
-                "token": token,
                 "status": status,
-                "is_offline": True,
-                "method": method
+                "is_offline": bool(is_offline),
+                "method": method,
+                "balance": updated_user["balance"] if updated_user else new_balance,
+                "emergency_balance": updated_user["emergency_balance"] if updated_user else new_emergency
             }
         })
     return render_template("emergencypay.html")
@@ -429,19 +482,44 @@ def insert():
 @app.route("/api/transactions/sync", methods=["POST"])
 def api_transactions_sync():
     """Reconciliation endpoint: Reconciles all pending offline mesh transactions when back online"""
+    data = request.get_json(silent=True) or {}
+    local_txs = data.get("transactions", [])
     conn = get_db()
-    # Mark pending transactions as completed
-    pending_count = conn.execute("SELECT COUNT(*) as cnt FROM transactions WHERE status = 'pending'").fetchone()["cnt"]
+
+    # Reconcile any client-side offline transactions not yet in DB
+    for t in local_txs:
+        t_id = t.get("tx_id") or t.get("id") or t.get("txId")
+        if t_id:
+            exists = conn.execute("SELECT id FROM transactions WHERE tx_id = ?", (str(t_id),)).fetchone()
+            if not exists:
+                payee = t.get("payee", "Unknown")
+                amount = float(t.get("amount", 0))
+                note = t.get("note", "")
+                conn.execute("""
+                    INSERT INTO transactions (tx_id, sender_id, payee, amount, status, channel, note, is_offline, method)
+                    VALUES (?, 1, ?, ?, 'completed', 'Bluetooth', ?, 1, 'BLUETOOTH')
+                """, (str(t_id), payee, amount, note))
+
+    # Mark all pending transactions as completed, and adjust online balance
+    pending = conn.execute("SELECT * FROM transactions WHERE status = 'pending'").fetchall()
+    pending_count = len(pending)
+    total_spent_offline = sum(float(p["amount"]) for p in pending)
+    if total_spent_offline > 0:
+        conn.execute("UPDATE users SET balance = MAX(0, balance - ?) WHERE id = 1", (total_spent_offline,))
+
     conn.execute("UPDATE transactions SET status = 'completed' WHERE status = 'pending'")
     conn.commit()
 
     all_txs = conn.execute("SELECT * FROM transactions ORDER BY created_at DESC").fetchall()
+    user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
     conn.close()
 
     return jsonify({
         "status": "success",
-        "message": f"Successfully reconciled {pending_count} pending offline transaction(s).",
+        "message": f"Successfully synchronized {pending_count} pending transaction(s).",
         "reconciled_count": pending_count,
+        "balance": user["balance"] if user else 69420.0,
+        "emergency_balance": user["emergency_balance"] if user else 6767.0,
         "transactions": [dict(t) for t in all_txs]
     })
 

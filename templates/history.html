@@ -297,8 +297,8 @@
     <div class="status-bar">
       <div class="status-left">
         <button type="button" class="status-pill" id="networkToggle" aria-expanded="false">
-          <span class="status-dot offline" id="statusDot"></span>
-          <span class="status-text offline" id="statusText">Offline</span>
+          <span class="status-dot online" id="statusDot"></span>
+          <span class="status-text online" id="statusText">Online</span>
         </button>
         <div class="network-menu" id="networkMenu">
           <button type="button" class="btn-online" data-status="online"><i class="ri-wifi-line"></i> Online</button>
@@ -312,7 +312,7 @@
     <div class="main-scroll">
       <div class="page-header">
         <h1>Transaction History</h1>
-        <button type="button" class="sync-btn disabled" id="syncBtn">Sync Now</button>
+        <button type="button" class="sync-btn active" id="syncBtn">Sync Now</button>
       </div>
 
       <div class="section" id="pendingSection" hidden>
@@ -352,12 +352,13 @@
 
   <script>
     const STORAGE_KEY = 'ep_tx_history';
-    const CONNECTION_KEY = 'ep_connection_status';
+    const CONNECTION_KEY = 'ep_network_status';
 
     const defaultHistory = [
       {
         id: 'demo-1',
-        payee: 'grocery@upi',
+        txId: 'EMP984121',
+        payee: 'Widow Spa',
         amount: 350,
         timestamp: new Date(Date.now() - 3600000).toISOString(),
         status: 'completed',
@@ -368,25 +369,33 @@
       },
       {
         id: 'demo-2',
-        payee: 'pharmacy@okicici',
+        txId: 'EMP552190',
+        payee: 'Spidey Pizza Service',
         amount: 120,
         timestamp: new Date(Date.now() - 86400000).toISOString(),
-        status: 'pending',
+        status: 'completed',
         is_offline: true,
-        method: 'OFFLINE',
-        channel: 'Local Mesh',
+        method: 'BLUETOOTH',
+        channel: 'Bluetooth',
         token: 'EP-MESH-44F2'
       }
     ];
 
     function getConnectionStatus() {
-      return localStorage.getItem(CONNECTION_KEY) || 'offline';
+      return localStorage.getItem(CONNECTION_KEY) || 'online';
     }
 
-    function setConnectionStatus(status) {
+    async function setConnectionStatus(status) {
       localStorage.setItem(CONNECTION_KEY, status);
       updateConnectionUI();
       updateSyncButton();
+      try {
+        await fetch('/api/system/network-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+      } catch (e) {}
     }
 
     function updateConnectionUI() {
@@ -396,7 +405,7 @@
       dot.className = 'status-dot ' + status;
       text.className = 'status-text ' + status;
       const labels = { online: 'Online', offline: 'Offline', emergency: 'Emergency Mode' };
-      text.textContent = labels[status] || 'Unknown';
+      text.textContent = labels[status] || 'Online';
     }
 
     function updateSyncButton() {
@@ -404,12 +413,12 @@
       const online = getConnectionStatus() === 'online';
       btn.classList.toggle('active', online);
       btn.classList.toggle('disabled', !online);
-      btn.disabled = !online;
+      btn.disabled = false;
     }
 
     function normalizeTx(raw, index) {
       const amount = Number(raw.amount) || 0;
-      let timestamp = raw.timestamp;
+      let timestamp = raw.created_at || raw.timestamp;
       if (timestamp && isNaN(Date.parse(timestamp))) {
         timestamp = new Date().toISOString();
       } else if (!timestamp) {
@@ -417,8 +426,9 @@
       }
       const channel = raw.channel || 'Bluetooth';
       const isBluetooth = /bluetooth/i.test(channel);
+      const txId = raw.tx_id || raw.txId || raw.id || 'tx-' + index;
       return {
-        id: raw.txId || raw.id || 'tx-' + index,
+        id: String(txId),
         payee: raw.payee || 'Unknown',
         amount,
         timestamp,
@@ -428,7 +438,7 @@
         channel,
         token: raw.token || '',
         note: raw.note || '',
-        txId: raw.txId || raw.id
+        txId: String(txId)
       };
     }
 
@@ -466,10 +476,8 @@
 
     function renderTransactionItem(tx, index) {
       const offlineMeta = tx.is_offline
-        ? (tx.method === 'BLUETOOTH'
-          ? '<span class="offline-tag"><i class="ri-bluetooth-line"></i> BT</span>'
-          : '<span class="offline-tag amber"><i class="ri-wifi-off-line"></i> Offline</span>')
-        : '';
+        ? '<span class="offline-tag"><i class="ri-bluetooth-line"></i> Bluetooth</span>'
+        : '<span class="offline-tag" style="background:#dcfce7;color:#15803d;"><i class="ri-bank-card-line"></i> UPI</span>';
       return `
         <article class="transaction-item" data-id="${tx.id}" tabindex="0">
           <div class="tx-icon-wrap payment">
@@ -537,25 +545,125 @@
         <div class="detail-row"><span>Date</span><span>${formatDate(tx.timestamp)}</span></div>
         <div class="detail-row"><span>Time</span><span>${formatTime(tx.timestamp)}</span></div>
         <div class="detail-row"><span>Status</span><span class="badge ${tx.status}">${tx.status}</span></div>
-        <div class="detail-row"><span>Method</span><span>${tx.is_offline ? (tx.method === 'BLUETOOTH' ? 'Bluetooth Payment' : 'Offline') : 'UPI Payment'}</span></div>
+        <div class="detail-row"><span>Method</span><span>${tx.is_offline ? 'Bluetooth Payment (Offline)' : 'UPI Payment (Online)'}</span></div>
         ${tx.txId ? `<div class="detail-row"><span>Reference</span><span>${escapeHtml(String(tx.txId))}</span></div>` : ''}
-        ${tx.token ? `<div class="detail-row"><span>Token</span><span>${escapeHtml(tx.token)}</span></div>` : ''}
         ${tx.note ? `<div class="detail-row"><span>Note</span><span>${escapeHtml(tx.note)}</span></div>` : ''}
       `;
       document.getElementById('detailModal').classList.add('open');
     }
 
     async function reconcileTransactions() {
-      if (getConnectionStatus() !== 'online') return;
+      const btn = document.getElementById('syncBtn');
+      const oldText = btn.textContent;
+      btn.textContent = 'Syncing...';
+      btn.disabled = true;
+
       try {
-        await fetch('/api/transactions/sync', { method: 'POST' });
+        if (getConnectionStatus() !== 'online') {
+          await setConnectionStatus('online');
+        }
+
+        const localTxs = loadTransactions();
+        const res = await fetch('/api/transactions/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: localTxs })
+        });
+
+        let serverTxs = [];
+        let message = 'All offline transactions synchronized!';
+        if (res.ok) {
+          const data = await res.json();
+          serverTxs = data.transactions || [];
+          if (data.message) message = data.message;
+        }
+
+        const map = new Map();
+        localTxs.forEach(t => {
+          map.set(String(t.tx_id || t.txId || t.id), { ...t, status: 'completed' });
+        });
+
+        serverTxs.forEach(t => {
+          const k = String(t.tx_id || t.id);
+          map.set(k, {
+            id: k,
+            txId: t.tx_id,
+            payee: t.payee,
+            amount: t.amount,
+            timestamp: t.created_at || new Date().toISOString(),
+            status: 'completed',
+            is_offline: !!t.is_offline,
+            method: t.method || (t.channel === 'Bluetooth' ? 'BLUETOOTH' : 'OFFLINE'),
+            channel: t.channel || 'Bluetooth',
+            token: t.token || '',
+            note: t.note || ''
+          });
+        });
+
+        const reconciled = Array.from(map.values()).map(normalizeTx);
+        reconciled.forEach(t => t.status = 'completed');
+        saveTransactions(reconciled);
+        render();
+
+        alert(message);
       } catch (err) {
         console.warn('Backend sync failed, reconciling local state', err);
+        const txs = loadTransactions().map(tx => ({ ...tx, status: 'completed' }));
+        saveTransactions(txs);
+        render();
+        alert('Offline transactions reconciled locally.');
+      } finally {
+        btn.textContent = oldText;
+        btn.disabled = false;
+        updateSyncButton();
       }
-      const txs = loadTransactions().map(tx =>
-        tx.status === 'pending' ? { ...tx, status: 'completed' } : tx
-      );
-      saveTransactions(txs);
+    }
+
+    async function fetchAndRenderTransactions() {
+      try {
+        const res = await fetch('/api/transactions');
+        if (res.ok) {
+          const serverTxs = await res.json();
+          const localTxs = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          
+          const map = new Map();
+          localTxs.forEach(t => {
+            const k = String(t.tx_id || t.txId || t.id || '');
+            if (k) map.set(k, t);
+          });
+
+          serverTxs.forEach(t => {
+            const k = String(t.tx_id || t.id || '');
+            if (k) {
+              const existing = map.get(k);
+              if (existing) {
+                map.set(k, { ...existing, ...t, status: t.status || existing.status });
+              } else {
+                map.set(k, {
+                  id: t.tx_id || t.id,
+                  txId: t.tx_id,
+                  payee: t.payee,
+                  amount: t.amount,
+                  timestamp: t.created_at || new Date().toISOString(),
+                  status: t.status || 'completed',
+                  is_offline: !!t.is_offline,
+                  method: t.method || (t.channel === 'Bluetooth' ? 'BLUETOOTH' : 'OFFLINE'),
+                  channel: t.channel || 'Bluetooth',
+                  token: t.token || '',
+                  note: t.note || ''
+                });
+              }
+            }
+          });
+
+          const merged = Array.from(map.values()).map(normalizeTx);
+          if (merged.length > 0) {
+            saveTransactions(merged);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch server transactions', err);
+      }
       render();
     }
 
@@ -587,9 +695,24 @@
       if (e.target.id === 'detailModal') document.getElementById('detailModal').classList.remove('open');
     });
 
+    async function checkServerNetwork() {
+      try {
+        const res = await fetch('/api/system/network-status');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status) {
+            localStorage.setItem('ep_network_status', data.status);
+            updateConnectionUI();
+            updateSyncButton();
+          }
+        }
+      } catch (e) {}
+    }
+
     updateConnectionUI();
     updateSyncButton();
-    render();
+    checkServerNetwork();
+    fetchAndRenderTransactions();
   </script>
 </body>
 </html>

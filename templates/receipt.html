@@ -97,7 +97,7 @@
         <div class="detail-row">
           <span class="detail-lbl">Payment Channel</span>
           <span class="badge-method" id="rcChannel">
-            <i class="ri-bluetooth-line"></i> Bluetooth
+            <i class="ri-bank-card-line"></i> UPI Payment
           </span>
         </div>
 
@@ -110,24 +110,15 @@
           <span class="detail-lbl">Note</span>
           <span class="detail-val" id="rcNote">None</span>
         </div>
-
-        <!-- Digital Token -->
-        <div class="token-box">
-          <div class="token-header">
-            <span class="token-lbl">Mesh Verification Token</span>
-            <button class="btn-copy" onclick="copyToken()" title="Copy Token"><i class="ri-file-copy-line"></i></button>
-          </div>
-          <div class="token-val" id="rcToken">EP-MESH-000000</div>
-        </div>
       </section>
 
-      <!-- Offline Info Box -->
-      <div class="alert-offline">
+      <!-- Offline Info Box (only shown for offline transactions) -->
+      <div class="alert-offline" id="offlineAlertBox" style="display:none;">
         <i class="ri-information-line"></i>
         <div>
           <div class="alert-title">Offline Ledger Stored</div>
           <p class="alert-desc">
-            This transfer was authorized without active internet. It will automatically reconcile with the banking issuer once your device reconnects online.
+            This transfer was authorized without active internet via Bluetooth. It will automatically reconcile with the banking network once your device reconnects online.
           </p>
         </div>
       </div>
@@ -150,21 +141,27 @@
     const receipt = JSON.parse(sessionStorage.getItem('ep_last_receipt') || 'null');
 
     if (receipt) {
+      const isOnline = !receipt.is_offline && (receipt.channel === 'UPI' || receipt.method === 'UPI');
       document.getElementById('rcAmount').textContent = Number(receipt.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 });
       document.getElementById('rcPayee').textContent = receipt.payee;
-      document.getElementById('rcTxId').textContent = receipt.tx_id || receipt.txId || 'EMP' + Math.floor(100000 + Math.random() * 900000);
-      document.getElementById('rcChannel').innerHTML = `<i class="ri-bluetooth-line"></i> ${receipt.channel || 'Bluetooth'}`;
-      document.getElementById('rcNote').textContent = receipt.note || 'Offline Payment';
-      document.getElementById('rcToken').textContent = receipt.token || 'EP-MESH-SECURE';
+      document.getElementById('rcTxId').textContent = receipt.tx_id || receipt.txId || ((isOnline ? 'UPI' : 'BT') + Math.floor(100000 + Math.random() * 900000));
+      document.getElementById('rcNote').textContent = receipt.note || (isOnline ? 'UPI Payment' : 'Offline Payment');
       
+      const sub = document.querySelector('.success-sub');
+      const offlineAlert = document.getElementById('offlineAlertBox');
+
+      if (isOnline) {
+        document.getElementById('rcChannel').innerHTML = `<i class="ri-bank-card-line"></i> UPI (Online)`;
+        if (sub) sub.textContent = 'Instant online UPI transfer completed';
+        if (offlineAlert) offlineAlert.style.display = 'none';
+      } else {
+        document.getElementById('rcChannel').innerHTML = `<i class="ri-bluetooth-line"></i> Bluetooth (Offline)`;
+        if (sub) sub.textContent = 'Offline Bluetooth transaction stored securely';
+        if (offlineAlert) offlineAlert.style.display = 'flex';
+      }
+
       const dt = receipt.timestamp ? new Date(receipt.timestamp) : new Date();
       document.getElementById('rcTime').textContent = dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' • ' + dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function copyToken() {
-      const token = document.getElementById('rcToken').textContent;
-      navigator.clipboard.writeText(token);
-      alert('Verification token copied to clipboard!');
     }
   </script>
 </body>

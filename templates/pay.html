@@ -147,19 +147,9 @@
 
         <div>
           <label class="form-label">Transfer Method</label>
-          <div class="channel-grid">
-            <div class="channel-card active" onclick="selectChannel('Bluetooth', this)">
-              <i class="ri-bluetooth-line"></i>
-              <span>Bluetooth</span>
-            </div>
-            <div class="channel-card" onclick="selectChannel('Local Mesh', this)">
-              <i class="ri-wifi-off-line"></i>
-              <span>Local Mesh</span>
-            </div>
-            <div class="channel-card" onclick="selectChannel('SMS Token', this)">
-              <i class="ri-message-3-line"></i>
-              <span>SMS Token</span>
-            </div>
+          <div class="channel-card active" id="methodCard" style="cursor:default; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <i class="ri-bank-card-line" id="methodIcon" style="font-size:1.25rem;"></i>
+            <span id="methodText" style="font-weight:600;">UPI Payment (Online)</span>
           </div>
         </div>
 
@@ -175,7 +165,7 @@
           </div>
           <div class="balance-row">
             <span class="balance-lbl">Execution Mode</span>
-            <span class="balance-val" id="dispMethod">Bluetooth (Offline Encrypted)</span>
+            <span class="balance-val" id="dispMethod">UPI (Instant Online)</span>
           </div>
         </div>
 
@@ -196,11 +186,11 @@
         <div class="confirm-box">
           <div class="confirm-amount" id="modalAmount">₹ 0.00</div>
           <div class="confirm-row"><span>Recipient:</span><strong id="modalPayee">-</strong></div>
-          <div class="confirm-row"><span>Channel:</span><strong id="modalChannel">Bluetooth</strong></div>
+          <div class="confirm-row"><span>Channel:</span><strong id="modalChannel">UPI</strong></div>
           <div class="confirm-row"><span>Note:</span><span id="modalNote">-</span></div>
         </div>
-        <p style="font-size:0.78rem;color:#b45309;line-height:1.4;">
-          <i class="ri-information-line"></i> This payment is digitally signed and stored offline. It will finalize instantly via local peer mesh.
+        <p style="font-size:0.78rem;color:#b45309;line-height:1.4;" id="confirmInfoText">
+          <i class="ri-shield-check-line" style="color:#15803d;"></i> Online UPI payment: Amount will be deducted from your Available Balance.
         </p>
         <div class="confirm-actions">
           <button type="button" class="btn-cancel" style="margin-top:0;" onclick="closeConfirmModal()">Cancel</button>
@@ -212,33 +202,44 @@
   </div>
 
   <script>
-    let selectedChannel = 'Bluetooth';
     let currentStatus = localStorage.getItem('ep_network_status') || 'online';
+    let isOnline = currentStatus === 'online';
+    let selectedChannel = isOnline ? 'UPI' : 'Bluetooth';
     let pendingPayload = null;
-
-    function selectChannel(channel, el) {
-      selectedChannel = channel;
-      document.querySelectorAll('.channel-card').forEach(c => c.classList.remove('active'));
-      el.classList.add('active');
-      document.getElementById('dispMethod').textContent = `${channel} (${currentStatus === 'online' ? 'Online' : 'Offline Encrypted'})`;
-    }
 
     async function initPage() {
       // Parse URL params for prefilled payee or phone
       const params = new URLSearchParams(window.location.search);
       const payee = params.get('payee');
       const phone = params.get('phone');
-      const channel = params.get('channel');
 
       if (payee) document.getElementById('payeeInput').value = payee;
       else if (phone) document.getElementById('payeeInput').value = phone;
 
-      if (channel) {
-        document.querySelectorAll('.channel-card').forEach(c => {
-          if (c.textContent.trim().toLowerCase().includes(channel.toLowerCase())) {
-            selectChannel(channel, c);
-          }
-        });
+      // Update network status and channel
+      isOnline = currentStatus === 'online';
+      selectedChannel = isOnline ? 'UPI' : 'Bluetooth';
+
+      const badge = document.getElementById('netBadge');
+      const text = document.getElementById('netText');
+      badge.className = `net-badge ${currentStatus}`;
+      text.textContent = currentStatus === 'emergency' ? 'Emergency' : (currentStatus === 'offline' ? 'Offline' : 'Online');
+
+      const methodIcon = document.getElementById('methodIcon');
+      const methodText = document.getElementById('methodText');
+      const dispMethod = document.getElementById('dispMethod');
+      const confirmInfo = document.getElementById('confirmInfoText');
+
+      if (isOnline) {
+        methodIcon.className = 'ri-bank-card-line';
+        methodText.textContent = 'UPI Payment (Online)';
+        dispMethod.textContent = 'UPI (Instant Online)';
+        if (confirmInfo) confirmInfo.innerHTML = '<i class="ri-shield-check-line" style="color:#15803d;"></i> Online UPI payment: Amount will be deducted from your Available Balance.';
+      } else {
+        methodIcon.className = 'ri-bluetooth-line';
+        methodText.textContent = 'Bluetooth Payment (Offline)';
+        dispMethod.textContent = 'Bluetooth (Offline Emergency)';
+        if (confirmInfo) confirmInfo.innerHTML = '<i class="ri-information-line"></i> Offline Bluetooth payment: Amount will be deducted from your Emergency Balance.';
       }
 
       // Fetch user balances
@@ -248,35 +249,53 @@
           const user = await res.json();
           document.getElementById('dispBalance').textContent = `₹ ${Number(user.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
           document.getElementById('dispEmergency').textContent = `₹ ${Number(user.emergency_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          localStorage.setItem('ep_user', JSON.stringify(user));
         }
       } catch (e) {
         console.warn('Using cached user');
       }
-
-      // Update network badge
-      const badge = document.getElementById('netBadge');
-      const text = document.getElementById('netText');
-      badge.className = `net-badge ${currentStatus}`;
-      text.textContent = currentStatus === 'emergency' ? 'Emergency' : (currentStatus === 'offline' ? 'Offline' : 'Online');
-      document.getElementById('dispMethod').textContent = `${selectedChannel} (${currentStatus === 'online' ? 'Online' : 'Offline Encrypted'})`;
     }
 
     function handleProceed(e) {
       e.preventDefault();
       const payee = document.getElementById('payeeInput').value.trim();
       const amount = parseFloat(document.getElementById('amountInput').value);
-      const note = document.getElementById('noteInput').value.trim() || 'Offline Payment';
+      const note = document.getElementById('noteInput').value.trim() || (isOnline ? 'UPI Payment' : 'Offline Payment');
 
       if (!payee || isNaN(amount) || amount <= 0) {
         alert('Please enter a valid recipient and amount');
         return;
       }
 
-      pendingPayload = { payee, amount, note, channel: selectedChannel };
+      // Reduction check: check against available balance when online, emergency balance when offline
+      const balStr = (document.getElementById('dispBalance').textContent || '0').replace(/[^0-9.]/g, '');
+      const emgStr = (document.getElementById('dispEmergency').textContent || '0').replace(/[^0-9.]/g, '');
+      const currentBal = parseFloat(balStr) || 0;
+      const currentEmg = parseFloat(emgStr) || 0;
+
+      if (isOnline) {
+        if (amount > currentBal) {
+          alert(`Insufficient Available Balance (₹${currentBal.toLocaleString('en-IN')}) for this online transfer.`);
+          return;
+        }
+      } else {
+        if (amount > currentEmg) {
+          alert(`Insufficient Emergency Balance (₹${currentEmg.toLocaleString('en-IN')}) for this offline transfer.`);
+          return;
+        }
+      }
+
+      pendingPayload = {
+        payee,
+        amount,
+        note,
+        channel: selectedChannel,
+        is_offline: !isOnline
+      };
 
       document.getElementById('modalAmount').textContent = `₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
       document.getElementById('modalPayee').textContent = payee;
-      document.getElementById('modalChannel').textContent = selectedChannel;
+      document.getElementById('modalChannel').textContent = isOnline ? 'UPI (Online)' : 'Bluetooth (Offline)';
       document.getElementById('modalNote').textContent = note;
 
       document.getElementById('confirmModal').classList.add('open');

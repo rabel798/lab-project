@@ -81,11 +81,11 @@
         <span class="summary-label">Transfer Amount</span>
         <div class="summary-amt" id="dispAmount">₹ 0.00</div>
         <div class="summary-payee" id="dispPayee">To: Recipient</div>
-        <div class="summary-channel" id="dispChannel">Via Bluetooth Offline Mesh</div>
+        <div class="summary-channel" id="dispChannel">Via UPI</div>
       </section>
 
       <h2 class="pin-title">Enter 4-Digit UPI PIN</h2>
-      <p class="pin-subtitle">Secured with asymmetric local mesh encryption</p>
+      <p class="pin-subtitle" id="dispSubtitle">Enter your 4-digit UPI PIN</p>
 
       <!-- 4 PIN Dots -->
       <div class="pin-dots">
@@ -115,7 +115,7 @@
     <!-- Processing Overlay -->
     <div class="processing-overlay" id="processingOverlay">
       <div class="spinner"></div>
-      <p style="font-weight:600;font-size:0.95rem;color:var(--primary);">Encrypting Offline Payment...</p>
+      <p style="font-weight:600;font-size:0.95rem;color:var(--primary);" id="overlayText">Authorizing Payment...</p>
     </div>
 
   </div>
@@ -123,13 +123,23 @@
   <script>
     let pin = '';
     const pending = JSON.parse(sessionStorage.getItem('ep_pending_payment') || 'null');
+    const currentStatus = localStorage.getItem('ep_network_status') || 'online';
+    const isOnline = currentStatus === 'online';
 
     if (!pending) {
       window.location.href = '/pay';
     } else {
       document.getElementById('dispAmount').textContent = `₹ ${Number(pending.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
       document.getElementById('dispPayee').textContent = `To: ${pending.payee}`;
-      document.getElementById('dispChannel').textContent = `Via ${pending.channel || 'Bluetooth'} Offline Mesh`;
+      if (isOnline) {
+        document.getElementById('dispChannel').textContent = `Via Normal UPI (Online)`;
+        document.getElementById('dispSubtitle').textContent = `Enter your 4-digit UPI PIN to authorize online transfer`;
+        document.getElementById('overlayText').textContent = `Processing Online UPI Transfer...`;
+      } else {
+        document.getElementById('dispChannel').textContent = `Via Bluetooth (Offline Emergency)`;
+        document.getElementById('dispSubtitle').textContent = `Secured with offline local encryption`;
+        document.getElementById('overlayText').textContent = `Recording Offline Bluetooth Payment...`;
+      }
     }
 
     function updateDots() {
@@ -144,7 +154,7 @@
         pin += digit;
         updateDots();
         if (pin.length === 4) {
-          setTimeout(submitPayment, 300);
+          setTimeout(submitPayment, 250);
         }
       }
     }
@@ -163,27 +173,38 @@
 
     async function submitPayment() {
       document.getElementById('processingOverlay').classList.add('open');
-      const channel = pending.channel || 'Bluetooth';
+      const channel = isOnline ? 'UPI' : 'Bluetooth';
+      const method = isOnline ? 'UPI' : 'BLUETOOTH';
+      const status = isOnline ? 'completed' : 'pending';
 
       const receipt = {
-        tx_id: 'EMP' + Math.floor(100000 + Math.random() * 900000),
+        tx_id: (isOnline ? 'UPI' : 'BT') + Math.floor(100000 + Math.random() * 900000),
         payee: pending.payee,
         amount: pending.amount,
-        note: pending.note || 'Offline Payment',
+        note: pending.note || (isOnline ? 'UPI Payment' : 'Offline Payment'),
         channel: channel,
         timestamp: new Date().toISOString(),
-        status: 'pending',
-        is_offline: true,
-        method: /bluetooth/i.test(channel) ? 'BLUETOOTH' : 'OFFLINE',
-        token: 'EP-MESH-' + Math.random().toString(36).substring(2, 10).toUpperCase()
+        status: status,
+        is_offline: !isOnline,
+        method: method,
+        token: ''
       };
 
       try {
-        await fetch('/insert', {
+        const res = await fetch('/insert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(receipt)
         });
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.data && resData.data.balance !== undefined) {
+            const cachedUser = JSON.parse(localStorage.getItem('ep_user') || '{}');
+            cachedUser.balance = resData.data.balance;
+            cachedUser.emergency_balance = resData.data.emergency_balance;
+            localStorage.setItem('ep_user', JSON.stringify(cachedUser));
+          }
+        }
       } catch (err) {
         console.warn('Saved offline in localStorage', err);
       }
@@ -197,7 +218,7 @@
 
       setTimeout(() => {
         window.location.href = '/receipt';
-      }, 700);
+      }, 500);
     }
   </script>
 </body>
