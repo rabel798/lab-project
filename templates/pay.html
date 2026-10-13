@@ -8,130 +8,291 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-
   <style>
     :root {
-      --bg-dark: #0b0f19;
-      --bg-card: #131b2e;
-      --emerald-primary: #10b981;
-      --emerald-glow: rgba(16, 185, 129, 0.25);
-      --teal-accent: #06b6d4;
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --border-color: rgba(255, 255, 255, 0.08);
-      --border-active: rgba(16, 185, 129, 0.4);
-      --danger: #ef4444;
-      --radius-md: 14px;
-      --radius-lg: 20px;
-      --font-family: 'Exo 2', sans-serif;
+      --primary: #3f3fe9;
+      --primary-100: #e8e8fd;
+      --primary-50: #f4f4fe;
+      --emergency: #dc2626;
+      --emergency-50: #fef2f2;
+      --emergency-100: #fee2e2;
+      --bg-page: #ffffff;
+      --border-color: #e5e7eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); }
-    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; }
-    .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 20px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: #f9fafb; color: var(--text-main); min-height: 100vh; display: flex; justify-content: center; }
+
+    .app-shell { width: 100%; max-width: 448px; min-height: 100vh; background: #fff; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 25px rgba(0,0,0,0.05); }
+
+    /* Top Bar */
+    .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border-color); background: #fff; position: sticky; top: 0; z-index: 20; }
+    .back-btn { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text-main); font-size: 1.3rem; transition: background 0.15s; }
+    .back-btn:hover { background: #f3f4f6; }
+    .top-title { font-size: 1.15rem; font-weight: 600; }
+
+    .net-badge { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; padding: 3px 8px; border-radius: 12px; }
+    .net-badge.online { background: #dcfce7; color: #15803d; }
+    .net-badge.offline { background: #fef3c7; color: #b45309; }
+    .net-badge.emergency { background: var(--emergency-100); color: #b91c1c; }
+    .net-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .net-badge.online .net-dot { background: #22c55e; }
+    .net-badge.offline .net-dot { background: #f59e0b; }
+    .net-badge.emergency .net-dot { background: var(--emergency); }
+
+    .content-scroll { flex: 1; overflow-y: auto; padding: 24px 16px 40px; text-align: center; }
+
+    /* Header Hero */
+    .hero-avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--primary-100); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 1.8rem; color: var(--primary); }
+    .hero-title { font-size: 1.35rem; font-weight: 700; color: var(--text-main); }
+    .hero-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+
+    /* Form */
+    .form-wrap { margin: 28px 0 20px; text-align: left; display: flex; flex-direction: column; gap: 16px; }
+    .form-label { font-size: 0.82rem; font-weight: 600; color: #4b5563; margin-bottom: 6px; display: block; }
     
-    header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); }
-    .back-btn { color: var(--text-main); text-decoration: none; font-size: 1.2rem; display: flex; align-items: center; gap: 6px; }
-    .header-title { font-weight: 700; font-size: 1.1rem; }
+    .input-box { position: relative; display: flex; align-items: center; }
+    .input-prefix { position: absolute; left: 16px; font-weight: 600; color: #6b7280; font-size: 1rem; }
+    .form-input { width: 100%; background: #f9fafb; border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px 14px 48px; font-size: 1rem; color: var(--text-main); outline: none; transition: all 0.15s; }
+    .form-input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(63, 63, 233, 0.12); }
+    .form-input.no-prefix { padding-left: 16px; }
 
-    .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; display: flex; flex-direction: column; gap: 18px; }
-    .form-group { display: flex; flex-direction: column; gap: 8px; }
-    .form-label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
-    .input-wrapper { position: relative; display: flex; align-items: center; }
-    .input-icon { position: absolute; left: 14px; color: var(--text-muted); font-size: 1.1rem; }
-    .form-input { width: 100%; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px 12px 42px; color: #fff; font-size: 1rem; outline: none; transition: border-color 0.2s; }
-    .form-input:focus { border-color: var(--emerald-primary); }
+    /* Offline Channel Selector */
+    .channel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+    .channel-card { border: 1.5px solid var(--border-color); border-radius: 10px; padding: 10px 6px; text-align: center; cursor: pointer; transition: all 0.15s; background: #fff; }
+    .channel-card i { font-size: 1.25rem; color: #6b7280; display: block; margin-bottom: 3px; }
+    .channel-card span { font-size: 0.72rem; font-weight: 600; color: #4b5563; }
+    .channel-card.active { border-color: var(--primary); background: var(--primary-50); }
+    .channel-card.active i { color: var(--primary); }
+    .channel-card.active span { color: var(--primary); }
 
-    .mode-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .mode-option { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; font-size: 0.75rem; color: var(--text-muted); }
-    .mode-option i { font-size: 1.2rem; }
-    .mode-option.active { border-color: var(--emerald-primary); background: rgba(16, 185, 129, 0.12); color: var(--emerald-primary); }
+    /* Balance Preview Card */
+    .balance-preview { background: #f9fafb; border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; text-align: left; margin-bottom: 24px; }
+    .balance-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; margin-bottom: 6px; }
+    .balance-row:last-child { margin-bottom: 0; }
+    .balance-lbl { color: var(--text-muted); }
+    .balance-val { font-weight: 600; color: var(--text-main); }
+    .balance-val.highlight { color: #d97706; }
 
-    .btn-submit { width: 100%; background: linear-gradient(135deg, var(--emerald-primary), var(--teal-accent)); color: #000; border: none; border-radius: var(--radius-md); padding: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
+    /* Action Buttons */
+    .btn-submit { width: 100%; background: var(--primary); color: #fff; border: none; border-radius: 12px; padding: 15px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s, transform 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-submit:hover { opacity: 0.95; transform: translateY(-1px); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-cancel { width: 100%; background: #f3f4f6; color: #374151; border: none; border-radius: 12px; padding: 13px; font-size: 0.95rem; font-weight: 600; cursor: pointer; margin-top: 10px; }
+    .btn-cancel:hover { background: #e5e7eb; }
+
+    /* Confirmation Modal */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 100; display: none; align-items: flex-end; justify-content: center; }
+    .modal-backdrop.open { display: flex; }
+    .confirm-sheet { width: 100%; max-width: 448px; background: #fff; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 24px 20px 28px; box-shadow: 0 -10px 25px rgba(0,0,0,0.1); text-align: left; animation: slideUp 0.25s ease-out; }
+    .confirm-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 14px; text-align: center; }
+    .confirm-box { background: var(--primary-50); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .confirm-amount { font-size: 1.8rem; font-weight: 800; color: var(--primary); text-align: center; margin: 4px 0 10px; }
+    .confirm-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 4px 0; color: #4b5563; }
+    .confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <a href="/emergencypay" class="back-btn"><i class="ri-arrow-left-line"></i> Dashboard</a>
-      <span class="header-title">Send Offline Payment</span>
-      <div style="width: 24px;"></div>
+  <div class="app-shell">
+    
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <a href="/emergencypay" class="back-btn">
+        <i class="ri-arrow-left-line"></i>
+      </a>
+      <h1 class="top-title">Send Money</h1>
+      <div class="net-badge online" id="netBadge">
+        <span class="net-dot"></span>
+        <span id="netText">Online</span>
+      </div>
     </header>
 
-    <div class="card">
-      <form id="payForm" onsubmit="proceedToPin(event)">
-        <div class="form-group">
-          <label class="form-label" for="payee">Recipient UPI VPA / Mobile</label>
-          <div class="input-wrapper">
-            <i class="ri-user-3-line input-icon"></i>
-            <input type="text" id="payee" class="form-input" placeholder="merchant@upi or 9876543210" required />
+    <div class="content-scroll">
+      <!-- Hero -->
+      <div class="hero-avatar">
+        <i class="ri-user-3-line"></i>
+      </div>
+      <h2 class="hero-title" id="pageHeading">Send Money</h2>
+      <p class="hero-sub" id="pageSub">Transfer securely to any recipient or peer</p>
+
+      <!-- Payment Form -->
+      <form class="form-wrap" id="sendForm" onsubmit="handleProceed(event)">
+        <div>
+          <label class="form-label" for="payeeInput">Recipient Phone / UPI VPA</label>
+          <div class="input-box">
+            <span class="input-prefix" id="phonePrefix"><i class="ri-user-line"></i></span>
+            <input type="text" id="payeeInput" class="form-input" placeholder="9876543210 or merchant@upi" required />
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="amount">Amount (₹)</label>
-          <div class="input-wrapper">
-            <i class="ri-money-rupee-circle-line input-icon"></i>
-            <input type="number" id="amount" class="form-input" min="1" max="5000" placeholder="0.00" required />
+        <div>
+          <label class="form-label" for="amountInput">Amount</label>
+          <div class="input-box">
+            <span class="input-prefix">₹</span>
+            <input type="number" id="amountInput" class="form-input" placeholder="0.00" min="1" step="any" required />
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="note">Payment Note (Optional)</label>
-          <div class="input-wrapper">
-            <i class="ri-chat-1-line input-icon"></i>
-            <input type="text" id="note" class="form-input" placeholder="Groceries, Fuel, Snacks..." />
+        <div>
+          <label class="form-label" for="noteInput">Payment Note (Optional)</label>
+          <div class="input-box">
+            <input type="text" id="noteInput" class="form-input no-prefix" placeholder="Groceries, Fuel, Medical, etc." />
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Offline Transfer Method</label>
-          <div class="mode-selector">
-            <div class="mode-option active" onclick="selectChannel(this, 'Bluetooth')">
+        <div>
+          <label class="form-label">Transfer Method</label>
+          <div class="channel-grid">
+            <div class="channel-card active" onclick="selectChannel('Bluetooth', this)">
               <i class="ri-bluetooth-line"></i>
               <span>Bluetooth</span>
             </div>
-            <div class="mode-option" onclick="selectChannel(this, 'Local Mesh')">
+            <div class="channel-card" onclick="selectChannel('Local Mesh', this)">
               <i class="ri-wifi-off-line"></i>
               <span>Local Mesh</span>
             </div>
-            <div class="mode-option" onclick="selectChannel(this, 'SMS Token')">
+            <div class="channel-card" onclick="selectChannel('SMS Token', this)">
               <i class="ri-message-3-line"></i>
               <span>SMS Token</span>
             </div>
           </div>
         </div>
 
-        <button type="submit" class="btn-submit">
+        <!-- Balance Preview Card -->
+        <div class="balance-preview">
+          <div class="balance-row">
+            <span class="balance-lbl">Available Balance</span>
+            <span class="balance-val" id="dispBalance">₹ 69,420.00</span>
+          </div>
+          <div class="balance-row">
+            <span class="balance-lbl">Emergency Reserve</span>
+            <span class="balance-val highlight" id="dispEmergency">₹ 6,767.00</span>
+          </div>
+          <div class="balance-row">
+            <span class="balance-lbl">Execution Mode</span>
+            <span class="balance-val" id="dispMethod">Bluetooth (Offline Encrypted)</span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btnSubmit">
           <span>Authorize Payment</span>
           <i class="ri-lock-2-line"></i>
         </button>
+        <button type="button" class="btn-cancel" onclick="window.location.href='/emergencypay'">
+          Cancel
+        </button>
       </form>
     </div>
+
+    <!-- Slide-up Confirmation Modal -->
+    <div class="modal-backdrop" id="confirmModal">
+      <div class="confirm-sheet">
+        <h3 class="confirm-title">Confirm Transfer</h3>
+        <div class="confirm-box">
+          <div class="confirm-amount" id="modalAmount">₹ 0.00</div>
+          <div class="confirm-row"><span>Recipient:</span><strong id="modalPayee">-</strong></div>
+          <div class="confirm-row"><span>Channel:</span><strong id="modalChannel">Bluetooth</strong></div>
+          <div class="confirm-row"><span>Note:</span><span id="modalNote">-</span></div>
+        </div>
+        <p style="font-size:0.78rem;color:#b45309;line-height:1.4;">
+          <i class="ri-information-line"></i> This payment is digitally signed and stored offline. It will finalize instantly via local peer mesh.
+        </p>
+        <div class="confirm-actions">
+          <button type="button" class="btn-cancel" style="margin-top:0;" onclick="closeConfirmModal()">Cancel</button>
+          <button type="button" class="btn-submit" style="padding:12px;" onclick="proceedToPin()">Enter PIN →</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
     let selectedChannel = 'Bluetooth';
+    let currentStatus = localStorage.getItem('ep_network_status') || 'online';
+    let pendingPayload = null;
 
-    function selectChannel(element, channel) {
-      document.querySelectorAll('.mode-option').forEach(el => el.classList.remove('active'));
-      element.classList.add('active');
+    function selectChannel(channel, el) {
       selectedChannel = channel;
+      document.querySelectorAll('.channel-card').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('dispMethod').textContent = `${channel} (${currentStatus === 'online' ? 'Online' : 'Offline Encrypted'})`;
     }
 
-    function proceedToPin(e) {
+    async function initPage() {
+      // Parse URL params for prefilled payee or phone
+      const params = new URLSearchParams(window.location.search);
+      const payee = params.get('payee');
+      const phone = params.get('phone');
+      const channel = params.get('channel');
+
+      if (payee) document.getElementById('payeeInput').value = payee;
+      else if (phone) document.getElementById('payeeInput').value = phone;
+
+      if (channel) {
+        document.querySelectorAll('.channel-card').forEach(c => {
+          if (c.textContent.trim().toLowerCase().includes(channel.toLowerCase())) {
+            selectChannel(channel, c);
+          }
+        });
+      }
+
+      // Fetch user balances
+      try {
+        const res = await fetch('/api/user');
+        if (res.ok) {
+          const user = await res.json();
+          document.getElementById('dispBalance').textContent = `₹ ${Number(user.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          document.getElementById('dispEmergency').textContent = `₹ ${Number(user.emergency_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        }
+      } catch (e) {
+        console.warn('Using cached user');
+      }
+
+      // Update network badge
+      const badge = document.getElementById('netBadge');
+      const text = document.getElementById('netText');
+      badge.className = `net-badge ${currentStatus}`;
+      text.textContent = currentStatus === 'emergency' ? 'Emergency' : (currentStatus === 'offline' ? 'Offline' : 'Online');
+      document.getElementById('dispMethod').textContent = `${selectedChannel} (${currentStatus === 'online' ? 'Online' : 'Offline Encrypted'})`;
+    }
+
+    function handleProceed(e) {
       e.preventDefault();
-      const payee = document.getElementById('payee').value;
-      const amount = document.getElementById('amount').value;
-      const note = document.getElementById('note').value || 'Offline Payment';
+      const payee = document.getElementById('payeeInput').value.trim();
+      const amount = parseFloat(document.getElementById('amountInput').value);
+      const note = document.getElementById('noteInput').value.trim() || 'Offline Payment';
 
-      // Store pending payment in session storage for PIN step
-      sessionStorage.setItem('ep_pending_payment', JSON.stringify({
-        payee, amount, note, channel: selectedChannel
-      }));
+      if (!payee || isNaN(amount) || amount <= 0) {
+        alert('Please enter a valid recipient and amount');
+        return;
+      }
 
+      pendingPayload = { payee, amount, note, channel: selectedChannel };
+
+      document.getElementById('modalAmount').textContent = `₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+      document.getElementById('modalPayee').textContent = payee;
+      document.getElementById('modalChannel').textContent = selectedChannel;
+      document.getElementById('modalNote').textContent = note;
+
+      document.getElementById('confirmModal').classList.add('open');
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirmModal').classList.remove('open');
+    }
+
+    function proceedToPin() {
+      if (!pendingPayload) return;
+      sessionStorage.setItem('ep_pending_payment', JSON.stringify(pendingPayload));
       window.location.href = '/pin';
     }
+
+    initPage();
   </script>
 </body>
 </html>
