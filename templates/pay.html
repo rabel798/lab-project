@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>EmergencyPay - Send Money</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: #131b2e;
+      --emerald-primary: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --teal-accent: #06b6d4;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(16, 185, 129, 0.4);
+      --danger: #ef4444;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --font-family: 'Exo 2', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); }
+    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; }
+    .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 20px; }
+    
+    header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); }
+    .back-btn { color: var(--text-main); text-decoration: none; font-size: 1.2rem; display: flex; align-items: center; gap: 6px; }
+    .header-title { font-weight: 700; font-size: 1.1rem; }
+
+    .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+    .form-group { display: flex; flex-direction: column; gap: 8px; }
+    .form-label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+    .input-wrapper { position: relative; display: flex; align-items: center; }
+    .input-icon { position: absolute; left: 14px; color: var(--text-muted); font-size: 1.1rem; }
+    .form-input { width: 100%; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px 12px 42px; color: #fff; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+    .form-input:focus { border-color: var(--emerald-primary); }
+
+    .mode-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .mode-option { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; font-size: 0.75rem; color: var(--text-muted); }
+    .mode-option i { font-size: 1.2rem; }
+    .mode-option.active { border-color: var(--emerald-primary); background: rgba(16, 185, 129, 0.12); color: var(--emerald-primary); }
+
+    .btn-submit { width: 100%; background: linear-gradient(135deg, var(--emerald-primary), var(--teal-accent)); color: #000; border: none; border-radius: var(--radius-md); padding: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="/emergencypay" class="back-btn"><i class="ri-arrow-left-line"></i> Dashboard</a>
+      <span class="header-title">Send Offline Payment</span>
+      <div style="width: 24px;"></div>
+    </header>
+
+    <div class="card">
+      <form id="payForm" onsubmit="proceedToPin(event)">
+        <div class="form-group">
+          <label class="form-label" for="payee">Recipient UPI VPA / Mobile</label>
+          <div class="input-wrapper">
+            <i class="ri-user-3-line input-icon"></i>
+            <input type="text" id="payee" class="form-input" placeholder="merchant@upi or 9876543210" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="amount">Amount (₹)</label>
+          <div class="input-wrapper">
+            <i class="ri-money-rupee-circle-line input-icon"></i>
+            <input type="number" id="amount" class="form-input" min="1" max="5000" placeholder="0.00" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="note">Payment Note (Optional)</label>
+          <div class="input-wrapper">
+            <i class="ri-chat-1-line input-icon"></i>
+            <input type="text" id="note" class="form-input" placeholder="Groceries, Fuel, Snacks..." />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Offline Transfer Method</label>
+          <div class="mode-selector">
+            <div class="mode-option active" onclick="selectChannel(this, 'Bluetooth')">
+              <i class="ri-bluetooth-line"></i>
+              <span>Bluetooth</span>
+            </div>
+            <div class="mode-option" onclick="selectChannel(this, 'Local Mesh')">
+              <i class="ri-wifi-off-line"></i>
+              <span>Local Mesh</span>
+            </div>
+            <div class="mode-option" onclick="selectChannel(this, 'SMS Token')">
+              <i class="ri-message-3-line"></i>
+              <span>SMS Token</span>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit">
+          <span>Authorize Payment</span>
+          <i class="ri-lock-2-line"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let selectedChannel = 'Bluetooth';
+
+    function selectChannel(element, channel) {
+      document.querySelectorAll('.mode-option').forEach(el => el.classList.remove('active'));
+      element.classList.add('active');
+      selectedChannel = channel;
+    }
+
+    function proceedToPin(e) {
+      e.preventDefault();
+      const payee = document.getElementById('payee').value;
+      const amount = document.getElementById('amount').value;
+      const note = document.getElementById('note').value || 'Offline Payment';
+
+      // Store pending payment in session storage for PIN step
+      sessionStorage.setItem('ep_pending_payment', JSON.stringify({
+        payee, amount, note, channel: selectedChannel
+      }));
+
+      window.location.href = '/pin';
+    }
+  </script>
+</body>
+</html>
