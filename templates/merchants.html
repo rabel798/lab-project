@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>EmergencyPay - Merchants</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #3f3fe9;
+      --primary-100: #e8e8fd;
+      --primary-50: #f4f4fe;
+      --emergency: #dc2626;
+      --bg-page: #f9fafb;
+      --card-bg: #ffffff;
+      --border-color: #e5e7eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg-page); color: var(--text-main); min-height: 100vh; display: flex; justify-content: center; }
+
+    .app-shell { width: 100%; max-width: 448px; min-height: 100vh; background: #fff; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 25px rgba(0,0,0,0.05); }
+
+    /* Top Bar */
+    .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border-color); background: #fff; position: sticky; top: 0; z-index: 20; }
+    .back-btn { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text-main); font-size: 1.3rem; transition: background 0.15s; }
+    .back-btn:hover { background: #f3f4f6; }
+    .top-title { font-size: 1.15rem; font-weight: 600; }
+
+    .content-scroll { flex: 1; overflow-y: auto; padding-bottom: 80px; }
+
+    /* Header text */
+    .header-box { padding: 20px 16px 12px; }
+    .header-title { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
+    .header-sub { font-size: 0.88rem; color: var(--text-muted); margin-top: 3px; }
+
+    /* Search Bar */
+    .search-box { margin: 8px 16px 16px; position: relative; }
+    .search-box i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 1.1rem; }
+    .search-input { width: 100%; padding: 10px 14px 10px 40px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.9rem; outline: none; background: #f9fafb; transition: border-color 0.15s, background 0.15s; }
+    .search-input:focus { border-color: var(--primary); background: #fff; }
+
+    /* Category Pills */
+    .categories-wrap { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 16px; scrollbar-width: none; }
+    .categories-wrap::-webkit-scrollbar { display: none; }
+    .cat-pill { padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--border-color); background: #f3f4f6; color: #4b5563; cursor: pointer; white-space: nowrap; transition: all 0.15s; display: flex; align-items: center; gap: 5px; }
+    .cat-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* Merchants List */
+    .section-head { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; margin-bottom: 12px; }
+    .section-head h2 { font-size: 1rem; font-weight: 600; }
+    .merchants-list { padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
+    .merchant-card { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px; display: flex; align-items: center; justify-content: space-between; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.03); transition: transform 0.15s; cursor: pointer; }
+    .merchant-card:hover { transform: translateY(-2px); }
+    .merchant-left { display: flex; align-items: center; gap: 12px; }
+    .merchant-icon { width: 48px; height: 48px; border-radius: 50%; background: var(--primary-50); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: var(--primary); flex-shrink: 0; }
+    .merchant-name { font-size: 0.95rem; font-weight: 600; color: var(--text-main); }
+    .merchant-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 6px; }
+    .badge-essential { font-size: 0.68rem; font-weight: 600; color: #16a34a; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
+    .btn-pay { background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+    .btn-pay:hover { opacity: 0.9; }
+
+    /* Bottom Navigation Dock */
+    .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 448px; background: #fff; border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 8px 0; z-index: 40; }
+    .nav-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #6b7280; font-size: 0.72rem; font-weight: 500; gap: 3px; width: 68px; position: relative; }
+    .nav-tab i { font-size: 1.3rem; }
+    .nav-tab.active { color: var(--primary); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <a href="/emergencypay" class="back-btn">
+        <i class="ri-arrow-left-line"></i>
+      </a>
+      <h1 class="top-title">Merchants</h1>
+      <div style="width: 36px;"></div>
+    </header>
+
+    <div class="content-scroll">
+      <div class="header-box">
+        <h1 class="header-title">Essential Merchants</h1>
+        <p class="header-sub">Verified offline-capable local services</p>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="search-box">
+        <i class="ri-search-line"></i>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search by merchant name or address" oninput="filterMerchants()">
+      </div>
+
+      <!-- Category Pills -->
+      <div class="categories-wrap" id="categoryPills">
+        <button class="cat-pill active" onclick="selectCategory('all', this)"><i class="ri-apps-line"></i> All</button>
+        <button class="cat-pill" onclick="selectCategory('Healthcare', this)"><i class="ri-hospital-line"></i> Healthcare</button>
+        <button class="cat-pill" onclick="selectCategory('Groceries', this)"><i class="ri-shopping-basket-line"></i> Groceries</button>
+        <button class="cat-pill" onclick="selectCategory('Emergency Services', this)"><i class="ri-flashlight-line"></i> Emergency</button>
+        <button class="cat-pill" onclick="selectCategory('Retail', this)"><i class="ri-store-2-line"></i> Retail</button>
+      </div>
+
+      <div class="section-head">
+        <h2 id="listTitle">All Merchants</h2>
+        <span id="merchantCount" style="font-size:0.8rem;color:var(--text-muted);font-weight:500;">5 providers</span>
+      </div>
+
+      <!-- Merchants List -->
+      <section class="merchants-list" id="merchantsList">
+        <!-- Loaded dynamically from /api/merchants -->
+      </section>
+    </div>
+
+    <!-- Bottom Navigation Dock -->
+    <nav class="bottom-nav">
+      <a href="/emergencypay" class="nav-tab">
+        <i class="ri-home-5-line"></i>
+        <span>Home</span>
+      </a>
+      <a href="/scan" class="nav-tab">
+        <i class="ri-qr-scan-line"></i>
+        <span>Scan</span>
+      </a>
+      <a href="/bluetooth" class="nav-tab">
+        <i class="ri-bluetooth-line"></i>
+        <span>Pay BT</span>
+      </a>
+      <a href="/history" class="nav-tab">
+        <i class="ri-history-line"></i>
+        <span>History</span>
+      </a>
+      <a href="/profile" class="nav-tab">
+        <i class="ri-user-3-line"></i>
+        <span>Profile</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <script>
+    let allMerchants = [];
+    let selectedCategory = 'all';
+
+    async function loadMerchants() {
+      try {
+        const res = await fetch('/api/merchants');
+        if (res.ok) {
+          allMerchants = await res.json();
+          renderMerchants();
+        }
+      } catch (err) {
+        console.error('Failed to load merchants', err);
+      }
+    }
+
+    function selectCategory(cat, btn) {
+      selectedCategory = cat;
+      document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('listTitle').textContent = cat === 'all' ? 'All Merchants' : `${cat} Providers`;
+      renderMerchants();
+    }
+
+    function filterMerchants() {
+      renderMerchants();
+    }
+
+    function getCategoryIcon(cat) {
+      switch ((cat || '').toLowerCase()) {
+        case 'healthcare': return 'ri-hospital-line';
+        case 'groceries': return 'ri-shopping-basket-line';
+        case 'emergency services': return 'ri-flashlight-line';
+        case 'retail': return 'ri-store-2-line';
+        default: return 'ri-store-line';
+      }
+    }
+
+    function renderMerchants() {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      const listContainer = document.getElementById('merchantsList');
+
+      const filtered = allMerchants.filter(m => {
+        const matchesCategory = selectedCategory === 'all' || (m.category || '').toLowerCase() === selectedCategory.toLowerCase();
+        const matchesSearch = (m.name || '').toLowerCase().includes(q) || (m.address || '').toLowerCase().includes(q);
+        return matchesCategory && matchesSearch;
+      });
+
+      document.getElementById('merchantCount').textContent = `${filtered.length} providers`;
+
+      if (filtered.length === 0) {
+        listContainer.innerHTML = `
+          <div style="text-align:center;padding:32px;color:var(--text-muted);font-size:0.9rem;">
+            No merchants found matching your filter
+          </div>`;
+        return;
+      }
+
+      listContainer.innerHTML = filtered.map(m => {
+        const icon = getCategoryIcon(m.category);
+        const payUrl = `/pay?payee=${encodeURIComponent(m.name)}&channel=Bluetooth`;
+
+        return `
+          <div class="merchant-card" onclick="window.location.href='${payUrl}'">
+            <div class="merchant-left">
+              <div class="merchant-icon">
+                <i class="${icon}"></i>
+              </div>
+              <div>
+                <div class="merchant-name">${escapeHtml(m.name)}</div>
+                <div class="merchant-meta">
+                  <span>${escapeHtml(m.category)}</span>
+                  <span>•</span>
+                  <span>${m.distance || '1.5'}km</span>
+                  ${m.is_essential ? '<span class="badge-essential">Essential</span>' : ''}
+                </div>
+              </div>
+            </div>
+            <button class="btn-pay" onclick="event.stopPropagation(); window.location.href='${payUrl}'">
+              Pay
+            </button>
+          </div>`;
+      }).join('');
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    loadMerchants();
+  </script>
+</body>
+</html>

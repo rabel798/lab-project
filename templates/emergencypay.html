@@ -252,26 +252,7 @@
         <a href="/merchants" style="font-size:0.8rem;color:var(--primary);text-decoration:none;font-weight:600;">View All</a>
       </div>
       <section class="services-scroll" id="servicesScroll">
-        <a href="/pay" class="service-card">
-          <div class="service-icon-wrap"><i class="ri-hospital-line"></i></div>
-          <span class="service-name">S.H.I.E.L.D Daycare</span>
-          <span class="service-category">Healthcare • 1.2km</span>
-        </a>
-        <a href="/pay" class="service-card">
-          <div class="service-icon-wrap"><i class="ri-shopping-basket-line"></i></div>
-          <span class="service-name">Spidey Pizza</span>
-          <span class="service-category">Groceries • 0.8km</span>
-        </a>
-        <a href="/pay" class="service-card">
-          <div class="service-icon-wrap"><i class="ri-heart-pulse-line"></i></div>
-          <span class="service-name">Widow Spa</span>
-          <span class="service-category">Healthcare • 1.5km</span>
-        </a>
-        <a href="/pay" class="service-card">
-          <div class="service-icon-wrap"><i class="ri-flashlight-line"></i></div>
-          <span class="service-name">God of Hammers</span>
-          <span class="service-category">Emergency • 1.8km</span>
-        </a>
+        <!-- Populated dynamically from /api/merchants -->
       </section>
 
       <!-- Recent Transactions -->
@@ -545,15 +526,37 @@
       }
     }
 
-    function escapeHtml(s) {
-      const d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
+    async function loadMerchants() {
+      const scroll = document.getElementById('servicesScroll');
+      try {
+        const res = await fetch('/api/merchants');
+        if (res.ok) {
+          const merchants = await res.json();
+          scroll.innerHTML = merchants.map(m => {
+            let icon = 'ri-store-line';
+            const cat = (m.category || '').toLowerCase();
+            if (cat.includes('health')) icon = 'ri-hospital-line';
+            else if (cat.includes('groc')) icon = 'ri-shopping-basket-line';
+            else if (cat.includes('emer')) icon = 'ri-flashlight-line';
+            else if (cat.includes('ret')) icon = 'ri-store-2-line';
+
+            return `
+              <a href="/pay?payee=${encodeURIComponent(m.name)}&channel=Bluetooth" class="service-card">
+                <div class="service-icon-wrap"><i class="${icon}"></i></div>
+                <span class="service-name">${escapeHtml(m.name)}</span>
+                <span class="service-category">${escapeHtml(m.category)} • ${m.distance || '1.5'}km</span>
+              </a>`;
+          }).join('');
+        }
+      } catch (e) {
+        console.warn('Failed to load merchants dynamically', e);
+      }
     }
 
     // Init
     updateStatusUI();
     loadUserData();
+    loadMerchants();
     loadTransactions();
   </script>
 </body>
