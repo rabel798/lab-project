@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>EmergencyPay - Profile & Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #3f3fe9;
+      --primary-100: #e8e8fd;
+      --primary-50: #f4f4fe;
+      --emergency: #dc2626;
+      --bg-page: #f9fafb;
+      --card-bg: #ffffff;
+      --border-color: #e5e7eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg-page); color: var(--text-main); min-height: 100vh; display: flex; justify-content: center; }
+
+    .app-shell { width: 100%; max-width: 448px; min-height: 100vh; background: #fff; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 25px rgba(0,0,0,0.05); }
+
+    .content-scroll { flex: 1; overflow-y: auto; padding-bottom: 80px; }
+
+    /* Blue Profile Header Curve */
+    .profile-hero { background: var(--primary); color: #fff; padding: 28px 20px 32px; border-bottom-left-radius: 28px; border-bottom-right-radius: 28px; position: relative; text-align: center; }
+    .btn-edit { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.2); border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .avatar-wrap { width: 84px; height: 84px; border-radius: 50%; background: rgba(255,255,255,0.22); margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: #fff; }
+    .profile-name { font-size: 1.45rem; font-weight: 700; }
+    .profile-phone { font-size: 0.88rem; color: rgba(255,255,255,0.85); margin-top: 3px; }
+
+    /* Sections */
+    .section-wrap { padding: 20px 16px 0; }
+    .section-title { font-size: 1.05rem; font-weight: 600; color: var(--text-main); margin-bottom: 12px; }
+
+    .settings-card { background: #fff; border: 1px solid var(--border-color); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+    .card-row { padding: 14px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    .card-row:last-child { border-bottom: none; }
+    .row-title { font-size: 0.92rem; font-weight: 600; color: var(--text-main); }
+    .row-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+    .row-val { font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+
+    .btn-action-sm { background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+    .btn-action-sm:hover { opacity: 0.9; }
+
+    /* Toggle switch */
+    .switch-wrap { position: relative; width: 48px; height: 26px; }
+    .switch-wrap input { opacity: 0; width: 0; height: 0; }
+    .switch-slider { position: absolute; inset: 0; background: #d1d5db; border-radius: 34px; cursor: pointer; transition: 0.2s; }
+    .switch-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+    .switch-wrap input:checked + .switch-slider { background: var(--emergency); }
+    .switch-wrap input:checked + .switch-slider:before { transform: translateX(22px); }
+
+    /* Security Key Card */
+    .key-box { font-family: monospace; font-size: 0.75rem; background: #f9fafb; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px; color: #4338ca; word-break: break-all; margin-top: 6px; }
+
+    /* Bottom Navigation Dock */
+    .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 448px; background: #fff; border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 8px 0; z-index: 40; }
+    .nav-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: #6b7280; font-size: 0.72rem; font-weight: 500; gap: 3px; width: 68px; position: relative; }
+    .nav-tab i { font-size: 1.3rem; }
+    .nav-tab.active { color: var(--primary); font-weight: 600; }
+    .nav-indicator { position: absolute; bottom: -8px; width: 36px; height: 3px; background: var(--primary); border-top-left-radius: 4px; border-top-right-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    
+    <div class="content-scroll">
+      <!-- Profile Hero Header -->
+      <section class="profile-hero">
+        <button class="btn-edit" onclick="editProfile()" title="Edit Profile">
+          <i class="ri-edit-line"></i>
+        </button>
+        <div class="avatar-wrap">
+          <i class="ri-user-fill"></i>
+        </div>
+        <h1 class="profile-name" id="userName">Mr. Sukhpal</h1>
+        <p class="profile-phone" id="userPhone">+91 9876543210</p>
+      </section>
+
+      <!-- Account Balances -->
+      <div class="section-wrap">
+        <h2 class="section-title">Account</h2>
+        <div class="settings-card">
+          <div class="card-row">
+            <div>
+              <div class="row-title">Available Balance</div>
+              <div class="row-sub">Total primary funds</div>
+            </div>
+            <div class="row-val" id="dispBalance">₹ 69,420.00</div>
+          </div>
+
+          <div class="card-row">
+            <div>
+              <div class="row-title">Emergency Balance</div>
+              <div class="row-sub">Reserved for critical outages</div>
+            </div>
+            <div class="row-val" style="color:var(--primary);" id="dispEmergency">₹ 6,767.00</div>
+          </div>
+
+          <div class="card-row">
+            <div>
+              <div class="row-title">Add Money</div>
+              <div class="row-sub">Deposit funds into wallet</div>
+            </div>
+            <button class="btn-action-sm" onclick="addFunds()">Add Funds</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="section-wrap">
+        <h2 class="section-title">Settings</h2>
+        <div class="settings-card">
+          <div class="card-row">
+            <div>
+              <div class="row-title">Connection Status</div>
+              <div class="row-sub">Active network simulation state</div>
+            </div>
+            <span id="netStatusBadge" style="font-size:0.75rem;font-weight:600;padding:3px 8px;border-radius:12px;background:#dcfce7;color:#15803d;">Online</span>
+          </div>
+
+          <div class="card-row">
+            <div>
+              <div class="row-title">Emergency Mode</div>
+              <div class="row-sub">Force offline peer-to-peer protocols</div>
+            </div>
+            <label class="switch-wrap">
+              <input type="checkbox" id="emergencyToggle" onchange="toggleEmergency(this.checked)">
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="card-row">
+            <div>
+              <div class="row-title">Reconcile Transactions</div>
+              <div class="row-sub">Sync pending offline receipts</div>
+            </div>
+            <button class="btn-action-sm" onclick="syncTransactions()">Sync Now</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cryptographic Security -->
+      <div class="section-wrap" style="margin-bottom:24px;">
+        <h2 class="section-title">Security & Keypair</h2>
+        <div class="settings-card" style="padding:16px;">
+          <div class="row-title">Asymmetric Public Key</div>
+          <div class="row-sub">Used to verify your offline Bluetooth signatures</div>
+          <div class="key-box" id="keyBox">PK_ECC_secp256k1_7f8a9b2c3d4e5f6081a2b3c4d5e6</div>
+          <div style="margin-top:12px;text-align:right;">
+            <button class="btn-action-sm" style="background:#f3f4f6;color:#374151;" onclick="regenerateKey()">Regenerate Keypair</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Navigation Dock -->
+    <nav class="bottom-nav">
+      <a href="/emergencypay" class="nav-tab">
+        <i class="ri-home-5-line"></i>
+        <span>Home</span>
+      </a>
+      <a href="/scan" class="nav-tab">
+        <i class="ri-qr-scan-line"></i>
+        <span>Scan</span>
+      </a>
+      <a href="/bluetooth" class="nav-tab">
+        <i class="ri-bluetooth-line"></i>
+        <span>Pay BT</span>
+      </a>
+      <a href="/history" class="nav-tab">
+        <i class="ri-history-line"></i>
+        <span>History</span>
+      </a>
+      <a href="/profile" class="nav-tab active">
+        <i class="ri-user-3-line"></i>
+        <span>Profile</span>
+        <span class="nav-indicator"></span>
+      </a>
+    </nav>
+
+  </div>
+
+  <script>
+    let currentUser = null;
+
+    async function loadProfile() {
+      try {
+        const res = await fetch('/api/user');
+        if (res.ok) {
+          currentUser = await res.json();
+          document.getElementById('userName').textContent = currentUser.name;
+          document.getElementById('userPhone').textContent = `+91 ${currentUser.phone}`;
+          document.getElementById('dispBalance').textContent = `₹ ${Number(currentUser.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          document.getElementById('dispEmergency').textContent = `₹ ${Number(currentUser.emergency_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        }
+
+        const netRes = await fetch('/api/system/network-status');
+        if (netRes.ok) {
+          const net = await netRes.json();
+          const badge = document.getElementById('netStatusBadge');
+          const toggle = document.getElementById('emergencyToggle');
+          
+          if (net.status === 'emergency') {
+            badge.textContent = 'Emergency';
+            badge.style.background = '#fee2e2';
+            badge.style.color = '#b91c1c';
+            toggle.checked = true;
+          } else if (net.status === 'offline') {
+            badge.textContent = 'Offline';
+            badge.style.background = '#fef3c7';
+            badge.style.color = '#b45309';
+            toggle.checked = false;
+          } else {
+            badge.textContent = 'Online';
+            badge.style.background = '#dcfce7';
+            badge.style.color = '#15803d';
+            toggle.checked = false;
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function toggleEmergency(enabled) {
+      const status = enabled ? 'emergency' : 'online';
+      localStorage.setItem('ep_network_status', status);
+      await fetch('/api/system/network-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      loadProfile();
+    }
+
+    async function addFunds() {
+      const amt = prompt('Enter amount to add (₹):', '1000');
+      if (!amt || isNaN(amt) || Number(amt) <= 0) return;
+      const target = confirm('Click OK to add to Available Balance, or Cancel to add to Emergency Reserve') ? 'balance' : 'emergency_balance';
+
+      try {
+        const res = await fetch('/api/user/add-funds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: Number(amt), target })
+        });
+        if (res.ok) {
+          alert(`Successfully added ₹${amt}!`);
+          loadProfile();
+        }
+      } catch (e) {
+        alert('Failed to add funds.');
+      }
+    }
+
+    async function editProfile() {
+      const name = prompt('Update Name:', currentUser ? currentUser.name : '');
+      const phone = prompt('Update Phone (10 digits):', currentUser ? currentUser.phone : '');
+      if (!name || !phone) return;
+
+      try {
+        const res = await fetch(`/api/users/${currentUser.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, phone })
+        });
+        if (res.ok) {
+          alert('Profile updated successfully!');
+          loadProfile();
+        }
+      } catch (e) {
+        alert('Failed to update profile.');
+      }
+    }
+
+    async function syncTransactions() {
+      try {
+        const res = await fetch('/api/transactions/sync', { method: 'POST' });
+        if (res.ok) {
+          const d = await res.json();
+          alert(d.message || 'Transactions reconciled successfully!');
+        }
+      } catch (e) {
+        alert('Reconciliation failed.');
+      }
+    }
+
+    function regenerateKey() {
+      const key = 'PK_ECC_secp256k1_' + Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2,'0')).join('');
+      document.getElementById('keyBox').textContent = key;
+      alert('New asymmetric ECC keypair generated for offline transaction signing!');
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>

@@ -8,81 +8,588 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-
   <style>
     :root {
-      --bg-dark: #0b0f19;
-      --bg-card: #131b2e;
-      --emerald-primary: #10b981;
-      --emerald-glow: rgba(16, 185, 129, 0.25);
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --border-color: rgba(255, 255, 255, 0.08);
-      --radius-md: 14px;
-      --radius-lg: 20px;
-      --font-family: 'Exo 2', sans-serif;
+      --primary: #3f3fe9;
+      --primary-100: #e8e8fd;
+      --emergency: #dc2626;
+      --emergency-100: #fee2e2;
+      --font-family: 'Exo 2', ui-sans-serif, system-ui, sans-serif;
     }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); }
-    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; }
-    
-    .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 20px; }
-    
-    header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); }
-    .back-btn { color: var(--text-main); text-decoration: none; font-size: 1.2rem; display: flex; align-items: center; gap: 6px; }
-    .header-title { font-weight: 700; font-size: 1.1rem; }
-
-    .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-
-    .history-list { display: flex; flex-direction: column; gap: 10px; }
-    .history-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-md); }
-    .tx-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); color: var(--emerald-primary); display: grid; place-items: center; font-size: 1.2rem; }
-    .tx-info { display: flex; flex-direction: column; gap: 2px; }
-    .tx-title { font-size: 0.95rem; font-weight: 600; }
-    .tx-meta { font-size: 0.75rem; color: var(--text-muted); }
-    .tx-amount { font-weight: 700; font-size: 1rem; color: var(--emerald-primary); }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-family);
+      background: #f9fafb;
+      color: #111827;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app-shell {
+      max-width: 28rem;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+    }
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+    }
+    .status-pill:hover { background: #f3f4f6; }
+    .status-dot {
+      width: 0.75rem;
+      height: 0.75rem;
+      border-radius: 9999px;
+      flex-shrink: 0;
+    }
+    .status-dot.online { background: #22c55e; }
+    .status-dot.offline { background: #f59e0b; }
+    .status-dot.emergency { background: var(--emergency); }
+    .status-text.online { color: #16a34a; }
+    .status-text.offline { color: #d97706; }
+    .status-text.emergency { color: var(--emergency); }
+    .network-menu {
+      position: absolute;
+      top: 2rem;
+      left: 0;
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+      z-index: 50;
+      display: none;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-width: 8rem;
+    }
+    .network-menu.open { display: flex; }
+    .network-menu button {
+      font-size: 0.75rem;
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.25rem;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+      text-align: left;
+      font-family: inherit;
+    }
+    .network-menu .btn-online { background: #dcfce7; color: #15803d; }
+    .network-menu .btn-offline { background: #fef3c7; color: #b45309; }
+    .network-menu .btn-emergency { background: var(--emergency-100); color: #b91c1c; }
+    .status-left { position: relative; }
+    .main-scroll {
+      flex: 1;
+      overflow: auto;
+      padding-bottom: 5rem;
+    }
+    .page-header {
+      padding: 1.5rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .page-header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    .sync-btn {
+      color: #fff;
+      padding: 0.25rem 0.75rem;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+    }
+    .sync-btn.active { background: var(--primary); }
+    .sync-btn.disabled {
+      background: #d1d5db;
+      cursor: not-allowed;
+    }
+    .section { padding: 0 1rem 1.5rem; }
+    .section h3 {
+      font-size: 1.125rem;
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+    }
+    .transaction-item {
+      background: #fff;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      box-shadow: 0 4px 15px rgb(0 0 0 / 0.05);
+      cursor: pointer;
+      border: 1px solid #f3f4f6;
+    }
+    .transaction-item:active { transform: scale(0.98); }
+    .tx-icon-wrap {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 0.75rem;
+      flex-shrink: 0;
+    }
+    .tx-icon-wrap.payment { background: var(--primary-100); color: var(--primary); }
+    .tx-icon-wrap.receipt { background: #fef3c7; color: #d97706; }
+    .tx-body { flex: 1; min-width: 0; }
+    .tx-body h4 {
+      font-weight: 500;
+      font-size: 0.9375rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tx-meta {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-top: 0.125rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .tx-meta .offline-tag { color: var(--emergency); display: inline-flex; align-items: center; }
+    .tx-meta .offline-tag.amber { color: #d97706; }
+    .tx-right { text-align: right; flex-shrink: 0; }
+    .tx-amount { font-weight: 500; font-size: 0.9375rem; }
+    .tx-status {
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin-top: 0.125rem;
+    }
+    .tx-status.completed { color: #16a34a; }
+    .tx-status.pending { color: #d97706; }
+    .tx-status.failed { color: #dc2626; }
+    .empty-state {
+      text-align: center;
+      padding: 1.5rem;
+      background: #f9fafb;
+      border-radius: 0.5rem;
+    }
+    .empty-state p { color: #6b7280; }
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+      padding: 0.5rem;
+      z-index: 10;
+    }
+    .bottom-nav-inner {
+      max-width: 28rem;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-around;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.25rem 0.75rem;
+      text-decoration: none;
+      color: #6b7280;
+      font-size: 0.75rem;
+      position: relative;
+    }
+    .nav-item i { font-size: 1.25rem; }
+    .nav-item span { margin-top: 0.25rem; }
+    .nav-item.active { color: var(--primary); }
+    .nav-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      width: 2.5rem;
+      height: 2px;
+      background: var(--primary);
+      border-radius: 9999px 9999px 0 0;
+    }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgb(0 0 0 / 0.5);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 0.75rem;
+      max-width: 28rem;
+      width: 100%;
+      max-height: 90vh;
+      overflow: auto;
+    }
+    .modal-header {
+      padding: 1rem;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h3 { font-size: 1.125rem; font-weight: 500; }
+    .modal-close {
+      width: 2rem;
+      height: 2rem;
+      border: none;
+      background: #f3f4f6;
+      border-radius: 9999px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+    .modal-body { padding: 1rem; }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      font-size: 0.875rem;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .detail-row span:first-child { color: #6b7280; }
+    .detail-row span:last-child { font-weight: 500; text-align: right; max-width: 60%; word-break: break-word; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .badge.completed { background: #dcfce7; color: #166534; }
+    .badge.pending { background: #fef3c7; color: #92400e; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <a href="/emergencypay" class="back-btn"><i class="ri-arrow-left-line"></i> Dashboard</a>
-      <span class="header-title">Transaction Log</span>
-      <div style="width: 24px;"></div>
-    </header>
+  <div class="app-shell">
+    <div class="status-bar">
+      <div class="status-left">
+        <button type="button" class="status-pill" id="networkToggle" aria-expanded="false">
+          <span class="status-dot offline" id="statusDot"></span>
+          <span class="status-text offline" id="statusText">Offline</span>
+        </button>
+        <div class="network-menu" id="networkMenu">
+          <button type="button" class="btn-online" data-status="online"><i class="ri-wifi-line"></i> Online</button>
+          <button type="button" class="btn-offline" data-status="offline"><i class="ri-wifi-off-line"></i> Offline</button>
+          <button type="button" class="btn-emergency" data-status="emergency"><i class="ri-alarm-warning-line"></i> Emergency</button>
+        </div>
+      </div>
+      <a href="/emergencypay" style="font-size:0.875rem;color:var(--primary);text-decoration:none;font-weight:500;">EmergencyPay</a>
+    </div>
 
-    <div class="card">
-      <div class="history-list" id="historyContainer">
-        <!-- Loaded dynamically -->
+    <div class="main-scroll">
+      <div class="page-header">
+        <h1>Transaction History</h1>
+        <button type="button" class="sync-btn disabled" id="syncBtn">Sync Now</button>
+      </div>
+
+      <div class="section" id="pendingSection" hidden>
+        <h3>Pending Transactions</h3>
+        <div id="pendingList"></div>
+      </div>
+
+      <div class="section">
+        <h3>All Transactions</h3>
+        <div id="allList"></div>
+        <div class="empty-state" id="emptyState" hidden>
+          <p>No transactions yet</p>
+        </div>
       </div>
     </div>
   </div>
 
+  <nav class="bottom-nav" aria-label="Main">
+    <div class="bottom-nav-inner">
+      <a href="/emergencypay" class="nav-item"><i class="ri-home-5-line"></i><span>Home</span></a>
+      <a href="/scan" class="nav-item"><i class="ri-qr-scan-line"></i><span>Scan</span></a>
+      <a href="/bluetooth" class="nav-item"><i class="ri-bluetooth-line"></i><span>Pay BT</span></a>
+      <a href="/history" class="nav-item active"><i class="ri-history-line"></i><span>History</span></a>
+      <a href="/profile" class="nav-item"><i class="ri-user-3-line"></i><span>Profile</span></a>
+    </div>
+  </nav>
+
+  <div class="modal-backdrop" id="detailModal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Transaction Details</h3>
+        <button type="button" class="modal-close" id="closeModal" aria-label="Close"><i class="ri-close-line"></i></button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
   <script>
+    const STORAGE_KEY = 'ep_tx_history';
+    const CONNECTION_KEY = 'ep_connection_status';
+
     const defaultHistory = [
-      { payee: 'grocery@upi', amount: 350, timestamp: 'Today, 2:15 PM', channel: 'Bluetooth', token: 'EP-MESH-98A1' },
-      { payee: 'pharmacy@okicici', amount: 120, timestamp: 'Yesterday, 6:40 PM', channel: 'Local Mesh', token: 'EP-MESH-44F2' }
+      {
+        id: 'demo-1',
+        payee: 'grocery@upi',
+        amount: 350,
+        timestamp: new Date(Date.now() - 3600000).toISOString(),
+        status: 'completed',
+        is_offline: true,
+        method: 'BLUETOOTH',
+        channel: 'Bluetooth',
+        token: 'EP-MESH-98A1'
+      },
+      {
+        id: 'demo-2',
+        payee: 'pharmacy@okicici',
+        amount: 120,
+        timestamp: new Date(Date.now() - 86400000).toISOString(),
+        status: 'pending',
+        is_offline: true,
+        method: 'OFFLINE',
+        channel: 'Local Mesh',
+        token: 'EP-MESH-44F2'
+      }
     ];
 
-    const history = JSON.parse(localStorage.getItem('ep_tx_history') || 'null') || defaultHistory;
-
-    function renderList() {
-      const container = document.getElementById('historyContainer');
-      container.innerHTML = history.map(tx => `
-        <div class="history-item">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="tx-icon"><i class="ri-arrow-up-line"></i></div>
-            <div class="tx-info">
-              <span class="tx-title">${tx.payee}</span>
-              <span class="tx-meta">${tx.timestamp || tx.date || 'Offline'} • ${tx.channel || 'Mesh'}</span>
-            </div>
-          </div>
-          <div class="tx-amount">- ₹${tx.amount}</div>
-        </div>
-      `).join('');
+    function getConnectionStatus() {
+      return localStorage.getItem(CONNECTION_KEY) || 'offline';
     }
 
-    renderList();
+    function setConnectionStatus(status) {
+      localStorage.setItem(CONNECTION_KEY, status);
+      updateConnectionUI();
+      updateSyncButton();
+    }
+
+    function updateConnectionUI() {
+      const status = getConnectionStatus();
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      dot.className = 'status-dot ' + status;
+      text.className = 'status-text ' + status;
+      const labels = { online: 'Online', offline: 'Offline', emergency: 'Emergency Mode' };
+      text.textContent = labels[status] || 'Unknown';
+    }
+
+    function updateSyncButton() {
+      const btn = document.getElementById('syncBtn');
+      const online = getConnectionStatus() === 'online';
+      btn.classList.toggle('active', online);
+      btn.classList.toggle('disabled', !online);
+      btn.disabled = !online;
+    }
+
+    function normalizeTx(raw, index) {
+      const amount = Number(raw.amount) || 0;
+      let timestamp = raw.timestamp;
+      if (timestamp && isNaN(Date.parse(timestamp))) {
+        timestamp = new Date().toISOString();
+      } else if (!timestamp) {
+        timestamp = new Date().toISOString();
+      }
+      const channel = raw.channel || 'Bluetooth';
+      const isBluetooth = /bluetooth/i.test(channel);
+      return {
+        id: raw.txId || raw.id || 'tx-' + index,
+        payee: raw.payee || 'Unknown',
+        amount,
+        timestamp,
+        status: raw.status || 'completed',
+        is_offline: raw.is_offline !== false,
+        method: raw.method || (isBluetooth ? 'BLUETOOTH' : 'OFFLINE'),
+        channel,
+        token: raw.token || '',
+        note: raw.note || '',
+        txId: raw.txId || raw.id
+      };
+    }
+
+    function loadTransactions() {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      const list = (stored && stored.length ? stored : defaultHistory).map(normalizeTx);
+      return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }
+
+    function saveTransactions(transactions) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    }
+
+    function formatAmount(amount) {
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+    }
+
+    function formatDate(ts) {
+      return new Date(ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function formatTime(ts) {
+      return new Date(ts).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+
+    function getTitle(tx) {
+      return 'Paid to ' + tx.payee;
+    }
+
+    function getStatusIcon(status) {
+      if (status === 'completed') return 'ri-checkbox-circle-fill';
+      if (status === 'pending') return 'ri-time-line';
+      return 'ri-close-circle-fill';
+    }
+
+    function renderTransactionItem(tx, index) {
+      const offlineMeta = tx.is_offline
+        ? (tx.method === 'BLUETOOTH'
+          ? '<span class="offline-tag"><i class="ri-bluetooth-line"></i> BT</span>'
+          : '<span class="offline-tag amber"><i class="ri-wifi-off-line"></i> Offline</span>')
+        : '';
+      return `
+        <article class="transaction-item" data-id="${tx.id}" tabindex="0">
+          <div class="tx-icon-wrap payment">
+            <i class="ri-arrow-up-line text-lg"></i>
+          </div>
+          <div class="tx-body">
+            <h4>${escapeHtml(getTitle(tx))}</h4>
+            <p class="tx-meta">
+              ${formatDate(tx.timestamp)} • ${formatTime(tx.timestamp)}
+              ${offlineMeta ? ' • ' + offlineMeta : ''}
+            </p>
+          </div>
+          <div class="tx-right">
+            <p class="tx-amount">${formatAmount(tx.amount)}</p>
+            <p class="tx-status ${tx.status}">
+              <i class="${getStatusIcon(tx.status)}"></i>
+              ${tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
+            </p>
+          </div>
+        </article>`;
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function render() {
+      const transactions = loadTransactions();
+      const pending = transactions.filter(t => t.status === 'pending');
+      const pendingSection = document.getElementById('pendingSection');
+      const pendingList = document.getElementById('pendingList');
+      const allList = document.getElementById('allList');
+      const emptyState = document.getElementById('emptyState');
+
+      if (pending.length) {
+        pendingSection.hidden = false;
+        pendingList.innerHTML = pending.map((tx, i) => renderTransactionItem(tx, i)).join('');
+      } else {
+        pendingSection.hidden = true;
+        pendingList.innerHTML = '';
+      }
+
+      if (transactions.length) {
+        emptyState.hidden = true;
+        allList.innerHTML = transactions.map((tx, i) => renderTransactionItem(tx, i)).join('');
+      } else {
+        allList.innerHTML = '';
+        emptyState.hidden = false;
+      }
+
+      document.querySelectorAll('.transaction-item').forEach(el => {
+        el.addEventListener('click', () => openDetail(el.dataset.id));
+      });
+    }
+
+    function openDetail(id) {
+      const tx = loadTransactions().find(t => t.id === id);
+      if (!tx) return;
+      const body = document.getElementById('modalBody');
+      body.innerHTML = `
+        <div class="detail-row"><span>Amount</span><span>${formatAmount(tx.amount)}</span></div>
+        <div class="detail-row"><span>Recipient</span><span>${escapeHtml(tx.payee)}</span></div>
+        <div class="detail-row"><span>Date</span><span>${formatDate(tx.timestamp)}</span></div>
+        <div class="detail-row"><span>Time</span><span>${formatTime(tx.timestamp)}</span></div>
+        <div class="detail-row"><span>Status</span><span class="badge ${tx.status}">${tx.status}</span></div>
+        <div class="detail-row"><span>Method</span><span>${tx.is_offline ? (tx.method === 'BLUETOOTH' ? 'Bluetooth Payment' : 'Offline') : 'UPI Payment'}</span></div>
+        ${tx.txId ? `<div class="detail-row"><span>Reference</span><span>${escapeHtml(String(tx.txId))}</span></div>` : ''}
+        ${tx.token ? `<div class="detail-row"><span>Token</span><span>${escapeHtml(tx.token)}</span></div>` : ''}
+        ${tx.note ? `<div class="detail-row"><span>Note</span><span>${escapeHtml(tx.note)}</span></div>` : ''}
+      `;
+      document.getElementById('detailModal').classList.add('open');
+    }
+
+    async function reconcileTransactions() {
+      if (getConnectionStatus() !== 'online') return;
+      try {
+        await fetch('/api/transactions/sync', { method: 'POST' });
+      } catch (err) {
+        console.warn('Backend sync failed, reconciling local state', err);
+      }
+      const txs = loadTransactions().map(tx =>
+        tx.status === 'pending' ? { ...tx, status: 'completed' } : tx
+      );
+      saveTransactions(txs);
+      render();
+    }
+
+    document.getElementById('syncBtn').addEventListener('click', reconcileTransactions);
+
+    document.getElementById('networkToggle').addEventListener('click', () => {
+      const menu = document.getElementById('networkMenu');
+      const open = menu.classList.toggle('open');
+      document.getElementById('networkToggle').setAttribute('aria-expanded', open);
+    });
+
+    document.querySelectorAll('#networkMenu [data-status]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setConnectionStatus(btn.dataset.status);
+        document.getElementById('networkMenu').classList.remove('open');
+      });
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.status-left')) {
+        document.getElementById('networkMenu').classList.remove('open');
+      }
+    });
+
+    document.getElementById('closeModal').addEventListener('click', () => {
+      document.getElementById('detailModal').classList.remove('open');
+    });
+    document.getElementById('detailModal').addEventListener('click', (e) => {
+      if (e.target.id === 'detailModal') document.getElementById('detailModal').classList.remove('open');
+    });
+
+    updateConnectionUI();
+    updateSyncButton();
+    render();
   </script>
 </body>
 </html>
