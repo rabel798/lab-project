@@ -5,3 +5,7 @@
 labvenv/
 .log
 .github/
+__pycache__/
+*.pyc
+database.db
+connection-status.json
