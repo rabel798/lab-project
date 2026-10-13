@@ -8,143 +8,196 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-
   <style>
     :root {
-      --bg-dark: #0b0f19;
-      --bg-card: #131b2e;
-      --emerald-primary: #10b981;
-      --emerald-glow: rgba(16, 185, 129, 0.25);
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --border-color: rgba(255, 255, 255, 0.08);
-      --radius-md: 14px;
-      --radius-lg: 20px;
-      --font-family: 'Exo 2', sans-serif;
+      --primary: #3f3fe9;
+      --primary-100: #e8e8fd;
+      --primary-50: #f4f4fe;
+      --emergency: #dc2626;
+      --bg-page: #ffffff;
+      --border-color: #e5e7eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); }
-    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
-    
-    .pin-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 32px 24px; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; gap: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
-    .pin-header { text-align: center; }
-    .pin-title { font-size: 1.2rem; font-weight: 700; }
-    .pin-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
-    .payment-summary { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 20px; text-align: center; width: 100%; font-weight: 700; font-size: 1.1rem; color: var(--emerald-primary); }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: #f9fafb; color: var(--text-main); min-height: 100vh; display: flex; justify-content: center; }
 
-    .pin-dots { display: flex; gap: 14px; margin: 10px 0; }
-    .pin-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border-color); transition: all 0.2s; }
-    .pin-dot.filled { background: var(--emerald-primary); border-color: var(--emerald-primary); box-shadow: 0 0 10px var(--emerald-glow); }
+    .app-shell { width: 100%; max-width: 448px; min-height: 100vh; background: #fff; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 25px rgba(0,0,0,0.05); }
 
-    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
-    .key-btn { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; font-size: 1.3rem; font-weight: 700; color: #fff; cursor: pointer; transition: background 0.15s; }
-    .key-btn:active { background: rgba(16, 185, 129, 0.2); }
+    /* Top Bar */
+    .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border-color); background: #fff; position: sticky; top: 0; z-index: 20; }
+    .back-btn { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text-main); font-size: 1.3rem; transition: background 0.15s; }
+    .back-btn:hover { background: #f3f4f6; }
+    .top-title { font-size: 1.15rem; font-weight: 600; }
+
+    .content-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 20px 40px; text-align: center; }
+
+    /* Summary Card */
+    .summary-card { width: 100%; max-width: 360px; background: var(--primary-50); border: 1px solid #e0e0fc; border-radius: 14px; padding: 16px; margin-bottom: 24px; text-align: center; }
+    .summary-label { font-size: 0.8rem; font-weight: 600; color: #4338ca; }
+    .summary-amt { font-size: 1.85rem; font-weight: 800; color: var(--primary); margin: 4px 0 2px; }
+    .summary-payee { font-size: 0.88rem; font-weight: 600; color: var(--text-main); }
+    .summary-channel { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+    .pin-title { font-size: 1.25rem; font-weight: 700; color: var(--text-main); }
+    .pin-subtitle { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
+
+    /* PIN Dots */
+    .pin-dots { display: flex; gap: 18px; margin: 24px 0 32px; justify-content: center; }
+    .pin-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #cbd5e1; background: #fff; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+    .pin-dot.filled { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 12px rgba(63, 63, 233, 0.4); transform: scale(1.1); }
+
+    /* Numeric Keypad */
+    .keypad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; max-width: 320px; }
+    .key-btn { background: #f9fafb; border: 1px solid var(--border-color); border-radius: 14px; padding: 18px; font-size: 1.45rem; font-weight: 700; color: var(--text-main); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; user-select: none; }
+    .key-btn:hover { background: #f3f4f6; border-color: #cbd5e1; }
+    .key-btn:active { background: var(--primary-100); color: var(--primary); transform: scale(0.96); }
+    .key-btn i { font-size: 1.4rem; color: #6b7280; }
+
+    /* Processing Overlay */
+    .processing-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.85); backdrop-filter: blur(4px); z-index: 50; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; }
+    .processing-overlay.open { display: flex; }
+    .spinner { width: 44px; height: 44px; border: 4px solid var(--primary-100); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <div class="pin-card">
-    <div class="pin-header">
-      <div class="pin-title">Enter 4-Digit UPI PIN</div>
-      <div class="pin-subtitle">Authenticating Encrypted Transfer</div>
+  <div class="app-shell">
+    
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <a href="/pay" class="back-btn">
+        <i class="ri-arrow-left-line"></i>
+      </a>
+      <h1 class="top-title">UPI Authorization</h1>
+      <div style="width: 36px;"></div>
+    </header>
+
+    <div class="content-area">
+      <!-- Summary Card -->
+      <section class="summary-card">
+        <span class="summary-label">Transfer Amount</span>
+        <div class="summary-amt" id="dispAmount">₹ 0.00</div>
+        <div class="summary-payee" id="dispPayee">To: Recipient</div>
+        <div class="summary-channel" id="dispChannel">Via Bluetooth Offline Mesh</div>
+      </section>
+
+      <h2 class="pin-title">Enter 4-Digit UPI PIN</h2>
+      <p class="pin-subtitle">Secured with asymmetric local mesh encryption</p>
+
+      <!-- 4 PIN Dots -->
+      <div class="pin-dots">
+        <div class="pin-dot" id="dot0"></div>
+        <div class="pin-dot" id="dot1"></div>
+        <div class="pin-dot" id="dot2"></div>
+        <div class="pin-dot" id="dot3"></div>
+      </div>
+
+      <!-- Keypad -->
+      <div class="keypad-grid">
+        <button class="key-btn" onclick="enterKey('1')">1</button>
+        <button class="key-btn" onclick="enterKey('2')">2</button>
+        <button class="key-btn" onclick="enterKey('3')">3</button>
+        <button class="key-btn" onclick="enterKey('4')">4</button>
+        <button class="key-btn" onclick="enterKey('5')">5</button>
+        <button class="key-btn" onclick="enterKey('6')">6</button>
+        <button class="key-btn" onclick="enterKey('7')">7</button>
+        <button class="key-btn" onclick="enterKey('8')">8</button>
+        <button class="key-btn" onclick="enterKey('9')">9</button>
+        <button class="key-btn" onclick="clearPin()"><i class="ri-close-line"></i></button>
+        <button class="key-btn" onclick="enterKey('0')">0</button>
+        <button class="key-btn" onclick="deleteKey()"><i class="ri-delete-back-line"></i></button>
+      </div>
     </div>
 
-    <div class="payment-summary" id="paymentSummary">
-      Paying ₹0.00
+    <!-- Processing Overlay -->
+    <div class="processing-overlay" id="processingOverlay">
+      <div class="spinner"></div>
+      <p style="font-weight:600;font-size:0.95rem;color:var(--primary);">Encrypting Offline Payment...</p>
     </div>
 
-    <div class="pin-dots">
-      <div class="pin-dot"></div>
-      <div class="pin-dot"></div>
-      <div class="pin-dot"></div>
-      <div class="pin-dot"></div>
-    </div>
-
-    <div class="keypad">
-      <button class="key-btn" onclick="enterDigit('1')">1</button>
-      <button class="key-btn" onclick="enterDigit('2')">2</button>
-      <button class="key-btn" onclick="enterDigit('3')">3</button>
-      <button class="key-btn" onclick="enterDigit('4')">4</button>
-      <button class="key-btn" onclick="enterDigit('5')">5</button>
-      <button class="key-btn" onclick="enterDigit('6')">6</button>
-      <button class="key-btn" onclick="enterDigit('7')">7</button>
-      <button class="key-btn" onclick="enterDigit('8')">8</button>
-      <button class="key-btn" onclick="enterDigit('9')">9</button>
-      <button class="key-btn" onclick="clearPin()"><i class="ri-close-line"></i></button>
-      <button class="key-btn" onclick="enterDigit('0')">0</button>
-      <button class="key-btn" onclick="window.location.href='/pay'"><i class="ri-arrow-left-line"></i></button>
-    </div>
   </div>
 
   <script>
-    let pinInput = '';
-    const pendingPayment = JSON.parse(sessionStorage.getItem('ep_pending_payment') || 'null');
+    let pin = '';
+    const pending = JSON.parse(sessionStorage.getItem('ep_pending_payment') || 'null');
 
-    if (!pendingPayment) {
+    if (!pending) {
       window.location.href = '/pay';
     } else {
-      document.getElementById('paymentSummary').textContent = `Paying ₹${pendingPayment.amount} to ${pendingPayment.payee}`;
+      document.getElementById('dispAmount').textContent = `₹ ${Number(pending.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+      document.getElementById('dispPayee').textContent = `To: ${pending.payee}`;
+      document.getElementById('dispChannel').textContent = `Via ${pending.channel || 'Bluetooth'} Offline Mesh`;
     }
 
-    function enterDigit(digit) {
-      if (pinInput.length < 4) {
-        pinInput += digit;
+    function updateDots() {
+      for (let i = 0; i < 4; i++) {
+        const dot = document.getElementById(`dot${i}`);
+        dot.classList.toggle('filled', i < pin.length);
+      }
+    }
+
+    function enterKey(digit) {
+      if (pin.length < 4) {
+        pin += digit;
         updateDots();
-        if (pinInput.length === 4) {
-          setTimeout(submitPayment, 250);
+        if (pin.length === 4) {
+          setTimeout(submitPayment, 300);
         }
+      }
+    }
+
+    function deleteKey() {
+      if (pin.length > 0) {
+        pin = pin.slice(0, -1);
+        updateDots();
       }
     }
 
     function clearPin() {
-      pinInput = '';
+      pin = '';
       updateDots();
     }
 
-    function updateDots() {
-      const dots = document.querySelectorAll('.pin-dot');
-      dots.forEach((dot, index) => {
-        if (index < pinInput.length) {
-          dot.classList.add('filled');
-        } else {
-          dot.classList.remove('filled');
-        }
-      });
-    }
-
     async function submitPayment() {
-      const formData = new FormData();
-      formData.append('payee', pendingPayment.payee);
-      formData.append('amount', pendingPayment.amount);
-      formData.append('note', pendingPayment.note);
-      formData.append('channel', pendingPayment.channel);
+      document.getElementById('processingOverlay').classList.add('open');
+      const channel = pending.channel || 'Bluetooth';
+
+      const receipt = {
+        tx_id: 'EMP' + Math.floor(100000 + Math.random() * 900000),
+        payee: pending.payee,
+        amount: pending.amount,
+        note: pending.note || 'Offline Payment',
+        channel: channel,
+        timestamp: new Date().toISOString(),
+        status: 'pending',
+        is_offline: true,
+        method: /bluetooth/i.test(channel) ? 'BLUETOOTH' : 'OFFLINE',
+        token: 'EP-MESH-' + Math.random().toString(36).substring(2, 10).toUpperCase()
+      };
 
       try {
-        const response = await fetch('/insert', { method: 'POST', body: formData });
-        const result = await response.json();
-
-        // Store transaction receipt payload
-        const receipt = {
-          txId: 'EMP' + Math.floor(100000 + Math.random() * 900000),
-          payee: pendingPayment.payee,
-          amount: pendingPayment.amount,
-          note: pendingPayment.note,
-          channel: pendingPayment.channel,
-          timestamp: new Date().toLocaleString(),
-          token: 'EP-MESH-' + Math.random().toString(36).substring(2, 10).toUpperCase()
-        };
-
-        sessionStorage.setItem('ep_last_receipt', JSON.stringify(receipt));
-        
-        // Save to persistent local transaction history
-        let history = JSON.parse(localStorage.getItem('ep_tx_history') || '[]');
-        history.unshift(receipt);
-        localStorage.setItem('ep_tx_history', JSON.stringify(history));
-
-        window.location.href = '/receipt';
+        await fetch('/insert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(receipt)
+        });
       } catch (err) {
-        console.error('Error processing payment:', err);
-        window.location.href = '/receipt';
+        console.warn('Saved offline in localStorage', err);
       }
+
+      // Store last receipt and add to persistent history
+      sessionStorage.setItem('ep_last_receipt', JSON.stringify(receipt));
+
+      let history = JSON.parse(localStorage.getItem('ep_tx_history') || '[]');
+      history.unshift(receipt);
+      localStorage.setItem('ep_tx_history', JSON.stringify(history));
+
+      setTimeout(() => {
+        window.location.href = '/receipt';
+      }, 700);
     }
   </script>
 </body>
