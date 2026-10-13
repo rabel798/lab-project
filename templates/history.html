@@ -312,7 +312,10 @@
     <div class="main-scroll">
       <div class="page-header">
         <h1>Transaction History</h1>
-        <button type="button" class="sync-btn active" id="syncBtn">Sync Now</button>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="sync-btn" id="clearBtn" style="background:#fee2e2;color:#dc2626;" onclick="clearTransactionHistory()">Clear</button>
+          <button type="button" class="sync-btn active" id="syncBtn">Sync Now</button>
+        </div>
       </div>
 
       <div class="section" id="pendingSection" hidden>
@@ -354,32 +357,7 @@
     const STORAGE_KEY = 'ep_tx_history';
     const CONNECTION_KEY = 'ep_network_status';
 
-    const defaultHistory = [
-      {
-        id: 'demo-1',
-        txId: 'EMP984121',
-        payee: 'Widow Spa',
-        amount: 350,
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        status: 'completed',
-        is_offline: true,
-        method: 'BLUETOOTH',
-        channel: 'Bluetooth',
-        token: 'EP-MESH-98A1'
-      },
-      {
-        id: 'demo-2',
-        txId: 'EMP552190',
-        payee: 'Spidey Pizza Service',
-        amount: 120,
-        timestamp: new Date(Date.now() - 86400000).toISOString(),
-        status: 'completed',
-        is_offline: true,
-        method: 'BLUETOOTH',
-        channel: 'Bluetooth',
-        token: 'EP-MESH-44F2'
-      }
-    ];
+    const defaultHistory = [];
 
     function getConnectionStatus() {
       return localStorage.getItem(CONNECTION_KEY) || 'online';
@@ -619,11 +597,38 @@
       }
     }
 
+    async function clearTransactionHistory() {
+      if (!confirm('Are you sure you want to clear all transaction history?')) return;
+      try {
+        const res = await fetch('/api/transactions/clear', { method: 'POST' });
+        if (res.ok) {
+          localStorage.removeItem(STORAGE_KEY);
+          saveTransactions([]);
+          render();
+          alert('Transaction history cleared successfully.');
+        } else {
+          alert('Failed to clear transaction history.');
+        }
+      } catch (err) {
+        localStorage.removeItem(STORAGE_KEY);
+        saveTransactions([]);
+        render();
+        alert('Transaction history cleared locally.');
+      }
+    }
+
     async function fetchAndRenderTransactions() {
       try {
         const res = await fetch('/api/transactions');
         if (res.ok) {
           const serverTxs = await res.json();
+          if (serverTxs.length === 0) {
+            localStorage.removeItem(STORAGE_KEY);
+            saveTransactions([]);
+            render();
+            return;
+          }
+
           const localTxs = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
           
           const map = new Map();
@@ -657,9 +662,7 @@
           });
 
           const merged = Array.from(map.values()).map(normalizeTx);
-          if (merged.length > 0) {
-            saveTransactions(merged);
-          }
+          saveTransactions(merged);
         }
       } catch (err) {
         console.warn('Could not fetch server transactions', err);

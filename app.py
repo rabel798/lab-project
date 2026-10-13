@@ -104,12 +104,14 @@ def init_db():
                 VALUES (?, ?, ?, ?)
             """, (d_name, d_phone, d_bal, d_emg))
 
+    # Ensure any groceries or pharmacy merchants are removed
+    cursor.execute("DELETE FROM merchants WHERE category LIKE '%groc%' OR category LIKE '%pharm%' OR name LIKE '%pizza%' OR name LIKE '%pharmacy%'")
+
     # Seed default merchants if empty
     cursor.execute("SELECT COUNT(*) as cnt FROM merchants")
     if cursor.fetchone()["cnt"] == 0:
         default_merchants = [
             ("S.H.I.E.L.D Daycare", "9876543211", "Healthcare", 1, 1.2, "Sector 17, Main Market"),
-            ("Spidey Pizza Service", "9876543212", "Groceries", 1, 0.8, "Queens Main Street"),
             ("Widow Spa", "9876543213", "Healthcare", 1, 1.5, "Red Room Avenue"),
             ("Panther Jewellers", "9876543214", "Retail", 0, 2.4, "Wakanda Plaza"),
             ("Electrician(God of Hammers) Services", "9876543215", "Emergency Services", 1, 1.8, "Asgardian Junction")
@@ -300,6 +302,49 @@ def api_add_funds():
     })
 
 
+@app.route("/api/user/transfer-to-emergency", methods=["POST"])
+def api_transfer_to_emergency():
+    data = request.get_json(silent=True) or request.form
+    try:
+        amount = float(data.get("amount", 0))
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "message": "Invalid amount"}), 400
+
+    user_id = int(data.get("user_id", 1))
+
+    if amount <= 0:
+        return jsonify({"success": False, "message": "Amount must be greater than zero"}), 400
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    if user["balance"] < amount:
+        conn.close()
+        return jsonify({
+            "success": False,
+            "message": f"Insufficient available balance (₹{user['balance']:.2f}) to transfer ₹{amount:.2f}"
+        }), 400
+
+    new_bal = round(user["balance"] - amount, 2)
+    new_emg = round(user["emergency_balance"] + amount, 2)
+
+    conn.execute("UPDATE users SET balance = ?, emergency_balance = ? WHERE id = ?", (new_bal, new_emg, user_id))
+    conn.commit()
+
+    updated = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": f"Successfully transferred ₹{amount:.2f} to Emergency Balance",
+        "balance": updated["balance"],
+        "emergency_balance": updated["emergency_balance"]
+    })
+
+
 @app.route("/api/merchants", methods=["GET"])
 def api_get_merchants():
     conn = get_db()
@@ -415,6 +460,19 @@ def api_transactions():
     txs = conn.execute("SELECT * FROM transactions ORDER BY created_at DESC").fetchall()
     conn.close()
     return jsonify([dict(t) for t in txs])
+
+
+@app.route("/api/transactions/clear", methods=["POST", "DELETE"])
+def api_clear_transactions():
+    conn = get_db()
+    conn.execute("DELETE FROM transactions")
+    conn.commit()
+    conn.close()
+    return jsonify({
+        "status": "success",
+        "message": "Transaction history cleared successfully",
+        "count": 0
+    })
 
 
 @app.route("/insert", methods=["GET", "POST"])

@@ -106,6 +106,14 @@
 
           <div class="card-row">
             <div>
+              <div class="row-title">Transfer to Emergency</div>
+              <div class="row-sub">Move funds from Available to Emergency Balance</div>
+            </div>
+            <button class="btn-action-sm" onclick="transferToEmergency()">Transfer</button>
+          </div>
+
+          <div class="card-row">
+            <div>
               <div class="row-title">Add Money</div>
               <div class="row-sub">Deposit funds into wallet</div>
             </div>
@@ -143,6 +151,14 @@
               <div class="row-sub">Sync pending offline receipts</div>
             </div>
             <button class="btn-action-sm" onclick="syncTransactions()">Sync Now</button>
+          </div>
+
+          <div class="card-row">
+            <div>
+              <div class="row-title">Clear Transaction History</div>
+              <div class="row-sub">Purge all local and synchronized transactions</div>
+            </div>
+            <button class="btn-action-sm" style="background:#fee2e2;color:#dc2626;" onclick="clearHistory()">Clear History</button>
           </div>
         </div>
       </div>
@@ -240,6 +256,44 @@
         body: JSON.stringify({ status })
       });
       loadProfile();
+    }
+
+    async function transferToEmergency() {
+      const amt = prompt('Enter amount to transfer to Emergency Balance (₹):', '500');
+      if (!amt || isNaN(amt) || Number(amt) <= 0) return;
+
+      try {
+        const res = await fetch('/api/user/transfer-to-emergency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: Number(amt) })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert(`Successfully transferred ₹${amt} to Emergency Balance!`);
+          loadProfile();
+        } else {
+          alert(data.message || 'Transfer failed.');
+        }
+      } catch (e) {
+        alert('Failed to transfer to emergency balance.');
+      }
+    }
+
+    async function clearHistory() {
+      if (!confirm('Are you sure you want to clear transaction history?')) return;
+      try {
+        const res = await fetch('/api/transactions/clear', { method: 'POST' });
+        if (res.ok) {
+          localStorage.removeItem('ep_tx_history');
+          alert('Transaction history cleared successfully!');
+        } else {
+          alert('Failed to clear transactions.');
+        }
+      } catch (e) {
+        localStorage.removeItem('ep_tx_history');
+        alert('Transaction history cleared locally.');
+      }
     }
 
     async function addFunds() {

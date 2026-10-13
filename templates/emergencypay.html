@@ -228,7 +228,12 @@
             <p class="emergency-balance-label">Emergency Balance</p>
             <p class="emergency-balance-val" id="emergencyBalance">₹ 6,767.00</p>
           </div>
-          <button class="btn-add-money" onclick="addMoneyPrompt()">Add Money</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+            <button class="btn-add-money" onclick="transferToEmergencyPrompt()" title="Transfer from Available to Emergency Balance" style="background:rgba(255,255,255,0.28);">
+              <i class="ri-arrow-down-line" style="vertical-align:middle;margin-right:2px;"></i>Transfer to Emergency
+            </button>
+            <button class="btn-add-money" onclick="addMoneyPrompt()">Add Money</button>
+          </div>
         </div>
       </section>
 
@@ -256,11 +261,6 @@
           <div class="service-icon-wrap"><i class="ri-hospital-line"></i></div>
           <span class="service-name">S.H.I.E.L.D Daycare</span>
           <span class="service-category">Healthcare • 1.2km</span>
-        </a>
-        <a href="/pay?payee=Spidey%20Pizza%20Service&channel=Bluetooth" class="service-card">
-          <div class="service-icon-wrap"><i class="ri-shopping-basket-line"></i></div>
-          <span class="service-name">Spidey Pizza Service</span>
-          <span class="service-category">Groceries • 0.8km</span>
         </a>
         <a href="/pay?payee=Widow%20Spa&channel=Bluetooth" class="service-card">
           <div class="service-icon-wrap"><i class="ri-hospital-line"></i></div>
@@ -362,9 +362,13 @@
         let list = [];
         if (res.ok) list = await res.json();
         
-        // Merge with local storage
+        // If server transaction history is cleared, clear local cache as well
+        if (list.length === 0) {
+          localStorage.removeItem('ep_tx_history');
+        }
+
         const localTxs = JSON.parse(localStorage.getItem('ep_tx_history') || '[]');
-        const combined = [...localTxs, ...list];
+        const combined = [...list, ...localTxs];
         const unique = Array.from(new Map(combined.map(t => [t.tx_id || t.id, t])).values());
 
         if (unique.length === 0) {
@@ -547,6 +551,34 @@
         }
       } catch (err) {
         alert('Could not add funds. Please try again.');
+      }
+    }
+
+    async function transferToEmergencyPrompt() {
+      const amtStr = prompt('Enter amount to transfer from Available Balance to Emergency Balance (₹):', '500');
+      if (!amtStr) return;
+      const amount = Number(amtStr);
+      if (isNaN(amount) || amount <= 0) {
+        alert('Please enter a valid amount greater than 0.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/user/transfer-to-emergency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert(`Successfully transferred ₹${amount.toLocaleString('en-IN')} to Emergency Balance!`);
+          document.getElementById('userBalance').textContent = `₹ ${Number(data.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          document.getElementById('emergencyBalance').textContent = `₹ ${Number(data.emergency_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          loadUserData();
+        } else {
+          alert(data.message || 'Transfer failed.');
+        }
+      } catch (err) {
+        alert('Could not complete transfer to emergency balance.');
       }
     }
 
