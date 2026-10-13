@@ -13,23 +13,23 @@ def emergency_pay():
 
 @app.route("/pay")
 def pay():
-    return render_template("emergencypay.html")
+    return render_template("pay.html")
 
 @app.route("/pin")
 def pin():
-    return render_template("emergencypay.html")
+    return render_template("pin.html")
 
 @app.route("/receipt")
 def receipt():
-    return render_template("emergencypay.html")
+    return render_template("receipt.html")
 
 @app.route("/receive")
 def receive():
-    return render_template("emergencypay.html")
+    return render_template("receive.html")
 
 @app.route("/history")
 def history():
-    return render_template("emergencypay.html")
+    return render_template("history.html")
 
 @app.route("/assets/<path:filename>")
 def serve_assets(filename):
