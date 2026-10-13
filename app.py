@@ -71,7 +71,7 @@ def init_db():
         cursor.execute("""
             INSERT INTO users (name, phone, balance, emergency_balance)
             VALUES (?, ?, ?, ?)
-        """, ("Mr. Sukhpal", "9876543210", 2500.0, 500.0))
+        """, ("Mr. Sukhpal", "9876543210", 69420.0, 6767.0))
         cursor.execute("""
             INSERT INTO users (name, phone, balance, emergency_balance)
             VALUES (?, ?, ?, ?)
