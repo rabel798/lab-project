@@ -65,67 +65,79 @@ def init_db():
         )
     """)
 
-    # Ensure primary user Rahul exists at id 1
+    # Ensure primary user Rahul Sharma exists at id 1 with official hackathon balances (500 online, 100 offline)
     cursor.execute("SELECT * FROM users WHERE id = 1")
     user1 = cursor.fetchone()
     if user1:
-        if user1["name"] != "Rahul" or user1["phone"] != "9876543210":
-            cursor.execute("""
-                UPDATE users SET name = 'Rahul', phone = '9876543210', balance = 69420.0, emergency_balance = 6767.0
-                WHERE id = 1
-            """)
+        cursor.execute("""
+            UPDATE users SET name = 'Rahul Sharma', phone = '9876543210', balance = 500.0, emergency_balance = 100.0
+            WHERE id = 1
+        """)
     else:
         cursor.execute("""
             INSERT INTO users (id, name, phone, balance, emergency_balance)
-            VALUES (1, 'Rahul', '9876543210', 69420.0, 6767.0)
+            VALUES (1, 'Rahul Sharma', '9876543210', 500.0, 100.0)
         """)
 
-    # Ensure Mr. Sukhpal exists as a separate user (id != 1)
-    cursor.execute("SELECT * FROM users WHERE name = 'Mr. Sukhpal' AND id != 1")
-    if not cursor.fetchone():
-        cursor.execute("SELECT * FROM users WHERE phone = '9811122233'")
-        if not cursor.fetchone():
-            cursor.execute("""
-                INSERT INTO users (name, phone, balance, emergency_balance)
-                VALUES ('Mr. Sukhpal', '9811122233', 12500.0, 2500.0)
-            """)
+    # Clean up legacy mock/superhero users
+    cursor.execute("DELETE FROM users WHERE name IN ('Dr. Doom', 'Sunsan Storm', 'Pavitra Prabhakar', 'Mr. Sukhpal')")
 
-    # Ensure demo peers exist
+    # Ensure genuine demo peers exist with balances (500 online, 100 offline)
     demo_users = [
-        ("Pavitra Prabhakar", "8765432109", 1800.0, 400.0),
-        ("Dr. Doom", "7654321098", 5000.0, 1000.0),
-        ("Sunsan Storm", "6543210987", 3200.0, 600.0)
+        ("Sukhpal Singh", "9811122233", 500.0, 100.0),
+        ("Priya Sharma", "8765432109", 500.0, 100.0),
+        ("Dr. Rohan Verma", "7654321098", 500.0, 100.0),
+        ("Ananya Patel", "6543210987", 500.0, 100.0)
     ]
     for d_name, d_phone, d_bal, d_emg in demo_users:
         cursor.execute("SELECT * FROM users WHERE phone = ?", (d_phone,))
-        if not cursor.fetchone():
+        existing = cursor.fetchone()
+        if existing:
+            cursor.execute("""
+                UPDATE users SET name = ?, balance = ?, emergency_balance = ? WHERE phone = ?
+            """, (d_name, d_bal, d_emg, d_phone))
+        else:
             cursor.execute("""
                 INSERT INTO users (name, phone, balance, emergency_balance)
                 VALUES (?, ?, ?, ?)
             """, (d_name, d_phone, d_bal, d_emg))
 
-    # Seed default merchants if empty
+    # Clean up legacy mock/superhero merchants
+    cursor.execute("""
+        DELETE FROM merchants WHERE name IN (
+            'S.H.I.E.L.D Daycare',
+            'Spidey Pizza Service',
+            'Widow Spa',
+            'Panther Jewellers',
+            'Electrician(God of Hammers) Services'
+        )
+    """)
+
+    # Seed genuine official merchants if empty
     cursor.execute("SELECT COUNT(*) as cnt FROM merchants")
     if cursor.fetchone()["cnt"] == 0:
         default_merchants = [
-            ("S.H.I.E.L.D Daycare", "9876543211", "Healthcare", 1, 1.2, "Sector 17, Main Market"),
-            ("Spidey Pizza Service", "9876543212", "Groceries", 1, 0.8, "Queens Main Street"),
-            ("Widow Spa", "9876543213", "Healthcare", 1, 1.5, "Red Room Avenue"),
-            ("Panther Jewellers", "9876543214", "Retail", 0, 2.4, "Wakanda Plaza"),
-            ("Electrician(God of Hammers) Services", "9876543215", "Emergency Services", 1, 1.8, "Asgardian Junction")
+            ("Apex City Care Pharmacy", "9876543211", "Healthcare", 1, 1.2, "Sector 17, Main Market"),
+            ("Daily Fresh Supermarket", "9876543212", "Groceries", 1, 0.8, "Central Avenue, Block 4"),
+            ("LifeLine Emergency Medicos", "9876543213", "Healthcare", 1, 1.5, "Civic Hospital Road"),
+            ("National Book & Stationery Depot", "9876543214", "Retail", 0, 2.4, "Metro Complex, Shop 12"),
+            ("City QuickFix Electrical Services", "9876543215", "Emergency Services", 1, 1.8, "Utility Hub, Cross Road 3")
         ]
         cursor.executemany("""
             INSERT INTO merchants (name, phone, category, is_essential, distance, address)
             VALUES (?, ?, ?, ?, ?, ?)
         """, default_merchants)
 
-    # Ensure Spidey Pizza Service is present
-    cursor.execute("SELECT id FROM merchants WHERE name = 'Spidey Pizza Service'")
+    # Ensure Apex City Care Pharmacy is present
+    cursor.execute("SELECT id FROM merchants WHERE name = 'Apex City Care Pharmacy'")
     if not cursor.fetchone():
         cursor.execute("""
             INSERT INTO merchants (name, phone, category, is_essential, distance, address)
-            VALUES ('Spidey Pizza Service', '9876543212', 'Groceries', 1, 0.8, 'Queens Main Street')
+            VALUES ('Apex City Care Pharmacy', '9876543211', 'Healthcare', 1, 1.2, 'Sector 17, Main Market')
         """)
+
+    # Clear transaction history
+    cursor.execute("DELETE FROM transactions")
 
     conn.commit()
     conn.close()
@@ -389,7 +401,7 @@ def api_bluetooth_scan():
     if not any("sukhpal" in (u.get("name") or "").lower() for u in user_list):
         user_list.insert(0, {
             "id": 5,
-            "name": "Mr. Sukhpal",
+            "name": "Sukhpal Singh",
             "phone": "9811122233"
         })
 
@@ -435,8 +447,8 @@ def api_transactions():
         is_offline = 1 if raw_offline in [True, "true", 1, "1"] else 0
 
         user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
-        current_balance = user["balance"] if user else 69420.0
-        current_emergency = user["emergency_balance"] if user else 6767.0
+        current_balance = user["balance"] if user else 500.0
+        current_emergency = user["emergency_balance"] if user else 100.0
 
         if not is_offline:
             status = "completed"
@@ -493,8 +505,8 @@ def insert():
 
         conn = get_db()
         user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
-        current_balance = user["balance"] if user else 69420.0
-        current_emergency = user["emergency_balance"] if user else 6767.0
+        current_balance = user["balance"] if user else 500.0
+        current_emergency = user["emergency_balance"] if user else 100.0
 
         if not is_offline:
             # Online: Normal UPI payment, reduce from Available Balance
@@ -582,8 +594,8 @@ def api_transactions_sync():
         "status": "success",
         "message": f"Successfully synchronized {pending_count} pending transaction(s).",
         "reconciled_count": pending_count,
-        "balance": user["balance"] if user else 69420.0,
-        "emergency_balance": user["emergency_balance"] if user else 6767.0,
+        "balance": user["balance"] if user else 500.0,
+        "emergency_balance": user["emergency_balance"] if user else 100.0,
         "transactions": [dict(t) for t in all_txs]
     })
 

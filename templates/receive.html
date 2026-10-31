@@ -158,7 +158,7 @@
         const res = await fetch('/api/user');
         if (res.ok) {
           const u = await res.json();
-          const cleanName = (u.name || 'sukhpal').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const cleanName = (u.name || 'rahul').toLowerCase().replace(/[^a-z0-9]/g, '');
           document.getElementById('vpaVal').textContent = `${cleanName}@emergencypay`;
         }
       } catch (e) {}
