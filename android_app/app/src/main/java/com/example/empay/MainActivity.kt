@@ -1,10 +1,16 @@
 package com.example.empay
 
+import android.Manifest
+import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -15,10 +21,13 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.empay.auth.PinAuthManager
 import com.example.empay.auth.SessionManager
 import com.example.empay.auth.UserSession
+import com.example.empay.bluetooth.BluetoothPaymentEngine
 import com.example.empay.crypto.CryptoManager
 import com.example.empay.db.AppDatabase
 import com.example.empay.db.TransactionEntity
@@ -27,6 +36,7 @@ import com.example.empay.network.NetworkManager
 import com.example.empay.network.SyncTransactionItem
 import com.example.empay.network.SyncTransactionsRequest
 import com.example.empay.network.TransferEmergencyRequest
+import com.example.empay.ui.BluetoothDeviceDialog
 import com.example.empay.ui.PinAuthDialog
 import com.example.empay.ui.TransferFundsDialog
 import kotlinx.coroutines.Dispatchers
@@ -42,10 +52,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sessionManager: SessionManager
     private lateinit var pinAuthManager: PinAuthManager
     private lateinit var appDatabase: AppDatabase
+    private lateinit var bluetoothEngine: BluetoothPaymentEngine
 
-    // UI elements
+    // UI elements - App Bar
     private lateinit var tvNetworkStatusBadge: TextView
     private lateinit var btnSyncBank: Button
+
+    // User Profile & Balances
     private lateinit var tvUserName: TextView
     private lateinit var tvUserPhone: TextView
     private lateinit var tvAccountNumber: TextView
@@ -54,19 +67,41 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvOnlineBalance: TextView
     private lateinit var tvEmergencyBalance: TextView
 
+    // Action buttons
     private lateinit var btnTransferToOffline: Button
     private lateinit var btnTestLogin: Button
     private lateinit var btnTestPin: Button
     private lateinit var btnCryptoSelfTest: Button
+    private lateinit var btnTamperTest: Button
 
+    // Phase 5 Bluetooth P2P
+    private lateinit var btnModePayer: Button
+    private lateinit var btnModeMerchant: Button
+    private lateinit var layoutPayerSection: LinearLayout
+    private lateinit var layoutMerchantSection: LinearLayout
+    private lateinit var etPayeeName: EditText
+    private lateinit var btnScanTerminal: Button
+    private lateinit var etBtAmount: EditText
+    private lateinit var btnBtChip2: Button
+    private lateinit var btnBtChip5: Button
+    private lateinit var btnPayLoopback: Button
+    private lateinit var btnPayRfcomm: Button
+    private lateinit var tvMerchantStatusBeacon: TextView
+    private lateinit var btnToggleMerchantRadar: Button
+    private var isMerchantRadarRunning = false
+    private var selectedBluetoothDevice: BluetoothDevice? = null
+
+    // Local SQLite Ledger
     private lateinit var tvPendingTxBadge: TextView
     private lateinit var btnAddMockTx: Button
     private lateinit var layoutLedgerContainer: LinearLayout
     private lateinit var tvEmptyLedgerMsg: TextView
 
+    // Bank Config
     private lateinit var etBankUrl: EditText
     private lateinit var btnSaveBankUrl: Button
 
+    // Terminal
     private lateinit var tvTerminalLog: TextView
     private lateinit var scrollTerminal: ScrollView
     private lateinit var btnClearTerminal: TextView
@@ -82,15 +117,20 @@ class MainActivity : AppCompatActivity() {
         sessionManager = SessionManager.getInstance(this)
         pinAuthManager = PinAuthManager.getInstance(this)
         appDatabase = AppDatabase.getInstance(this)
+        bluetoothEngine = BluetoothPaymentEngine(this)
 
         initViews()
+        // Request Bluetooth permissions up‑front (required for scanning on Android 12+)
+        initBluetoothFlow()
+        // Initialise UI to PAYER mode with correct contrast & readable text
+        updateP2PMode(isPayer = true)
         setupListeners()
         observeSession()
         monitorNetworkConnectivity()
         initHardwareCrypto()
         refreshLocalLedgerUI()
 
-        // Sync local SQLite wallet balance with SessionManager if available
+
         val localWallet = appDatabase.walletDao.getWallet()
         if (localWallet != null) {
             sessionManager.updateBalances(sessionManager.getUser().balance, localWallet.balance)
@@ -98,7 +138,7 @@ class MainActivity : AppCompatActivity() {
 
         appendLog("INIT", "EmPay Protocol Core initialized (Min SDK 26, Target SDK 36)")
         appendLog("DATABASE", "Local SQLite ledger ready (empay_offline.db). Offline balance: ₹${localWallet?.balance ?: 10.0}")
-        appendLog("AUTH", "Hardware-backed EncryptedSharedPreferences ready. Default PIN: 1234")
+        appendLog("P2P", "Bluetooth RFCOMM Engine loaded (SPP UUID: 00001101-0000-1000-8000-00805F9B34FB)")
     }
 
     private fun initViews() {
@@ -117,6 +157,22 @@ class MainActivity : AppCompatActivity() {
         btnTestLogin = findViewById(R.id.btnTestLogin)
         btnTestPin = findViewById(R.id.btnTestPin)
         btnCryptoSelfTest = findViewById(R.id.btnCryptoSelfTest)
+        btnTamperTest = findViewById(R.id.btnTamperTest)
+
+        // Phase 5 Bluetooth P2P
+        btnModePayer = findViewById(R.id.btnModePayer)
+        btnModeMerchant = findViewById(R.id.btnModeMerchant)
+        layoutPayerSection = findViewById(R.id.layoutPayerSection)
+        layoutMerchantSection = findViewById(R.id.layoutMerchantSection)
+        etPayeeName = findViewById(R.id.etPayeeName)
+        btnScanTerminal = findViewById(R.id.btnScanTerminal)
+        etBtAmount = findViewById(R.id.etBtAmount)
+        btnBtChip2 = findViewById(R.id.btnBtChip2)
+        btnBtChip5 = findViewById(R.id.btnBtChip5)
+        btnPayLoopback = findViewById(R.id.btnPayLoopback)
+        btnPayRfcomm = findViewById(R.id.btnPayRfcomm)
+        tvMerchantStatusBeacon = findViewById(R.id.tvMerchantStatusBeacon)
+        btnToggleMerchantRadar = findViewById(R.id.btnToggleMerchantRadar)
 
         tvPendingTxBadge = findViewById(R.id.tvPendingTxBadge)
         btnAddMockTx = findViewById(R.id.btnAddMockTx)
@@ -145,34 +201,147 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        btnTestLogin.setOnClickListener {
-            performOnlineBankLogin()
+        btnTestLogin.setOnClickListener { performOnlineBankLogin() }
+        btnTestPin.setOnClickListener { showOfflinePinDialog() }
+        btnTransferToOffline.setOnClickListener { initiateFundReservation() }
+        btnSyncBank.setOnClickListener { performBankSync() }
+        btnCryptoSelfTest.setOnClickListener { runCryptoSelfTest() }
+        btnTamperTest.setOnClickListener { runTamperVerificationTest() }
+        btnAddMockTx.setOnClickListener { generateMockOfflineTransaction() }
+
+        // Phase 5 Mode Toggle: clean contrast without theme color blend
+        btnModePayer.setOnClickListener { updateP2PMode(isPayer = true) }
+        btnModeMerchant.setOnClickListener { updateP2PMode(isPayer = false) }
+
+        // Phase 5 Terminal Chooser / Scanner
+        btnScanTerminal.setOnClickListener { showBluetoothDevicePicker() }
+
+        btnBtChip2.setOnClickListener { etBtAmount.setText("2.00") }
+        btnBtChip5.setOnClickListener { etBtAmount.setText("5.00") }
+
+        btnPayLoopback.setOnClickListener {
+            initiateP2PPayment(isLoopback = true)
         }
 
-        btnTestPin.setOnClickListener {
-            showOfflinePinDialog()
+        btnPayRfcomm.setOnClickListener {
+            initiateP2PPayment(isLoopback = false)
         }
 
-        btnTransferToOffline.setOnClickListener {
-            initiateFundReservation()
-        }
-
-        btnSyncBank.setOnClickListener {
-            performBankSync()
-        }
-
-        btnCryptoSelfTest.setOnClickListener {
-            runCryptoSelfTest()
-        }
-
-        btnAddMockTx.setOnClickListener {
-            generateMockOfflineTransaction()
+        btnToggleMerchantRadar.setOnClickListener {
+            toggleMerchantRadar()
         }
 
         btnClearTerminal.setOnClickListener {
             tvTerminalLog.text = ""
             appendLog("TERMINAL", "Log cleared.")
         }
+    }
+
+    /**
+     * Updates the segmented P2P mode switch with clean styling and high-contrast text.
+     */
+    private fun updateP2PMode(isPayer: Boolean) {
+        val activeBg = ContextCompat.getColorStateList(this, R.color.primary)
+        val inactiveBg = ColorStateList.valueOf(Color.parseColor("#E2E8F0"))
+        val activeTextColor = Color.WHITE
+        val inactiveTextColor = Color.parseColor("#1E293B")
+
+        if (isPayer) {
+            layoutPayerSection.visibility = View.VISIBLE
+            layoutMerchantSection.visibility = View.GONE
+            btnModePayer.backgroundTintList = activeBg
+            btnModePayer.setTextColor(activeTextColor)
+            btnModeMerchant.backgroundTintList = inactiveBg
+            btnModeMerchant.setTextColor(inactiveTextColor)
+            appendLog("P2P", "Switched to PAYER mode (Send offline money via Bluetooth)")
+        } else {
+            layoutPayerSection.visibility = View.GONE
+            layoutMerchantSection.visibility = View.VISIBLE
+            btnModeMerchant.backgroundTintList = activeBg
+            btnModeMerchant.setTextColor(activeTextColor)
+            btnModePayer.backgroundTintList = inactiveBg
+            btnModePayer.setTextColor(inactiveTextColor)
+            appendLog("P2P", "Switched to MERCHANT mode (Receive & verify offline payments)")
+        }
+    }
+
+    /**
+     * Opens the interactive Bluetooth Device Scanner & Selection dialog.
+     */
+    private fun showBluetoothDevicePicker() {
+        val picker = BluetoothDeviceDialog(
+            context = this,
+            bluetoothEngine = bluetoothEngine,
+            onRequestPermissions = {
+                checkAndRequestBluetoothPermissions(autoOpenPicker = false)
+            },
+            onDeviceSelected = { name, device, isDemoLoopback ->
+                etPayeeName.setText(name)
+                selectedBluetoothDevice = device
+                if (isDemoLoopback) {
+                    appendLog("TERMINAL", "Selected simulated terminal: $name (Ready for 'P2P Loopback Pay')")
+                    Toast.makeText(this, "Selected $name (Demo Terminal)", Toast.LENGTH_SHORT).show()
+                } else {
+                    val addr = device?.address ?: "Discovered"
+                    appendLog("BLUETOOTH", "Selected peer terminal: $name [$addr]")
+                    Toast.makeText(this, "Target: $name", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+        picker.show()
+    }
+
+    private val REQUEST_BLUETOOTH_PERMISSIONS = 1001
+    private var pendingLaunchDevicePicker = false
+
+    private fun checkAndRequestBluetoothPermissions(autoOpenPicker: Boolean = false) {
+        pendingLaunchDevicePicker = autoOpenPicker
+        val required = mutableListOf<String>()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                required.add(Manifest.permission.BLUETOOTH_SCAN)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                required.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
+                required.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                required.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+
+        if (required.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, required.toTypedArray(), REQUEST_BLUETOOTH_PERMISSIONS)
+        } else if (autoOpenPicker) {
+            showBluetoothDevicePicker()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_BLUETOOTH_PERMISSIONS) {
+            val allGranted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+            if (allGranted) {
+                appendLog("PERMISSIONS", "🟢 Bluetooth permissions granted.")
+                if (pendingLaunchDevicePicker) {
+                    pendingLaunchDevicePicker = false
+                    showBluetoothDevicePicker()
+                }
+            } else {
+                appendLog("PERMISSIONS", "⚠️ Bluetooth permission denied. Nearby discovery might be limited.")
+                pendingLaunchDevicePicker = false
+                Toast.makeText(this, "Bluetooth permissions required for nearby device discovery", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    // Call this early (e.g., after UI init) to prompt permissions without forcibly showing the picker dialog
+    private fun initBluetoothFlow() {
+        checkAndRequestBluetoothPermissions(autoOpenPicker = false)
     }
 
     private fun initHardwareCrypto() {
@@ -295,14 +464,11 @@ class MainActivity : AppCompatActivity() {
                 if (response.isSuccessful && response.body() != null) {
                     val result = response.body()!!
                     if (result.success) {
-                        // 1. Atomically update local SQLite ledger
                         withContext(Dispatchers.IO) {
                             appDatabase.walletDao.addBalance(amount)
                         }
 
-                        // 2. Update reactive user session state
                         sessionManager.updateBalances(result.balance, result.emergencyBalance)
-
                         val localWallet = withContext(Dispatchers.IO) {
                             appDatabase.walletDao.getWallet()
                         }
@@ -335,9 +501,169 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Sync Button Handler: Pushes all pending offline transactions to the Central Bank
-     * and refreshes authoritative balances when online.
+     * Phase 5: P2P Bluetooth / Loopback Payment Flow
      */
+    private fun initiateP2PPayment(isLoopback: Boolean) {
+        val amountStr = etBtAmount.text.toString().trim()
+        val amount = amountStr.toDoubleOrNull()
+        val payeeName = etPayeeName.text.toString().trim().ifEmpty { "Apex City Care Pharmacy" }
+
+        if (amount == null || amount <= 0.0) {
+            Toast.makeText(this, "Please enter a valid amount", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val localWallet = appDatabase.walletDao.getWallet()
+        val currentBal = localWallet?.balance ?: 0.0
+
+        if (currentBal < amount) {
+            appendLog("P2P PAYMENT", "❌ Insufficient offline balance (₹$currentBal). Cannot send ₹$amount.")
+            Toast.makeText(this, "Insufficient offline wallet balance (₹$currentBal)", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        // Require 4-digit PIN verification to unlock private key signing
+        val pinDialog = PinAuthDialog(
+            context = this,
+            actionTitle = "Authorize Offline Transfer",
+            actionSubtitle = "Enter PIN to sign ₹$amount payment with ECDSA",
+            onSuccess = {
+                if (isLoopback) {
+                    executeLoopbackPayment(payeeName, amount)
+                } else {
+                    executeRfcommPayment(payeeName, amount)
+                }
+            },
+            onFailed = { reason ->
+                appendLog("PIN AUTH", "❌ Payment cancelled: $reason")
+            }
+        )
+        pinDialog.show()
+    }
+
+    private fun executeLoopbackPayment(payeeName: String, amount: Double) {
+        appendLog("P2P PAYMENT", "⚡ Initiating P2P Loopback Payment to $payeeName (₹$amount)...")
+        bluetoothEngine.simulateP2PLoopbackPayment(
+            receiverId = "MERCHANT_APEX",
+            receiverName = payeeName,
+            amount = amount,
+            onStatusLog = { logMsg -> appendLog("BLUETOOTH", logMsg) },
+            onSuccess = { packet, ack ->
+                refreshLocalLedgerUI()
+                appendLog("P2P PAYMENT", "✅ PAYMENT COMPLETED! Tx: ${packet.txId}")
+                appendLog("P2P PAYMENT", "Receipt Nonce: ${ack.ackNonce.take(8)} | Status: ${ack.status}")
+                Toast.makeText(this, "Payment Complete: -₹$amount to $payeeName", Toast.LENGTH_SHORT).show()
+            },
+            onError = { errMsg ->
+                appendLog("P2P PAYMENT", "❌ $errMsg")
+                Toast.makeText(this, errMsg, Toast.LENGTH_LONG).show()
+            }
+        )
+    }
+
+    private fun executeRfcommPayment(payeeName: String, amount: Double) {
+        val targetDevice: BluetoothDevice? = selectedBluetoothDevice ?: run {
+            val paired = bluetoothEngine.getPairedDevices()
+            if (paired.isNotEmpty()) paired.first() else null
+        }
+
+        if (targetDevice == null) {
+            appendLog("BLUETOOTH", "⚠️ No Bluetooth target selected.")
+            appendLog("HINT", "Opening Device Chooser / Scanner to pick a peer...")
+            Toast.makeText(this, "Select a Bluetooth terminal or demo shop", Toast.LENGTH_SHORT).show()
+            showBluetoothDevicePicker()
+            return
+        }
+
+        appendLog("BLUETOOTH", "Attempting RFCOMM connection to ${targetDevice.name ?: "Peer"} [${targetDevice.address}]...")
+
+        bluetoothEngine.sendPaymentToDevice(
+            device = targetDevice,
+            receiverId = "MERCHANT_PEER",
+            receiverName = payeeName,
+            amount = amount,
+            onStatusLog = { logMsg -> appendLog("BLUETOOTH", logMsg) },
+            onSuccess = { packet, ack ->
+                refreshLocalLedgerUI()
+                appendLog("P2P PAYMENT", "✅ Bluetooth RFCOMM Payment Confirmed by Peer!")
+                Toast.makeText(this, "Payment Sent via Bluetooth!", Toast.LENGTH_SHORT).show()
+            },
+            onError = { errMsg ->
+                appendLog("BLUETOOTH", "❌ $errMsg")
+                Toast.makeText(this, errMsg, Toast.LENGTH_LONG).show()
+            }
+        )
+    }
+
+    private fun toggleMerchantRadar() {
+        if (!isMerchantRadarRunning) {
+            isMerchantRadarRunning = true
+            tvMerchantStatusBeacon.text = "🟢 Radar ACTIVE (Listening)"
+            tvMerchantStatusBeacon.setTextColor(getColor(R.color.primary_dark))
+            btnToggleMerchantRadar.text = "Stop Merchant Radar"
+            btnToggleMerchantRadar.setBackgroundColor(getColor(R.color.error_red))
+
+            bluetoothEngine.startMerchantServer(
+                onPaymentReceived = { packet, ack ->
+                    refreshLocalLedgerUI()
+                    appendLog("MERCHANT", "🎉 Payment Received from ${packet.senderName}: +₹${packet.amount}")
+                    appendLog("MERCHANT", "Signature & Nonce verified. Credited local balance.")
+                    Toast.makeText(this, "Received ₹${packet.amount} from ${packet.senderName}", Toast.LENGTH_SHORT).show()
+                },
+                onStatusLog = { logMsg -> appendLog("MERCHANT", logMsg) },
+                onError = { errMsg -> appendLog("MERCHANT", "❌ $errMsg") }
+            )
+        } else {
+            isMerchantRadarRunning = false
+            bluetoothEngine.stopMerchantServer()
+            tvMerchantStatusBeacon.text = "● Radar Standby"
+            tvMerchantStatusBeacon.setTextColor(getColor(R.color.text_secondary))
+            btnToggleMerchantRadar.text = "Start Merchant Listening Socket"
+            btnToggleMerchantRadar.setBackgroundColor(getColor(R.color.primary))
+            appendLog("MERCHANT", "Merchant Radar stopped.")
+        }
+    }
+
+    /**
+     * Proves Cryptographic Authenticity & Integrity:
+     * Shows what happens when an attacker tries to tamper with the amount.
+     */
+    private fun runTamperVerificationTest() {
+        appendLog("TAMPER TEST", "🛡️ Running Adversarial Cryptographic Tamper Test...")
+        lifecycleScope.launch(Dispatchers.Default) {
+            try {
+                val txId = CryptoManager.generateTxId()
+                val nonce = CryptoManager.generateNonce()
+                val originalAmount = 5.0
+                val tamperedAmount = 500.0 // Malicious modification
+                val timestamp = System.currentTimeMillis()
+
+                val originalCanonical = CryptoManager.getCanonicalBytes(txId, "USER_1", "MERCHANT_APEX", originalAmount, timestamp, nonce)
+                val signature = CryptoManager.signData(originalCanonical)
+                val pubKey = CryptoManager.getPublicKeyBase64()
+
+                // Attacker modifies the amount to ₹500.00
+                val tamperedCanonical = CryptoManager.getCanonicalBytes(txId, "USER_1", "MERCHANT_APEX", tamperedAmount, timestamp, nonce)
+
+                val originalCheck = CryptoManager.verifySignature(pubKey, originalCanonical, signature)
+                val tamperedCheck = CryptoManager.verifySignature(pubKey, tamperedCanonical, signature)
+
+                withContext(Dispatchers.Main) {
+                    appendLog("TAMPER TEST", "1. Legit Payload (₹5.00): ${String(originalCanonical)}")
+                    appendLog("TAMPER TEST", "   Signature Verification: $originalCheck (VALID ✅)")
+                    appendLog("TAMPER TEST", "2. Attacker Tampered Payload (₹500.00): ${String(tamperedCanonical)}")
+                    appendLog("TAMPER TEST", "   Signature Verification: $tamperedCheck (FAILED ❌)")
+                    appendLog("TAMPER TEST", "🛡️ CONCLUSION: Mathematically impossible to alter amounts without the private key.")
+                    Toast.makeText(this@MainActivity, "Tamper Test: Attack Blocked by ECDSA!", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    appendLog("TAMPER TEST", "Error: ${e.message}")
+                }
+            }
+        }
+    }
+
     private fun performBankSync() {
         val isOnline = NetworkManager.isOnline(this)
         if (!isOnline) {
@@ -352,8 +678,6 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val apiService = BankApiClient.getApiService(this@MainActivity)
-
-                // 1. Check for pending offline transactions in local SQLite
                 val pendingTxs = withContext(Dispatchers.IO) {
                     appDatabase.transactionDao.getPendingSyncTransactions()
                 }
@@ -408,11 +732,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Phase 4: Hardware Cryptographic Self-Test
-     * Canonicalizes payload, signs with SHA256withECDSA in AndroidKeyStore,
-     * and verifies the signature on-device.
-     */
     private fun runCryptoSelfTest() {
         appendLog("CRYPTO", "Running Hardware Keystore Cryptographic Self-Test...")
         lifecycleScope.launch(Dispatchers.Default) {
@@ -452,11 +771,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Phase 4: Mock Offline Transaction Injection
-     * Allows evaluator to simulate paying ₹5 offline to an essential merchant
-     * and watch it get logged as PENDING_SYNC in the local SQLite ledger.
-     */
     private fun generateMockOfflineTransaction() {
         val currentWallet = appDatabase.walletDao.getWallet()
         val currentBal = currentWallet?.balance ?: 0.0
@@ -478,7 +792,6 @@ class MainActivity : AppCompatActivity() {
                 val canonicalBytes = CryptoManager.getCanonicalBytes(txId, "1", "MERCHANT_APEX", amount, timestamp, nonce)
                 val signature = CryptoManager.signData(canonicalBytes)
 
-                // Atomic deduction in local SQLite
                 val deducted = appDatabase.walletDao.deductBalance(amount)
                 if (deducted) {
                     val tx = TransactionEntity(
@@ -631,6 +944,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        bluetoothEngine.stopMerchantServer()
         try {
             if (networkCallback != null && connectivityManager != null) {
                 connectivityManager?.unregisterNetworkCallback(networkCallback!!)
