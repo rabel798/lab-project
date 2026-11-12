@@ -13,6 +13,7 @@ import android.net.NetworkRequest
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -234,6 +235,31 @@ class MainActivity : AppCompatActivity() {
         btnClearTerminal.setOnClickListener {
             tvTerminalLog.text = ""
             appendLog("TERMINAL", "Log cleared.")
+        }
+
+        // Enable independent touch scrolling on Activity Terminal inside the outer screen ScrollView
+        val terminalScrollTouchListener = View.OnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+            v.onTouchEvent(event)
+        }
+        scrollTerminal.setOnTouchListener(terminalScrollTouchListener)
+        tvTerminalLog.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+            false
         }
     }
 

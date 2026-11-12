@@ -781,8 +781,11 @@
                 <ScrollView
                     android:id="@+id/scrollTerminal"
                     android:layout_width="match_parent"
-                    android:layout_height="180dp"
+                    android:layout_height="200dp"
                     android:layout_marginTop="10dp"
+                    android:scrollbars="vertical"
+                    android:fadeScrollbars="false"
+                    android:nestedScrollingEnabled="true"
                     android:fillViewport="true">
 
                     <TextView
