@@ -1,7 +1,9 @@
 package com.example.empay.network
 
 import retrofit2.Response
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Path
 
 /**
@@ -14,5 +16,14 @@ interface BankApiService {
 
     @GET("/api/users/phone/{phone}")
     suspend fun getUserByPhone(@Path("phone") phone: String): Response<BankUserResponse>
-}
 
+    @POST("/api/user/transfer-to-emergency")
+    suspend fun transferToEmergency(
+        @Body request: TransferEmergencyRequest
+    ): Response<TransferEmergencyResponse>
+
+    @POST("/api/transactions/sync")
+    suspend fun syncTransactions(
+        @Body request: SyncTransactionsRequest
+    ): Response<SyncTransactionsResponse>
+}

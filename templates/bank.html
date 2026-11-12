@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EmPay Central Bank - Settlement &amp; Reserve Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.2);
+      --primary: #3b82f6;
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.15);
+      --red: #ef4444;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --terminal-bg: #030712;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation */
+    header {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      color: #fff;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+    .brand-title h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    .brand-title p {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+    .badge.online {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .badge.offline {
+      background: var(--amber-bg);
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+    .nav-btn {
+      background: #1f2937;
+      color: #e5e7eb;
+      border: 1px solid #374151;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .nav-btn:hover {
+      background: #374151;
+      color: #fff;
+    }
+
+    /* Container */
+    main {
+      flex: 1;
+      max-width: 1380px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Metric Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: #374151;
+    }
+    .metric-card.primary::before { background: linear-gradient(90deg, #10b981, #3b82f6); }
+    .metric-card.amber::before { background: var(--amber); }
+    .metric-card.blue::before { background: var(--primary); }
+
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .metric-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .metric-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      display: grid;
+      place-items: center;
+      color: #e5e7eb;
+    }
+    .metric-value {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .metric-sub {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+    .metric-sub strong { color: #f3f4f6; }
+
+    /* Control Panel Grid */
+    .workbench-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+    }
+    @media (max-width: 1024px) {
+      .workbench-grid { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 12px;
+    }
+    .panel-header i {
+      font-size: 1.15rem;
+      color: var(--accent);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .input-field, .select-field {
+      background: #0d131f;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #fff;
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .input-field:focus, .select-field:focus {
+      border-color: var(--accent);
+    }
+
+    .chips-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .chip:hover { background: #334155; }
+
+    .btn {
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: none;
+      transition: transform 0.1s ease, filter 0.15s ease;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+    .btn-blue {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #fff;
+    }
+    .btn-amber {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+    }
+    .btn-danger {
+      background: #dc2626;
+      color: #fff;
+    }
+    .btn-secondary {
+      background: #1f2937;
+      color: #d1d5db;
+      border: 1px solid #374151;
+    }
+
+    /* Accounts & Ledger Tables */
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .table-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .table-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .table-title small {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: normal;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th {
+      background: rgba(255, 255, 255, 0.02);
+      text-align: left;
+      padding: 12px 18px;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: #e5e7eb;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    .tag-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+    .tag-completed {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent);
+    }
+    .tag-pending {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--amber);
+    }
+
+    /* Terminal Console */
+    .terminal-panel {
+      background: var(--terminal-bg);
+      border: 1px solid #1f2937;
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .terminal-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #1f2937;
+      padding-bottom: 8px;
+    }
+    .terminal-logs {
+      height: 160px;
+      overflow-y: auto;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      color: #94a3b8;
+    }
+    .log-entry { margin-bottom: 4px; }
+    .log-time { color: #64748b; }
+    .log-tag { color: var(--accent); font-weight: 600; }
+    .log-warn { color: var(--amber); }
+    .log-err { color: var(--red); }
+
+    /* In-Website Toast Notification System */
+    #toastContainer {
+      position: fixed;
+      top: 80px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+      max-width: 380px;
+      width: calc(100% - 48px);
+    }
+    .toast-item {
+      pointer-events: auto;
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-left: 4px solid var(--primary);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .toast-item.success { border-left-color: var(--accent); }
+    .toast-item.warning { border-left-color: var(--amber); }
+    .toast-item.danger { border-left-color: var(--red); }
+    .toast-icon {
+      font-size: 1.25rem;
+      color: var(--primary);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .toast-item.success .toast-icon { color: var(--accent); }
+    .toast-item.warning .toast-icon { color: var(--amber); }
+    .toast-item.danger .toast-icon { color: var(--red); }
+    .toast-body { flex: 1; }
+    .toast-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #f3f4f6;
+      margin-bottom: 2px;
+    }
+    .toast-msg {
+      font-size: 0.76rem;
+      color: #9ca3af;
+      line-height: 1.4;
+    }
+    .toast-close {
+      background: transparent;
+      border: none;
+      color: #6b7280;
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+    .toast-close:hover { color: #fff; }
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(40px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Notification Overlay -->
+  <div id="toastContainer"></div>
+
+  <!-- Top Navigation -->
+  <header>
+    <a href="/bank" class="brand">
+      <div class="brand-icon">
+        <i class="ri-bank-line"></i>
+      </div>
+      <div class="brand-title">
+        <h1>EmPay Central Bank</h1>
+        <p>RESERVE AUTHORITY &amp; SETTLEMENT ENGINE</p>
+      </div>
+    </a>
+
+    <div class="nav-actions">
+      <span id="badgeNetwork" class="badge online">
+        <i class="ri-wifi-line"></i> Central Bank Online
+      </span>
+      <button id="btnToggleNetwork" class="nav-btn" onclick="toggleNetwork()">
+        <i class="ri-shut-down-line"></i> Simulate Outage
+      </button>
+      <button class="nav-btn" onclick="showToast('Central Bank Test', 'In-website notification system is operational.', 'info', 'ri-notification-3-line')">
+        <i class="ri-notification-3-line"></i> Test Alert
+      </button>
+      <a href="/emergencypay" class="nav-btn">
+        <i class="ri-smartphone-line"></i> Mobile Simulator
+      </a>
+      <a href="/history" class="nav-btn">
+        <i class="ri-file-list-3-line"></i> Full Ledger
+      </a>
+      <a href="/" class="nav-btn">
+        <i class="ri-home-4-line"></i> Saturn V Team
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Live Financial Metrics Grid -->
+    <div class="metrics-grid">
+      <!-- Primary Evaluator User Card -->
+      <div class="metric-card primary">
+        <div class="metric-header">
+          <div>
+            <div class="metric-title">Primary User (Evaluator Demo)</div>
+            <h3 style="font-size: 1.1rem; margin-top: 2px;" id="userName">Rahul Sharma</h3>
+          </div>
+          <div class="metric-icon" style="color: var(--accent);">
+            <i class="ri-user-star-line"></i>
+          </div>
+        </div>
+        <div class="metric-value" id="userTotal">₹ 510.00</div>
+        <div class="metric-sub">
+          <span>Online Available: <strong id="userOnline">₹ 500.00</strong></span>
+          <span>Emergency Reserve: <strong id="userEmergency" style="color: var(--accent);">₹ 10.00</strong></span>
+        </div>
+      </div>
+
+      <!-- System Liquidity Total -->
+      <div class="metric-card blue">
+        <div class="metric-header">
+          <div>
+            <div class="metric-title">Total System Liquidity</div>
+            <h3 style="font-size: 1.1rem; margin-top: 2px;">Bank Ledger Reserves</h3>
+          </div>
+          <div class="metric-icon" style="color: var(--primary);">
+            <i class="ri-safe-2-line"></i>
+          </div>
+        </div>
+        <div class="metric-value" id="systemTotal">₹ 2,550.00</div>
+        <div class="metric-sub">
+          <span>Total Online: <strong id="systemOnline">₹ 2,500.00</strong></span>
+          <span>Total Reserved: <strong id="systemEmergency" style="color: #60a5fa;">₹ 50.00</strong></span>
+        </div>
+      </div>
+
+      <!-- Settlement Status -->
+      <div class="metric-card amber">
+        <div class="metric-header">
+          <div>
+            <div class="metric-title">Settlement Health</div>
+            <h3 style="font-size: 1.1rem; margin-top: 2px;">Mesh Outage Engine</h3>
+          </div>
+          <div class="metric-icon" style="color: var(--amber);">
+            <i class="ri-refresh-line"></i>
+          </div>
+        </div>
+        <div class="metric-value" id="pendingCount">0 Pending</div>
+        <div class="metric-sub">
+          <span>Settled Transactions: <strong id="settledCount">0</strong></span>
+          <span>Mesh Sync Status: <strong style="color: var(--accent);">IDLE</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulation Workbench (3 Columns) -->
+    <div class="workbench-grid">
+
+      <!-- Action 1: Reserve Offline Emergency Balance -->
+      <div class="panel">
+        <div class="panel-header">
+          <i class="ri-shield-keyhole-line"></i>
+          <span>1. Reserve Offline Funds</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+          Debits online available balance and locks it into the offline emergency reserve. Enforces the economic invariant: money cannot be minted offline.
+        </p>
+
+        <div class="form-group">
+          <label>Target Account</label>
+          <select id="selReserveUser" class="select-field">
+            <option value="1">Rahul Sharma (ID 1)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Transfer Amount (₹)</label>
+          <input type="number" id="inpReserveAmount" class="input-field" value="10.00" step="1.0" min="1.0">
+          <div class="chips-row">
+            <button class="chip" onclick="setReserve(5)">+₹5</button>
+            <button class="chip" onclick="setReserve(10)">+₹10</button>
+            <button class="chip" onclick="setReserve(25)">+₹25</button>
+            <button class="chip" onclick="setReserve(50)">+₹50</button>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="executeReserveFunds()">
+          <i class="ri-lock-password-line"></i> Authorize &amp; Reserve Funds
+        </button>
+      </div>
+
+      <!-- Action 2: Liquidity Top-up / Inject Funds -->
+      <div class="panel">
+        <div class="panel-header">
+          <i class="ri-add-circle-line" style="color: var(--primary);"></i>
+          <span>2. Inject Central Bank Capital</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+          Inject test liquidity directly into an account's online balance or emergency allocation to verify boundary conditions and balance limits.
+        </p>
+
+        <div class="form-group">
+          <label>Target Account</label>
+          <select id="selAddUser" class="select-field">
+            <option value="1">Rahul Sharma (ID 1)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Target Ledger Pocket</label>
+          <select id="selAddTarget" class="select-field">
+            <option value="balance">Online Available Balance</option>
+            <option value="emergency_balance">Emergency Offline Reserve</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" id="inpAddAmount" class="input-field" value="200.00" step="50.0" min="10.0">
+        </div>
+
+        <button class="btn btn-blue" onclick="executeAddFunds()">
+          <i class="ri-coin-line"></i> Credit Central Bank Account
+        </button>
+      </div>
+
+      <!-- Action 3: Outage Settlement & Reset -->
+      <div class="panel">
+        <div class="panel-header">
+          <i class="ri-git-merge-line" style="color: var(--amber);"></i>
+          <span>3. Outage Reconcile &amp; Reset</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+          Reconciles offline mesh receipts uploaded by Android WorkManager (<code style="color: #60a5fa;">/api/transactions/sync</code>) or resets demo state.
+        </p>
+
+        <button class="btn btn-amber" onclick="executeSyncTransactions()">
+          <i class="ri-refresh-line"></i> Reconcile Pending Offline Receipts
+        </button>
+
+        <button class="btn btn-secondary" onclick="executeResetDemo()">
+          <i class="ri-restart-line"></i> Reset Hackathon Balances (₹500 / ₹10)
+        </button>
+
+        <button class="btn btn-danger" onclick="executeClearTransactions()" style="margin-top: auto;">
+          <i class="ri-delete-bin-line"></i> Clear Transaction History
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Accounts Ledger Table -->
+    <div class="table-container">
+      <div class="table-header">
+        <div class="table-title">
+          <i class="ri-contacts-book-line" style="color: var(--accent);"></i>
+          <span>Central Bank User Accounts</span>
+          <small id="userCountLabel">Loading accounts...</small>
+        </div>
+        <button class="nav-btn" onclick="loadBankData()">
+          <i class="ri-refresh-line"></i> Refresh
+        </button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Account Holder</th>
+            <th>Phone</th>
+            <th>Online Balance</th>
+            <th>Emergency Reserve</th>
+            <th>Total Worth</th>
+            <th>Quick Allocation</th>
+          </tr>
+        </thead>
+        <tbody id="usersTableBody">
+          <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading user ledger...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Authoritative Transactions Ledger Table -->
+    <div class="table-container">
+      <div class="table-header">
+        <div class="table-title">
+          <i class="ri-exchange-funds-line" style="color: var(--primary);"></i>
+          <span>Authoritative Settlement Ledger</span>
+          <small id="txCountLabel">All transactions in database.db</small>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <select id="filterTxStatus" class="select-field" style="padding: 4px 8px; font-size: 0.75rem;" onchange="renderTransactions()">
+            <option value="ALL">All Statuses</option>
+            <option value="completed">Completed Only</option>
+            <option value="pending">Pending Mesh Only</option>
+          </select>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Tx ID</th>
+            <th>Timestamp</th>
+            <th>Payee / Merchant</th>
+            <th>Amount</th>
+            <th>Channel</th>
+            <th>Type</th>
+            <th>Settlement Status</th>
+          </tr>
+        </thead>
+        <tbody id="txTableBody">
+          <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading transactions...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Real-time Bank Terminal -->
+    <div class="terminal-panel">
+      <div class="terminal-bar">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: var(--accent);">●</span>
+          <span style="font-size: 0.75rem; font-weight: 700; color: #e2e8f0;">LIVE CENTRAL BANK AUDIT STREAM</span>
+        </div>
+        <span style="font-size: 0.7rem; color: #64748b;">Auto-refreshing every 3s</span>
+      </div>
+      <div class="terminal-logs" id="terminalLogs">
+        <div class="log-entry"><span class="log-time">[00:00:00]</span> <span class="log-tag">[INIT]</span> EmPay Central Bank Authority Dashboard Initialized.</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let allUsers = [];
+    let allTransactions = [];
+    let isOnlineState = true;
+
+    // Change Detection State for in-website notifications
+    const previousState = {
+      initialized: false,
+      rahulBalance: null,
+      rahulEmergency: null,
+      txCount: null,
+      networkOnline: null
+    };
+
+    function showToast(title, message, type = 'info', icon = 'ri-notification-3-line') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = `toast-item ${type}`;
+      toast.innerHTML = `
+        <i class="${icon} toast-icon"></i>
+        <div class="toast-body">
+          <div class="toast-title">${title}</div>
+          <div class="toast-msg">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">✕</button>
+      `;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(40px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 5000);
+    }
+
+    function log(tag, msg, type = '') {
+      const logs = document.getElementById('terminalLogs');
+      const time = new Date().toTimeString().split(' ')[0];
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      let tagClass = 'log-tag';
+      if (type === 'warn') tagClass = 'log-warn';
+      if (type === 'err') tagClass = 'log-err';
+      div.innerHTML = `<span class="log-time">[${time}]</span> <span class="${tagClass}">[${tag}]</span> ${msg}`;
+      logs.appendChild(div);
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    async function loadBankData() {
+      try {
+        // 1. Fetch all users
+        const uRes = await fetch('/api/users');
+        if (uRes.ok) {
+          allUsers = await uRes.json();
+          renderUsers();
+        }
+
+        // 2. Fetch network status
+        const netRes = await fetch('/api/system/network-status');
+        if (netRes.ok) {
+          const net = await netRes.json();
+          isOnlineState = net.online;
+          updateNetworkBadge(isOnlineState);
+        }
+
+        // 3. Fetch transactions
+        const txRes = await fetch('/api/transactions');
+        if (txRes.ok) {
+          allTransactions = await txRes.json();
+          renderTransactions();
+        }
+
+        // 4. Auto-detect changes from Android App or other sessions & emit In-Website Notifications
+        const rahul = allUsers.find(u => u.id === 1);
+        if (rahul) {
+          if (previousState.initialized) {
+            if (previousState.rahulBalance !== rahul.balance || previousState.rahulEmergency !== rahul.emergency_balance) {
+              const diffBal = (rahul.balance - previousState.rahulBalance).toFixed(2);
+              const diffEmg = (rahul.emergency_balance - previousState.rahulEmergency).toFixed(2);
+              showToast(
+                'Account Balance Mutation',
+                `Rahul Sharma: Online ₹${rahul.balance.toFixed(2)} (${diffBal >= 0 ? '+' : ''}${diffBal}), Reserve ₹${rahul.emergency_balance.toFixed(2)} (${diffEmg >= 0 ? '+' : ''}${diffEmg})`,
+                'success',
+                'ri-wallet-3-line'
+              );
+            }
+          }
+          previousState.rahulBalance = rahul.balance;
+          previousState.rahulEmergency = rahul.emergency_balance;
+        }
+
+        if (previousState.initialized && previousState.txCount !== null && allTransactions.length > previousState.txCount) {
+          const newCount = allTransactions.length - previousState.txCount;
+          const latest = allTransactions[0];
+          showToast(
+            'New Ledger Transaction Settled',
+            `${newCount} new transaction(s) recorded. Latest: ₹${Number(latest?.amount || 0).toFixed(2)} to ${latest?.payee || 'Direct Transfer'}`,
+            'info',
+            'ri-exchange-dollar-line'
+          );
+        }
+        previousState.txCount = allTransactions.length;
+
+        if (previousState.initialized && previousState.networkOnline !== null && previousState.networkOnline !== isOnlineState) {
+          showToast(
+            'Network Topology Changed',
+            isOnlineState ? 'Central Bank restored online. Ready for sync.' : 'Grid Outage Active. Mesh payments only.',
+            isOnlineState ? 'success' : 'warning',
+            isOnlineState ? 'ri-wifi-line' : 'ri-wifi-off-line'
+          );
+        }
+        previousState.networkOnline = isOnlineState;
+        previousState.initialized = true;
+
+      } catch (e) {
+        log('ERROR', 'Failed to connect to Central Bank API: ' + e.message, 'err');
+      }
+    }
+
+    function renderUsers() {
+      const tbody = document.getElementById('usersTableBody');
+      const selReserve = document.getElementById('selReserveUser');
+      const selAdd = document.getElementById('selAddUser');
+
+      let totalOnline = 0;
+      let totalEmergency = 0;
+
+      tbody.innerHTML = '';
+      selReserve.innerHTML = '';
+      selAdd.innerHTML = '';
+
+      allUsers.forEach(u => {
+        const bal = Number(u.balance || 0);
+        const emg = Number(u.emergency_balance || 0);
+        const total = bal + emg;
+
+        totalOnline += bal;
+        totalEmergency += emg;
+
+        // Populate Primary Rahul Sharma metric
+        if (u.id === 1) {
+          document.getElementById('userName').textContent = u.name;
+          document.getElementById('userTotal').textContent = `₹ ${total.toFixed(2)}`;
+          document.getElementById('userOnline').textContent = `₹ ${bal.toFixed(2)}`;
+          document.getElementById('userEmergency').textContent = `₹ ${emg.toFixed(2)}`;
+        }
+
+        // Populate options
+        const opt1 = document.createElement('option');
+        opt1.value = u.id;
+        opt1.textContent = `${u.name} (Online: ₹${bal.toFixed(2)})`;
+        selReserve.appendChild(opt1);
+
+        const opt2 = document.createElement('option');
+        opt2.value = u.id;
+        opt2.textContent = `${u.name} (ID ${u.id})`;
+        selAdd.appendChild(opt2);
+
+        // Populate Table Row
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span style="font-family: monospace; font-weight: 700; color: #94a3b8;">#${u.id}</span></td>
+          <td><strong>${u.name}</strong></td>
+          <td style="font-family: monospace; color: #94a3b8;">${u.phone || 'N/A'}</td>
+          <td><span style="color: #60a5fa; font-weight: 700;">₹ ${bal.toFixed(2)}</span></td>
+          <td><span style="color: var(--accent); font-weight: 700;">₹ ${emg.toFixed(2)}</span></td>
+          <td><strong>₹ ${total.toFixed(2)}</strong></td>
+          <td>
+            <button class="chip" onclick="quickReserve(${u.id}, 10)">Reserve ₹10</button>
+            <button class="chip" onclick="quickAdd(${u.id}, 100)">+₹100</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('systemTotal').textContent = `₹ ${(totalOnline + totalEmergency).toFixed(2)}`;
+      document.getElementById('systemOnline').textContent = `₹ ${totalOnline.toFixed(2)}`;
+      document.getElementById('systemEmergency').textContent = `₹ ${totalEmergency.toFixed(2)}`;
+      document.getElementById('userCountLabel').textContent = `${allUsers.length} accounts verified`;
+    }
+
+    function renderTransactions() {
+      const tbody = document.getElementById('txTableBody');
+      const filter = document.getElementById('filterTxStatus').value;
+
+      let filtered = allTransactions;
+      if (filter !== 'ALL') {
+        filtered = allTransactions.filter(t => t.status === filter);
+      }
+
+      const pending = allTransactions.filter(t => t.status === 'pending').length;
+      const completed = allTransactions.filter(t => t.status === 'completed').length;
+
+      document.getElementById('pendingCount').textContent = `${pending} Pending`;
+      document.getElementById('settledCount').textContent = `${completed}`;
+      document.getElementById('txCountLabel').textContent = `${allTransactions.length} records in ledger`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No transactions recorded.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(t => {
+        const isPending = t.status === 'pending';
+        const tagClass = isPending ? 'tag-pending' : 'tag-completed';
+        const statusText = isPending ? 'PENDING SYNC' : 'SETTLED';
+        const channel = t.channel || (t.is_offline ? 'Bluetooth' : 'UPI');
+        const type = t.is_offline ? 'Offline Mesh' : 'Online';
+
+        return `
+          <tr>
+            <td style="font-family: monospace; font-size: 0.75rem; color: #94a3b8;">${t.tx_id || ('TX-' + t.id)}</td>
+            <td style="color: #94a3b8; font-size: 0.75rem;">${t.created_at || 'Just now'}</td>
+            <td><strong>${t.payee || 'Direct Transfer'}</strong></td>
+            <td><strong style="color: #fff;">₹ ${Number(t.amount).toFixed(2)}</strong></td>
+            <td><span class="badge" style="background: #1e293b; color: #cbd5e1;">${channel}</span></td>
+            <td><span style="font-size: 0.75rem; color: #94a3b8;">${type}</span></td>
+            <td><span class="tag-status ${tagClass}">${statusText}</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function updateNetworkBadge(isOnline) {
+      const badge = document.getElementById('badgeNetwork');
+      const btn = document.getElementById('btnToggleNetwork');
+      if (isOnline) {
+        badge.className = 'badge online';
+        badge.innerHTML = `<i class="ri-wifi-line"></i> Central Bank Online`;
+        btn.innerHTML = `<i class="ri-shut-down-line"></i> Simulate Outage`;
+      } else {
+        badge.className = 'badge offline';
+        badge.innerHTML = `<i class="ri-wifi-off-line"></i> Grid Outage (Offline Mesh)`;
+        btn.innerHTML = `<i class="ri-restart-line"></i> Restore Central Bank`;
+      }
+    }
+
+    async function toggleNetwork() {
+      try {
+        const res = await fetch('/api/system/toggle-network', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          isOnlineState = data.online;
+          updateNetworkBadge(isOnlineState);
+          log('NETWORK', `Network state changed: ${isOnlineState ? 'ONLINE (Central Bank Reachable)' : 'OFFLINE (Outage Mode Active)'}`, isOnlineState ? '' : 'warn');
+        }
+      } catch (e) {
+        log('ERROR', 'Could not toggle network: ' + e.message, 'err');
+      }
+    }
+
+    function setReserve(val) {
+      document.getElementById('inpReserveAmount').value = val.toFixed(2);
+    }
+
+    async function executeReserveFunds() {
+      const userId = document.getElementById('selReserveUser').value;
+      const amount = parseFloat(document.getElementById('inpReserveAmount').value);
+
+      if (!amount || amount <= 0) {
+        alert('Please enter a valid amount.');
+        return;
+      }
+
+      try {
+        log('BANK API', `Initiating reserve transfer: ₹${amount.toFixed(2)} for User ID ${userId}...`);
+        const res = await fetch('/api/user/transfer-to-emergency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, amount: amount })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          log('BANK API', `✅ 200 OK: ${data.message} | New Online: ₹${data.balance} | Reserve: ₹${data.emergency_balance}`);
+          showToast('Offline Reserve Allocated', `Successfully reserved ₹${amount.toFixed(2)} for User #${userId}. New offline reserve: ₹${data.emergency_balance}`, 'success', 'ri-shield-check-line');
+          loadBankData();
+        } else {
+          log('BANK API', `❌ Rejected: ${data.message || 'Unknown error'}`, 'err');
+          showToast('Reservation Rejected', data.message || 'Transaction rejected by Central Bank.', 'danger', 'ri-error-warning-line');
+          alert(data.message || 'Reservation rejected.');
+        }
+      } catch (e) {
+        log('ERROR', 'Reserve request failed: ' + e.message, 'err');
+      }
+    }
+
+    async function quickReserve(userId, amount) {
+      document.getElementById('selReserveUser').value = userId;
+      document.getElementById('inpReserveAmount').value = amount.toFixed(2);
+      await executeReserveFunds();
+    }
+
+    async function executeAddFunds() {
+      const userId = document.getElementById('selAddUser').value;
+      const target = document.getElementById('selAddTarget').value;
+      const amount = parseFloat(document.getElementById('inpAddAmount').value);
+
+      if (!amount || amount <= 0) return;
+
+      try {
+        log('LIQUIDITY', `Injecting ₹${amount.toFixed(2)} to ${target} (User #${userId})...`);
+        const res = await fetch('/api/user/add-funds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, amount: amount, target: target })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          log('LIQUIDITY', `✅ 200 OK: Added ₹${amount.toFixed(2)}. Online: ₹${data.balance} | Reserve: ₹${data.emergency_balance}`);
+          showToast('Capital Injected', `Credited ₹${amount.toFixed(2)} to ${target} (User #${userId})`, 'success', 'ri-add-circle-line');
+          loadBankData();
+        }
+      } catch (e) {
+        log('ERROR', 'Add funds failed: ' + e.message, 'err');
+      }
+    }
+
+    async function quickAdd(userId, amount) {
+      document.getElementById('selAddUser').value = userId;
+      document.getElementById('inpAddAmount').value = amount.toFixed(2);
+      await executeAddFunds();
+    }
+
+    async function executeSyncTransactions() {
+      try {
+        log('SETTLEMENT', 'Triggering Central Bank reconciliation against pending transactions...');
+        const res = await fetch('/api/transactions/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: [] })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          log('SETTLEMENT', `✅ 200 OK: Reconciled ${data.reconciled_count} pending transaction(s). Online Balance: ₹${data.balance}`);
+          showToast('Reconciliation Complete', `Settled ${data.reconciled_count} pending offline transaction(s). Online Balance: ₹${data.balance}`, 'info', 'ri-refresh-line');
+          loadBankData();
+        }
+      } catch (e) {
+        log('ERROR', 'Sync failed: ' + e.message, 'err');
+      }
+    }
+
+    async function executeResetDemo() {
+      if (!confirm('Reset all balances to Official Demo state (₹500.00 Online, ₹10.00 Emergency)?')) return;
+      try {
+        log('ADMIN', 'Resetting accounts to official hackathon state...');
+        const res = await fetch('/api/bank/reset-demo', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          log('ADMIN', `✅ 200 OK: ${data.message}`);
+          loadBankData();
+        }
+      } catch (e) {
+        log('ERROR', 'Reset failed: ' + e.message, 'err');
+      }
+    }
+
+    async function executeClearTransactions() {
+      if (!confirm('Clear all recorded transactions in the Central Bank ledger?')) return;
+      try {
+        const res = await fetch('/api/transactions/clear', { method: 'POST' });
+        if (res.ok) {
+          log('ADMIN', '🗑️ Ledger cleared.');
+          loadBankData();
+        }
+      } catch (e) {
+        log('ERROR', 'Clear failed: ' + e.message, 'err');
+      }
+    }
+
+    // Initial load + periodic polling every 3 seconds
+    loadBankData();
+    setInterval(loadBankData, 3000);
+  </script>
+</body>
+</html>
+

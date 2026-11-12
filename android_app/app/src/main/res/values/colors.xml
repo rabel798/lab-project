@@ -2,4 +2,28 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="primary">#0D9488</color>
+    <color name="primary_dark">#0F766E</color>
+    <color name="primary_light">#CCFBF1</color>
+    <color name="accent">#14B8A6</color>
+    <color name="background">#F8FAFC</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="card_stroke">#E2E8F0</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="status_online">#10B981</color>
+    <color name="status_offline">#F59E0B</color>
+    <color name="error_red">#EF4444</color>
+    <color name="amber_warning">#D97706</color>
+    <color name="amber_bg">#FEF3C7</color>
+    <color name="green_bg">#D1FAE5</color>
+    <color name="terminal_bg">#0F172A</color>
+    <color name="terminal_header">#1E293B</color>
+    <color name="terminal_text">#38BDF8</color>
+    <color name="terminal_log">#E2E8F0</color>
+    <color name="terminal_accent">#34D399</color>
+    <color name="pin_dot_empty">#CBD5E1</color>
+    <color name="pin_dot_filled">#0D9488</color>
+    <color name="chip_bg">#F1F5F9</color>
+    <color name="chip_stroke">#CBD5E1</color>
 </resources>

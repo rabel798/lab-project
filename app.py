@@ -171,6 +171,11 @@ def main_portfolio():
     return render_template("main.html")  # Portfolio untouched
 
 
+@app.route("/bank")
+def bank_dashboard():
+    return render_template("bank.html")
+
+
 @app.route("/emergencypay")
 def emergency_pay():
     return render_template("emergencypay.html")
@@ -249,6 +254,25 @@ def api_get_user():
             "emergency_balance": user["emergency_balance"]
         })
     return jsonify({"error": "User not found"}), 404
+
+
+@app.route("/api/users", methods=["GET"])
+def api_get_all_users():
+    conn = get_db()
+    users = conn.execute("SELECT id, name, phone, balance, emergency_balance FROM users ORDER BY id ASC").fetchall()
+    conn.close()
+    return jsonify([dict(u) for u in users])
+
+
+@app.route("/api/bank/reset-demo", methods=["POST"])
+def api_bank_reset_demo():
+    conn = get_db()
+    conn.execute("UPDATE users SET balance = 500.0, emergency_balance = 10.0 WHERE id = 1")
+    conn.execute("UPDATE users SET balance = 500.0, emergency_balance = 10.0 WHERE id != 1")
+    conn.commit()
+    user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
+    conn.close()
+    return jsonify({"success": True, "message": "Reset to official demo balances (₹500.00 Online, ₹10.00 Emergency)", "user": dict(user)})
 
 
 @app.route("/api/users/<int:user_id>", methods=["GET", "PATCH"])
