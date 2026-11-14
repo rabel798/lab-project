@@ -177,6 +177,26 @@ class BluetoothPaymentEngine(private val context: Context) {
         val amount = packet.amount
         val currentMerchant = sessionManager.getUser()
 
+        // 0. Self-Transfer Check: Prevent transferring money to yourself (same account across devices)
+        val isSelfTransfer = persistToLocalDatabase && (
+                (packet.senderId.isNotEmpty() && packet.senderId == currentMerchant.id.toString()) ||
+                (packet.senderPublicKey.isNotEmpty() && packet.senderPublicKey == CryptoManager.getPublicKeyBase64())
+        )
+
+        if (isSelfTransfer) {
+            onStatusLog("🛡️ SELF-TRANSFER BLOCKED: Incoming payment rejected. Sender and Receiver share the same account (${packet.senderName}).")
+            return AckPacket(
+                txId = txId,
+                status = "REJECTED_SELF_TRANSFER",
+                receiverId = currentMerchant.id.toString(),
+                receiverName = currentMerchant.name,
+                timestamp = System.currentTimeMillis(),
+                ackNonce = CryptoManager.generateNonce(),
+                signature = "",
+                message = "SELF_TRANSFER_BLOCKED: Transferring money to yourself is blocked. Payer and Payee share the same account (${packet.senderName})."
+            )
+        }
+
         // 1. Anti-Replay Check: Reject if nonce already used
         if (appDatabase.transactionDao.isNonceUsed(nonce)) {
             onStatusLog("🛡️ SECURITY ALERT: Replay Attack Detected! Nonce $nonce is already registered.")
@@ -302,6 +322,7 @@ class BluetoothPaymentEngine(private val context: Context) {
                     return@launch
                 }
 
+
                 // 2. Connect to Merchant RFCOMM Socket
                 onStatusLog("Connecting to ${device.name} (${device.address})...")
                 socket = device.createRfcommSocketToServiceRecord(BluetoothConstants.SPP_UUID)
@@ -420,6 +441,7 @@ class BluetoothPaymentEngine(private val context: Context) {
                     }
                     return@launch
                 }
+
 
                 val localServer = ServerSocket(0).apply { reuseAddress = true }
                 val port = localServer.localPort

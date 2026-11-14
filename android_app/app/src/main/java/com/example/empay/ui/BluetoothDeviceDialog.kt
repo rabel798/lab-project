@@ -168,6 +168,8 @@ class BluetoothDeviceDialog(
             "Apex City Care Pharmacy" to "Emergency Medical Supplies",
             "Daily Fresh Supermarket" to "Essential Food & Rations",
             "LifeLine Emergency Medicos" to "24/7 Disaster Relief",
+            "Priya Sharma" to "Peer Device (Phone 2 Demo)",
+            "Sukhpal Singh" to "Peer Device (Phone 2 Demo)",
             "City QuickFix Electrical Services" to "Power & Grid Repairs"
         )
 

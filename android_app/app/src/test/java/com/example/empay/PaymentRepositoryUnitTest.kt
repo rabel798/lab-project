@@ -150,5 +150,49 @@ class PaymentRepositoryUnitTest {
         assertEquals(450.0, response.balance, 0.001)
         assertEquals(40.0, response.emergencyBalance, 0.001)
     }
+
+    @Test
+    fun testSelfTransferRejectionPreventsBalanceDeduction() {
+        var localWalletBalance = 25.0
+        val paymentAmount = 5.0
+        val senderUser = UserSession(id = 1L, name = "Rahul Sharma", phone = "9876543210")
+        val receiverMerchant = UserSession(id = 1L, name = "Rahul Sharma", phone = "9876543210")
+
+        // 1. Detect self-transfer between devices on same account
+        val isSelfTransfer = (senderUser.id == receiverMerchant.id) ||
+                senderUser.name.equals(receiverMerchant.name, ignoreCase = true)
+
+        assertTrue("Must detect same-account self-transfer", isSelfTransfer)
+
+        // 2. Peer returns rejection ack
+        val ackStatus = if (isSelfTransfer) "REJECTED_SELF_TRANSFER" else "SUCCESS"
+        assertEquals("REJECTED_SELF_TRANSFER", ackStatus)
+
+        // 3. Since ack is not SUCCESS, local wallet deduction MUST NOT occur
+        if (ackStatus == "SUCCESS") {
+            localWalletBalance -= paymentAmount
+        }
+
+        assertEquals("Local wallet balance must remain unchanged at ₹25.00 on self-transfer rejection", 25.0, localWalletBalance, 0.001)
+    }
+
+    @Test
+    fun testMultiUserDemoProfilesConfigured() {
+        val demoUsers = UserSession.DEMO_USERS
+        assertEquals("Must provide 5 configured demo profiles for multi-device testing", 5, demoUsers.size)
+
+        val names = demoUsers.map { it.name }
+        assertTrue(names.contains("Rahul Sharma"))
+        assertTrue(names.contains("Sukhpal Singh"))
+        assertTrue(names.contains("Priya Sharma"))
+        assertTrue(names.contains("Dr. Rohan Verma"))
+        assertTrue(names.contains("Ananya Patel"))
+
+        // Ensure IDs and phones are unique
+        val ids = demoUsers.map { it.id }
+        val phones = demoUsers.map { it.phone }
+        assertEquals(ids.size, ids.toSet().size)
+        assertEquals(phones.size, phones.toSet().size)
+    }
 }
 

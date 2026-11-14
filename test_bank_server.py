@@ -246,6 +246,57 @@ class BankServerTestCase(unittest.TestCase):
         self.assertEqual(user_data["emergency_balance"], 0.0)
         self.assertEqual(user_data["balance"], 495.0)
 
+    def test_12_self_transfer_does_not_deduct_balance(self):
+        """Self-Transfer Protection: Transferring money to oneself across devices does not decrease central bank balance."""
+        self.client.post("/api/bank/reset-demo")
+        initial_user = json.loads(self.client.get("/api/user").data.decode())
+        initial_bal = initial_user["balance"]
+        initial_emg = initial_user["emergency_balance"]
+
+        # User 1 sends money to themselves (Payee is Rahul Sharma / same user_id)
+        self_tx_payload = {
+            "transactions": [
+                {
+                    "tx_id": "TX-SELF-001",
+                    "sender_id": 1,
+                    "receiver_id": 1,
+                    "payee": "Rahul Sharma",
+                    "amount": 5.0,
+                    "direction": "SENT",
+                    "note": "Internal self-transfer between devices"
+                }
+            ]
+        }
+        resp = self.client.post("/api/transactions/sync", data=json.dumps(self_tx_payload), content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.data.decode())
+
+        # Balance must NOT be deducted
+        self.assertEqual(data["balance"], initial_bal)
+        self.assertEqual(data["emergency_balance"], initial_emg)
+
+        persisted = json.loads(self.client.get("/api/user").data.decode())
+        self.assertEqual(persisted["emergency_balance"], initial_emg)
+
+    def test_13_multi_user_profiles_and_distinct_ids(self):
+        """Multi-Device Testing: Multiple unique user accounts exist with separate IDs and phone numbers."""
+        app.init_db()
+        resp = self.client.get("/api/users")
+        self.assertEqual(resp.status_code, 200)
+        users = json.loads(resp.data.decode())
+        self.assertGreaterEqual(len(users), 4)
+
+        user_names = [u["name"] for u in users]
+        self.assertIn("Rahul Sharma", user_names)
+        self.assertIn("Sukhpal Singh", user_names)
+        self.assertIn("Priya Sharma", user_names)
+
+        # Ensure all IDs and phone numbers are unique
+        user_ids = [u["id"] for u in users]
+        user_phones = [u["phone"] for u in users]
+        self.assertEqual(len(user_ids), len(set(user_ids)))
+        self.assertEqual(len(user_phones), len(set(user_phones)))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -46,6 +46,7 @@ import com.example.empay.sync.SyncNotificationHelper
 import com.example.empay.ui.BluetoothDeviceDialog
 import com.example.empay.ui.PinAuthDialog
 import com.example.empay.ui.TransferFundsDialog
+import com.example.empay.ui.UserProfileDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -219,7 +220,9 @@ class MainActivity : AppCompatActivity() {
             triggerWorkManagerSync()
         }
 
-        btnTestLogin.setOnClickListener { performOnlineBankLogin() }
+        btnTestLogin.text = "Switch User"
+        btnTestLogin.setOnClickListener { showUserProfileDialog() }
+        tvUserName.setOnClickListener { showUserProfileDialog() }
         btnTestPin.setOnClickListener { showOfflinePinDialog() }
         btnTransferToOffline.setOnClickListener { initiateFundReservation() }
         btnSyncBank.setOnClickListener { performBankSync() }
@@ -525,6 +528,16 @@ class MainActivity : AppCompatActivity() {
         val amountStr = etBtAmount.text.toString().trim()
         val amount = amountStr.toDoubleOrNull()
         val payeeName = etPayeeName.text.toString().trim().ifEmpty { "Apex City Care Pharmacy" }
+
+        val currentUser = paymentRepository.getCurrentUser()
+        if (payeeName.trim().equals(currentUser.phone.trim(), ignoreCase = true) ||
+            payeeName.trim().equals(currentUser.accountNumber.trim(), ignoreCase = true) ||
+            payeeName.equals("Self", ignoreCase = true) ||
+            payeeName.equals("Myself", ignoreCase = true)) {
+            appendLog("P2P PAYMENT", "❌ Self-transfer blocked: Cannot transfer money to your own account/phone (${currentUser.phone}).")
+            Toast.makeText(this, "Self-transfer not allowed: Cannot send money to yourself.", Toast.LENGTH_LONG).show()
+            return
+        }
 
         if (amount == null || amount <= 0.0) {
             Toast.makeText(this, "Please enter a valid amount", Toast.LENGTH_SHORT).show()
@@ -867,6 +880,23 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showUserProfileDialog() {
+        val dialog = UserProfileDialog(
+            context = this,
+            currentUserId = paymentRepository.getCurrentUser().id,
+            onUserSelected = { selectedUser ->
+                lifecycleScope.launch {
+                    val updated = paymentRepository.switchActiveUser(selectedUser)
+                    refreshLocalLedgerUI()
+                    appendLog("AUTH", "Switched active user profile to ${updated.name} (Phone: ${updated.phone})")
+                    appendLog("AUTH", "Active Ledger Account: ${updated.accountNumber} | Bank: ₹${updated.balance} | Reserve: ₹${updated.emergencyBalance}")
+                    Toast.makeText(this@MainActivity, "Logged in as ${updated.name}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+        dialog.show()
     }
 
     private fun performOnlineBankLogin() {

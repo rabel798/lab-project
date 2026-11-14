@@ -14,6 +14,12 @@ interface BankApiService {
     @GET("/api/user")
     suspend fun getUser(): Response<BankUserResponse>
 
+    @GET("/api/users")
+    suspend fun getAllUsers(): Response<List<BankUserResponse>>
+
+    @GET("/api/users/{id}")
+    suspend fun getUserById(@Path("id") id: Long): Response<BankUserResponse>
+
     @GET("/api/users/phone/{phone}")
     suspend fun getUserByPhone(@Path("phone") phone: String): Response<BankUserResponse>
 

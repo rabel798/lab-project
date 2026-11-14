@@ -58,6 +58,44 @@ class PaymentRepository private constructor(private val context: Context) {
 
     fun getCurrentUser(): UserSession = sessionManager.getUser()
 
+    suspend fun switchActiveUser(user: UserSession): UserSession = withContext(Dispatchers.IO) {
+        sessionManager.updateUser(user)
+        appDatabase.walletDao.updateBalance(user.emergencyBalance)
+
+        if (NetworkManager.isOnline(context)) {
+            try {
+                val api = getApiService()
+                val resp = api.getUserById(user.id)
+                if (resp.isSuccessful && resp.body() != null) {
+                    val remote = resp.body()!!
+                    val updated = user.copy(
+                        balance = remote.balance,
+                        emergencyBalance = remote.emergencyBalance
+                    )
+                    sessionManager.updateUser(updated)
+                    appDatabase.walletDao.updateBalance(remote.emergencyBalance)
+                    return@withContext updated
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return@withContext user
+    }
+
+    suspend fun fetchAllBankUsers(): List<BankUserResponse> = withContext(Dispatchers.IO) {
+        if (!NetworkManager.isOnline(context)) return@withContext emptyList()
+        try {
+            val resp = getApiService().getAllUsers()
+            if (resp.isSuccessful && resp.body() != null) {
+                return@withContext resp.body()!!
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return@withContext emptyList()
+    }
+
     suspend fun getOfflineWallet(): WalletEntity? = withContext(Dispatchers.IO) {
         appDatabase.walletDao.getWallet()
     }

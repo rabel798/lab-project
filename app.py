@@ -607,13 +607,27 @@ def api_transactions_sync():
                 sender_id = int(t.get("sender_id", user_id) or user_id)
                 receiver_id = t.get("receiver_id")
 
+                # Self-Transfer Protection: Based on unique identifiers (User ID, unique phone number, account ID) - NOT name
+                curr_user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                user_phone = str(curr_user["phone"]).strip() if curr_user else ""
+                expected_acc = f"ACC-{user_phone}" if user_phone else ""
+                is_self_transfer = (
+                    (receiver_id is not None and str(receiver_id).strip() != "" and str(sender_id) == str(receiver_id)) or
+                    (bool(user_phone) and payee.strip() == user_phone) or
+                    (bool(expected_acc) and expected_acc in payee.strip()) or
+                    direction == "SELF"
+                )
+
                 conn.execute("""
                     INSERT INTO transactions (tx_id, sender_id, receiver_id, payee, amount, status, channel, note, is_offline, method)
                     VALUES (?, ?, ?, ?, ?, 'completed', 'Bluetooth', ?, 1, 'BLUETOOTH')
                 """, (str(t_id), sender_id, receiver_id, payee, amount, note))
 
                 reconciled_count += 1
-                if direction == "RECEIVED":
+                if is_self_transfer:
+                    # Self-transfer between same user's devices: Net bank balance change is strictly 0.00
+                    pass
+                elif direction == "RECEIVED":
                     total_received += amount
                 else:
                     total_spent += amount
