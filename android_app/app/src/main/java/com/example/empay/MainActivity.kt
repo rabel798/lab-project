@@ -27,6 +27,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.work.WorkInfo
 import com.example.empay.auth.PinAuthManager
 import com.example.empay.auth.SessionManager
 import com.example.empay.auth.UserSession
@@ -39,6 +40,8 @@ import com.example.empay.network.NetworkManager
 import com.example.empay.network.SyncTransactionItem
 import com.example.empay.network.SyncTransactionsRequest
 import com.example.empay.network.TransferEmergencyRequest
+import com.example.empay.sync.SyncManager
+import com.example.empay.sync.SyncNotificationHelper
 import com.example.empay.ui.BluetoothDeviceDialog
 import com.example.empay.ui.PinAuthDialog
 import com.example.empay.ui.TransferFundsDialog
@@ -103,6 +106,8 @@ class MainActivity : AppCompatActivity() {
     // Bank Config
     private lateinit var etBankUrl: EditText
     private lateinit var btnSaveBankUrl: Button
+    private lateinit var tvAutoSyncBadge: TextView
+    private lateinit var btnTriggerWorkManager: Button
 
     // Terminal
     private lateinit var tvTerminalLog: TextView
@@ -132,6 +137,7 @@ class MainActivity : AppCompatActivity() {
         monitorNetworkConnectivity()
         initHardwareCrypto()
         refreshLocalLedgerUI()
+        initPhase6WorkManager()
 
 
         val localWallet = appDatabase.walletDao.getWallet()
@@ -184,6 +190,8 @@ class MainActivity : AppCompatActivity() {
 
         etBankUrl = findViewById(R.id.etBankUrl)
         btnSaveBankUrl = findViewById(R.id.btnSaveBankUrl)
+        tvAutoSyncBadge = findViewById(R.id.tvAutoSyncBadge)
+        btnTriggerWorkManager = findViewById(R.id.btnTriggerWorkManager)
 
         tvTerminalLog = findViewById(R.id.tvTerminalLog)
         scrollTerminal = findViewById(R.id.scrollTerminal)
@@ -202,6 +210,10 @@ class MainActivity : AppCompatActivity() {
                 appendLog("CONFIG", "Updated Laptop Bank endpoint: $updatedUrl")
                 Toast.makeText(this, "Bank Server IP Saved", Toast.LENGTH_SHORT).show()
             }
+        }
+
+        btnTriggerWorkManager.setOnClickListener {
+            triggerWorkManagerSync()
         }
 
         btnTestLogin.setOnClickListener { performOnlineBankLogin() }
@@ -403,6 +415,8 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     updateNetworkBadge(true)
                     appendLog("NETWORK", "🟢 Connectivity restored: Central Bank connection available.")
+                    appendLog("AUTO-SYNC", "Network restored. Triggering automatic ledger sync...")
+                    SyncManager.triggerImmediateSync(this@MainActivity)
                 }
             }
 
@@ -581,6 +595,11 @@ class MainActivity : AppCompatActivity() {
                 appendLog("P2P PAYMENT", "✅ PAYMENT COMPLETED! Tx: ${packet.txId}")
                 appendLog("P2P PAYMENT", "Receipt Nonce: ${ack.ackNonce.take(8)} | Status: ${ack.status}")
                 Toast.makeText(this, "Payment Complete: -₹$amount to $payeeName", Toast.LENGTH_SHORT).show()
+
+                if (NetworkManager.isOnline(this@MainActivity)) {
+                    appendLog("AUTO-SYNC", "Online connection active. Auto-syncing offline receipt with Central Bank...")
+                    SyncManager.triggerImmediateSync(this@MainActivity)
+                }
             },
             onError = { errMsg ->
                 appendLog("P2P PAYMENT", "❌ $errMsg")
@@ -615,6 +634,11 @@ class MainActivity : AppCompatActivity() {
                 refreshLocalLedgerUI()
                 appendLog("P2P PAYMENT", "✅ Bluetooth RFCOMM Payment Confirmed by Peer!")
                 Toast.makeText(this, "Payment Sent via Bluetooth!", Toast.LENGTH_SHORT).show()
+
+                if (NetworkManager.isOnline(this@MainActivity)) {
+                    appendLog("AUTO-SYNC", "Online connection active. Auto-syncing offline receipt with Central Bank...")
+                    SyncManager.triggerImmediateSync(this@MainActivity)
+                }
             },
             onError = { errMsg ->
                 appendLog("BLUETOOTH", "❌ $errMsg")
@@ -728,7 +752,10 @@ class MainActivity : AppCompatActivity() {
                             txId = it.txId,
                             payee = it.receiverName,
                             amount = it.amount,
-                            note = "Bluetooth Offline Payment (Nonce: ${it.nonce.take(8)})"
+                            note = "Bluetooth Offline Payment (Direction: ${it.direction})",
+                            direction = it.direction,
+                            senderId = it.senderId,
+                            receiverId = it.receiverId
                         )
                     }
 
@@ -742,6 +769,7 @@ class MainActivity : AppCompatActivity() {
                             pendingTxs.forEach { tx ->
                                 appDatabase.transactionDao.markAsSynced(tx.txId)
                             }
+                            appDatabase.walletDao.updateBalance(body.emergencyBalance)
                         }
                         sessionManager.updateBalances(body.balance, body.emergencyBalance)
                         appendLog("SYNC", "✅ 200 OK: Reconciled ${body.reconciledCount} pending transactions with Bank ledger!")
@@ -861,6 +889,11 @@ class MainActivity : AppCompatActivity() {
                         appendLog("HINT", "Tap '🔄 Sync' to push this transaction to the Laptop Bank.")
 
                         Toast.makeText(this@MainActivity, "Offline Tx Created: -₹5.00 (PENDING_SYNC)", Toast.LENGTH_SHORT).show()
+
+                        if (NetworkManager.isOnline(this@MainActivity)) {
+                            appendLog("AUTO-SYNC", "Online connection active. Auto-syncing offline receipt with Central Bank...")
+                            SyncManager.triggerImmediateSync(this@MainActivity)
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -931,7 +964,19 @@ class MainActivity : AppCompatActivity() {
 
                 if (response.isSuccessful && response.body() != null) {
                     val bankUser = response.body()!!
-                    sessionManager.updateBalances(bankUser.balance, bankUser.emergencyBalance)
+                    val hasPendingTxs = withContext(Dispatchers.IO) {
+                        appDatabase.transactionDao.getPendingSyncTransactions().isNotEmpty()
+                    }
+                    if (hasPendingTxs) {
+                        // Preserve local offline wallet deduction until pending transactions are synced
+                        val localWallet = withContext(Dispatchers.IO) { appDatabase.walletDao.getWallet() }
+                        sessionManager.updateBalances(bankUser.balance, localWallet?.balance ?: bankUser.emergencyBalance)
+                    } else {
+                        sessionManager.updateBalances(bankUser.balance, bankUser.emergencyBalance)
+                        withContext(Dispatchers.IO) {
+                            appDatabase.walletDao.updateBalance(bankUser.emergencyBalance)
+                        }
+                    }
                     sessionManager.updateOnlineStatus(true)
 
                     updateNetworkBadge(true)
@@ -974,10 +1019,76 @@ class MainActivity : AppCompatActivity() {
     private fun appendLog(tag: String, message: String) {
         val timestamp = timeFormat.format(Date())
         val logLine = "[$timestamp] [$tag] $message\n"
-        tvTerminalLog.append(logLine)
+        runOnUiThread {
+            tvTerminalLog.append(logLine)
+            scrollTerminal.post {
+                scrollTerminal.fullScroll(View.FOCUS_DOWN)
+            }
+        }
+    }
 
-        scrollTerminal.post {
-            scrollTerminal.fullScroll(View.FOCUS_DOWN)
+    /**
+     * Phase 6: Initializes Android WorkManager background sync and observers.
+     */
+    private fun initPhase6WorkManager() {
+        SyncNotificationHelper.createNotificationChannel(this)
+        SyncManager.scheduleAutoSync(this)
+        appendLog("WORKMANAGER", "Auto-Sync background daemon armed (Constraint: NetworkType.CONNECTED)")
+
+        SyncManager.getImmediateSyncWorkInfo(this).observe(this) { workInfoList ->
+            if (workInfoList.isNullOrEmpty()) return@observe
+            val workInfo = workInfoList.first()
+            when (workInfo.state) {
+                WorkInfo.State.ENQUEUED -> {
+                    tvAutoSyncBadge.text = "● Auto-Sync: Enqueued"
+                    tvAutoSyncBadge.setTextColor(ContextCompat.getColor(this, R.color.primary_dark))
+                }
+                WorkInfo.State.RUNNING -> {
+                    tvAutoSyncBadge.text = "● Auto-Sync: Syncing..."
+                    tvAutoSyncBadge.setTextColor(ContextCompat.getColor(this, R.color.primary))
+                    appendLog("WORKMANAGER", "⏳ SyncWorker active: pushing pending offline ledger to Laptop Bank...")
+                }
+                WorkInfo.State.SUCCEEDED -> {
+                    tvAutoSyncBadge.text = "● Auto-Sync: Reconciled ✅"
+                    tvAutoSyncBadge.setTextColor(ContextCompat.getColor(this, R.color.primary_dark))
+                    val count = workInfo.outputData.getInt("reconciled_count", 0)
+                    val total = workInfo.outputData.getDouble("total_amount", 0.0)
+                    if (count > 0) {
+                        appendLog("WORKMANAGER", "✅ Auto-Sync Succeeded: $count offline txs (₹$total) settled with Central Bank.")
+                    } else {
+                        appendLog("WORKMANAGER", "✅ Auto-Sync Completed: Ledger already up-to-date (0 pending txs).")
+                    }
+                    refreshLocalLedgerUI()
+                }
+                WorkInfo.State.FAILED -> {
+                    tvAutoSyncBadge.text = "● Auto-Sync: Retrying"
+                    tvAutoSyncBadge.setTextColor(ContextCompat.getColor(this, R.color.error_red))
+                    val err = workInfo.outputData.getString("error") ?: "Server unreachable"
+                    appendLog("WORKMANAGER", "⚠️ SyncWorker notice: $err")
+                }
+                else -> {}
+            }
+        }
+    }
+
+    private fun triggerWorkManagerSync() {
+        appendLog("WORKMANAGER", "Manual sync request queued for Android WorkManager...")
+        Toast.makeText(this, "Dispatched to WorkManager Queue", Toast.LENGTH_SHORT).show()
+        SyncManager.triggerImmediateSync(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (NetworkManager.isOnline(this)) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                val pending = appDatabase.transactionDao.getPendingSyncTransactions()
+                if (pending.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        appendLog("AUTO-SYNC", "App in foreground with ${pending.size} pending offline receipts. Auto-syncing with Central Bank...")
+                        SyncManager.triggerImmediateSync(this@MainActivity)
+                    }
+                }
+            }
         }
     }
 

@@ -584,7 +584,12 @@ def api_transactions_sync():
     """Reconciliation endpoint: Reconciles all pending offline mesh transactions when back online"""
     data = request.get_json(silent=True) or {}
     local_txs = data.get("transactions", [])
+    user_id = int(data.get("user_id", 1))
     conn = get_db()
+
+    reconciled_count = 0
+    total_spent = 0.0
+    total_received = 0.0
 
     # Reconcile any client-side offline transactions not yet in DB
     for t in local_txs:
@@ -595,31 +600,60 @@ def api_transactions_sync():
                 payee = t.get("payee", "Unknown")
                 amount = float(t.get("amount", 0))
                 note = t.get("note", "")
+                direction = str(t.get("direction", "SENT")).upper()
+                if "RECEIVED" in note.upper():
+                    direction = "RECEIVED"
+
+                sender_id = int(t.get("sender_id", user_id) or user_id)
+                receiver_id = t.get("receiver_id")
+
                 conn.execute("""
-                    INSERT INTO transactions (tx_id, sender_id, payee, amount, status, channel, note, is_offline, method)
-                    VALUES (?, 1, ?, ?, 'completed', 'Bluetooth', ?, 1, 'BLUETOOTH')
-                """, (str(t_id), payee, amount, note))
+                    INSERT INTO transactions (tx_id, sender_id, receiver_id, payee, amount, status, channel, note, is_offline, method)
+                    VALUES (?, ?, ?, ?, ?, 'completed', 'Bluetooth', ?, 1, 'BLUETOOTH')
+                """, (str(t_id), sender_id, receiver_id, payee, amount, note))
 
-    # Mark all pending transactions as completed, and adjust online balance
-    pending = conn.execute("SELECT * FROM transactions WHERE status = 'pending'").fetchall()
-    pending_count = len(pending)
-    total_spent_offline = sum(float(p["amount"]) for p in pending)
-    if total_spent_offline > 0:
-        conn.execute("UPDATE users SET balance = MAX(0, balance - ?) WHERE id = 1", (total_spent_offline,))
+                reconciled_count += 1
+                if direction == "RECEIVED":
+                    total_received += amount
+                else:
+                    total_spent += amount
 
-    conn.execute("UPDATE transactions SET status = 'completed' WHERE status = 'pending'")
+    # Apply net offline balance adjustments to user's emergency balance
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    if user:
+        current_emg = float(user["emergency_balance"])
+        current_bal = float(user["balance"])
+
+        current_emg += total_received
+
+        if current_emg >= total_spent:
+            new_emg = round(current_emg - total_spent, 2)
+            new_bal = round(current_bal, 2)
+        else:
+            remainder = total_spent - current_emg
+            new_emg = 0.0
+            new_bal = max(0.0, round(current_bal - remainder, 2))
+
+        conn.execute("UPDATE users SET balance = ?, emergency_balance = ? WHERE id = ?", (new_bal, new_emg, user_id))
+
+    # Also resolve any pending transactions pre-existing in the DB
+    pending_rows = conn.execute("SELECT * FROM transactions WHERE status = 'pending'").fetchall()
+    if pending_rows:
+        reconciled_count += len(pending_rows)
+        conn.execute("UPDATE transactions SET status = 'completed' WHERE status = 'pending'")
+
     conn.commit()
 
     all_txs = conn.execute("SELECT * FROM transactions ORDER BY created_at DESC").fetchall()
-    user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
+    updated_user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
 
     return jsonify({
         "status": "success",
-        "message": f"Successfully synchronized {pending_count} pending transaction(s).",
-        "reconciled_count": pending_count,
-        "balance": user["balance"] if user else 500.0,
-        "emergency_balance": user["emergency_balance"] if user else 100.0,
+        "message": f"Successfully synchronized {reconciled_count} transaction(s).",
+        "reconciled_count": reconciled_count,
+        "balance": updated_user["balance"] if updated_user else 500.0,
+        "emergency_balance": updated_user["emergency_balance"] if updated_user else 10.0,
         "transactions": [dict(t) for t in all_txs]
     })
 

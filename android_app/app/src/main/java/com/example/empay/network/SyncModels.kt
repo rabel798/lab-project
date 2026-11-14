@@ -9,7 +9,10 @@ data class SyncTransactionItem(
     @SerializedName("tx_id") val txId: String,
     @SerializedName("payee") val payee: String,
     @SerializedName("amount") val amount: Double,
-    @SerializedName("note") val note: String = "Bluetooth Mesh Offline Payment"
+    @SerializedName("note") val note: String = "Bluetooth Mesh Offline Payment",
+    @SerializedName("direction") val direction: String = "SENT",
+    @SerializedName("sender_id") val senderId: String = "1",
+    @SerializedName("receiver_id") val receiverId: String? = null
 )
 
 /**

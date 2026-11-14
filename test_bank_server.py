@@ -139,7 +139,20 @@ class BankServerTestCase(unittest.TestCase):
         self.assertEqual(tx_map["TX-TEST-BT-001"]["amount"], 25.0)
         self.assertEqual(tx_map["TX-TEST-BT-001"]["status"], "completed")
         self.assertEqual(tx_map["TX-TEST-BT-002"]["amount"], 40.0)
+
+        # Verify emergency balance was permanently deducted and not reset
+        conn = sqlite3.connect(self.temp_db_path)
+        conn.row_factory = sqlite3.Row
+        user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
+        self.assertEqual(data["reconciled_count"], 2)
+        # In setUp: emergency_balance starts at 500.0. Spent 25 + 40 = 65.0 -> 435.0
+        self.assertEqual(user["emergency_balance"], 435.0)
+        self.assertEqual(data["emergency_balance"], 435.0)
         conn.close()
+
+        # Verify subsequent GET /api/user also retains the deducted balance
+        check_user = json.loads(self.client.get("/api/user").data.decode())
+        self.assertEqual(check_user["emergency_balance"], 435.0)
 
     def test_07_sync_duplicate_idempotency(self):
         """Anti-Replay / Idempotency: Re-syncing the same transaction ID does not double-count."""
@@ -202,6 +215,36 @@ class BankServerTestCase(unittest.TestCase):
         user_data = json.loads(user_resp.data.decode())
         self.assertEqual(user_data["balance"], 500.0)
         self.assertEqual(user_data["emergency_balance"], 10.0)
+
+    def test_11_offline_sync_deduction_and_overflow(self):
+        """Phase 6: Verifies that syncing offline spending permanently deducts from emergency balance and overflows to online balance if needed."""
+        # Reset to demo baseline: ₹500.00 online, ₹10.00 emergency
+        self.client.post("/api/bank/reset-demo")
+
+        # Spend ₹15.00 offline: ₹10.00 from emergency, remaining ₹5.00 from online balance
+        tx_payload = {
+            "transactions": [
+                {
+                    "tx_id": "TX-OVERFLOW-001",
+                    "payee": "Emergency Relief Camp",
+                    "amount": 15.0,
+                    "direction": "SENT",
+                    "note": "Rations & Medical Supplies"
+                }
+            ]
+        }
+        sync_resp = self.client.post("/api/transactions/sync", data=json.dumps(tx_payload), content_type="application/json")
+        self.assertEqual(sync_resp.status_code, 200)
+        data = json.loads(sync_resp.data.decode())
+
+        self.assertEqual(data["emergency_balance"], 0.0)
+        self.assertEqual(data["balance"], 495.0)
+
+        # Confirm persisted in DB
+        user_resp = self.client.get("/api/user")
+        user_data = json.loads(user_resp.data.decode())
+        self.assertEqual(user_data["emergency_balance"], 0.0)
+        self.assertEqual(user_data["balance"], 495.0)
 
 
 if __name__ == "__main__":

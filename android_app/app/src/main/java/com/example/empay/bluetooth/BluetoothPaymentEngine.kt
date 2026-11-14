@@ -154,7 +154,8 @@ class BluetoothPaymentEngine(private val context: Context) {
      */
     fun processIncomingPayment(
         packetJson: String,
-        onStatusLog: (String) -> Unit
+        onStatusLog: (String) -> Unit,
+        persistToLocalDatabase: Boolean = true
     ): AckPacket {
         val packet = try {
             gson.fromJson(packetJson, PaymentPacket::class.java)
@@ -235,30 +236,33 @@ class BluetoothPaymentEngine(private val context: Context) {
             )
         }
 
-        // 4. Verification Passed: Credit merchant wallet & record received transaction
-        appDatabase.walletDao.addBalance(amount)
-        val txEntity = TransactionEntity(
-            txId = packet.txId,
-            senderId = packet.senderId,
-            senderName = packet.senderName,
-            receiverId = packet.receiverId,
-            receiverName = packet.receiverName,
-            amount = packet.amount,
-            timestamp = packet.timestamp,
-            nonce = packet.nonce,
-            signature = packet.signature,
-            status = TransactionEntity.STATUS_PENDING_SYNC,
-            direction = TransactionEntity.DIRECTION_RECEIVED
-        )
-        appDatabase.transactionDao.insertTransaction(txEntity)
+        // 4. Verification Passed: Credit merchant wallet & record received transaction if real merchant mode
+        if (persistToLocalDatabase) {
+            appDatabase.walletDao.addBalance(amount)
+            val txEntity = TransactionEntity(
+                txId = packet.txId,
+                senderId = packet.senderId,
+                senderName = packet.senderName,
+                receiverId = packet.receiverId,
+                receiverName = packet.receiverName,
+                amount = packet.amount,
+                timestamp = packet.timestamp,
+                nonce = packet.nonce,
+                signature = packet.signature,
+                status = TransactionEntity.STATUS_PENDING_SYNC,
+                direction = TransactionEntity.DIRECTION_RECEIVED
+            )
+            appDatabase.transactionDao.insertTransaction(txEntity)
+            onStatusLog("✅ Merchant Ledger Credited +₹${packet.amount}. New Local Wallet: ₹${appDatabase.walletDao.getWallet()?.balance}")
+        } else {
+            onStatusLog("✅ Loopback Verification Passed: Simulated peer validated cryptographic ECDSA signature & nonce.")
+        }
 
         // 5. Generate Signed Mutual Receipt (AckPacket)
         val ackTimestamp = System.currentTimeMillis()
         val ackNonce = CryptoManager.generateNonce()
         val ackCanonical = "${packet.txId}|SUCCESS|${packet.nonce}|$ackTimestamp|$ackNonce".toByteArray(StandardCharsets.UTF_8)
         val ackSignature = CryptoManager.signData(ackCanonical)
-
-        onStatusLog("✅ Merchant Ledger Credited +₹${packet.amount}. New Local Wallet: ₹${appDatabase.walletDao.getWallet()?.balance}")
 
         return AckPacket(
             txId = txId,
@@ -417,8 +421,9 @@ class BluetoothPaymentEngine(private val context: Context) {
                     return@launch
                 }
 
-                onStatusLog("Starting Loopback P2P Socket Channel on port 8989...")
-                val localServer = ServerSocket(8989)
+                val localServer = ServerSocket(0).apply { reuseAddress = true }
+                val port = localServer.localPort
+                onStatusLog("Starting Loopback P2P Socket Channel on port $port...")
 
                 // Launch receiver thread
                 val serverJob = launch {
@@ -434,7 +439,7 @@ class BluetoothPaymentEngine(private val context: Context) {
                     }
 
                     val packetJson = payloadBuilder.toString()
-                    val ack = processIncomingPayment(packetJson, onStatusLog)
+                    val ack = processIncomingPayment(packetJson, onStatusLog, persistToLocalDatabase = false)
                     writer.println(gson.toJson(ack))
                     writer.println("---END---")
                     writer.flush()
@@ -443,7 +448,7 @@ class BluetoothPaymentEngine(private val context: Context) {
                 }
 
                 // Launch sender thread
-                val clientSocket = Socket("127.0.0.1", 8989)
+                val clientSocket = Socket("127.0.0.1", port)
                 val user = sessionManager.getUser()
                 val txId = CryptoManager.generateTxId()
                 val nonce = CryptoManager.generateNonce()
