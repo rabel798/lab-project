@@ -1,8 +1,10 @@
 package com.example.empay
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -628,6 +630,17 @@ class MainActivity : AppCompatActivity() {
             tvMerchantStatusBeacon.setTextColor(getColor(R.color.primary_dark))
             btnToggleMerchantRadar.text = "Stop Merchant Radar"
             btnToggleMerchantRadar.setBackgroundColor(getColor(R.color.error_red))
+
+            // Request Android to broadcast Bluetooth discoverability so payer devices can find this phone
+            try {
+                val discoverableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+                }
+                startActivity(discoverableIntent)
+                appendLog("MERCHANT", "Requested 300s Bluetooth discoverability from Android OS.")
+            } catch (e: Exception) {
+                appendLog("MERCHANT", "Discoverable intent notice: ${e.message}")
+            }
 
             bluetoothEngine.startMerchantServer(
                 onPaymentReceived = { packet, ack ->

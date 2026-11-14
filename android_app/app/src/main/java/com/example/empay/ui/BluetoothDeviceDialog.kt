@@ -123,12 +123,26 @@ class BluetoothDeviceDialog(
 
         if (pairedDevices.isEmpty()) {
             val emptyTv = TextView(context).apply {
-                text = "No paired devices found in Android Settings."
+                text = "No paired devices found. Pair both phones once in Bluetooth Settings for instant 1-tap connection:"
                 setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
                 textSize = 11f
                 setPadding(8, 4, 8, 8)
             }
+            val btnOpenSettings = Button(context).apply {
+                text = "⚙️ Open Bluetooth Settings to Pair"
+                textSize = 11f
+                setTextColor(Color.WHITE)
+                backgroundTintList = ContextCompat.getColorStateList(context, R.color.primary)
+                setOnClickListener {
+                    try {
+                        context.startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
             containerPaired.addView(emptyTv)
+            containerPaired.addView(btnOpenSettings)
         } else {
             pairedDevices.forEach { device ->
                 val name = device.name ?: "Bluetooth Device"

@@ -2,12 +2,12 @@ package com.example.empay.auth
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.Base64
 
 /**
  * Manages local, offline PIN authentication using hardware-backed EncryptedSharedPreferences.
@@ -31,6 +31,13 @@ class PinAuthManager private constructor(context: Context) {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: PinAuthManager(context.applicationContext).also { INSTANCE = it }
             }
+        }
+
+        fun computeHash(pin: String, salt: ByteArray): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            digest.update(salt)
+            val hash = digest.digest(pin.toByteArray(StandardCharsets.UTF_8))
+            return Base64.getEncoder().encodeToString(hash)
         }
 
         private fun createEncryptedPreferences(context: Context): SharedPreferences {
@@ -72,7 +79,7 @@ class PinAuthManager private constructor(context: Context) {
 
         val saltBytes = ByteArray(16)
         secureRandom.nextBytes(saltBytes)
-        val saltBase64 = Base64.encodeToString(saltBytes, Base64.NO_WRAP)
+        val saltBase64 = Base64.getEncoder().encodeToString(saltBytes)
 
         val hashBase64 = computeHash(pin, saltBytes)
 
@@ -93,20 +100,13 @@ class PinAuthManager private constructor(context: Context) {
         val storedSaltBase64 = prefs.getString(KEY_PIN_SALT, null) ?: return false
         val storedHashBase64 = prefs.getString(KEY_PIN_HASH, null) ?: return false
 
-        val saltBytes = Base64.decode(storedSaltBase64, Base64.NO_WRAP)
+        val saltBytes = Base64.getDecoder().decode(storedSaltBase64.trim())
         val computedHashBase64 = computeHash(pin, saltBytes)
 
         return MessageDigest.isEqual(
             storedHashBase64.toByteArray(StandardCharsets.UTF_8),
             computedHashBase64.toByteArray(StandardCharsets.UTF_8)
         )
-    }
-
-    private fun computeHash(pin: String, salt: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        digest.update(salt)
-        val hash = digest.digest(pin.toByteArray(StandardCharsets.UTF_8))
-        return Base64.encodeToString(hash, Base64.NO_WRAP)
     }
 
     fun resetPinToDefault() {
