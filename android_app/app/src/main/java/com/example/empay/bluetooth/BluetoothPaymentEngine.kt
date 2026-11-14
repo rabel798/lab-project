@@ -273,7 +273,9 @@ class BluetoothPaymentEngine(private val context: Context) {
                 direction = TransactionEntity.DIRECTION_RECEIVED
             )
             appDatabase.transactionDao.insertTransaction(txEntity)
-            onStatusLog("✅ Merchant Ledger Credited +₹${packet.amount}. New Local Wallet: ₹${appDatabase.walletDao.getWallet()?.balance}")
+            val newBal = appDatabase.walletDao.getWallet()?.balance ?: 0.0
+            sessionManager.updateBalances(currentMerchant.balance, newBal)
+            onStatusLog("✅ Merchant Ledger Credited +₹${packet.amount}. New Local Wallet: ₹$newBal")
         } else {
             onStatusLog("✅ Loopback Verification Passed: Simulated peer validated cryptographic ECDSA signature & nonce.")
         }

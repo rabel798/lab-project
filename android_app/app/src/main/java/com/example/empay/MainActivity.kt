@@ -608,9 +608,16 @@ class MainActivity : AppCompatActivity() {
 
         appendLog("BLUETOOTH", "Attempting RFCOMM connection to ${targetDevice.name ?: "Peer"} [${targetDevice.address}]...")
 
+        val targetUser = UserSession.DEMO_USERS.find {
+            it.name.equals(payeeName.trim(), ignoreCase = true) ||
+            it.phone == payeeName.trim() ||
+            it.accountNumber.equals(payeeName.trim(), ignoreCase = true)
+        }
+        val targetReceiverId = targetUser?.id?.toString() ?: "MERCHANT_PEER"
+
         paymentRepository.executeBluetoothPayment(
             device = targetDevice,
-            receiverId = "MERCHANT_PEER",
+            receiverId = targetReceiverId,
             receiverName = payeeName,
             amount = amount,
             onStatusLog = { logMsg -> appendLog("BLUETOOTH", logMsg) },
@@ -906,8 +913,9 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val apiService = BankApiClient.getApiService(this@MainActivity)
+                val currentUserId = paymentRepository.getCurrentUser().id
                 val response = withContext(Dispatchers.IO) {
-                    apiService.getUser()
+                    apiService.getUserById(currentUserId)
                 }
 
                 if (response.isSuccessful && response.body() != null) {

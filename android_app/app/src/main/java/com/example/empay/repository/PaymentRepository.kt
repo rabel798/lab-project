@@ -178,7 +178,10 @@ class PaymentRepository private constructor(private val context: Context) {
                     )
                 }
 
-                val syncResponse = apiService.syncTransactions(SyncTransactionsRequest(syncItems))
+                val currentUserId = sessionManager.getUser().id
+                val syncResponse = apiService.syncTransactions(
+                    SyncTransactionsRequest(transactions = syncItems, userId = currentUserId)
+                )
                 if (syncResponse.isSuccessful && syncResponse.body() != null) {
                     val body = syncResponse.body()!!
                     pendingTxs.forEach { tx ->
@@ -193,7 +196,8 @@ class PaymentRepository private constructor(private val context: Context) {
                     )
                 }
             } else {
-                val userResponse = apiService.getUser()
+                val currentUserId = sessionManager.getUser().id
+                val userResponse = apiService.getUserById(currentUserId)
                 if (userResponse.isSuccessful && userResponse.body() != null) {
                     val bankUser = userResponse.body()!!
                     sessionManager.updateBalances(bankUser.balance, bankUser.emergencyBalance)

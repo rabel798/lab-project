@@ -19,7 +19,8 @@ data class SyncTransactionItem(
  * Batch payload of pending offline transactions uploaded by Android WorkManager or manual sync.
  */
 data class SyncTransactionsRequest(
-    @SerializedName("transactions") val transactions: List<SyncTransactionItem>
+    @SerializedName("transactions") val transactions: List<SyncTransactionItem>,
+    @SerializedName("user_id") val userId: Long? = null
 )
 
 /**

@@ -47,7 +47,10 @@ class SyncWorker(
             )
         }
 
-        val request = SyncTransactionsRequest(transactions = syncItems)
+        val request = SyncTransactionsRequest(
+            transactions = syncItems,
+            userId = sessionManager.getUser().id
+        )
 
         try {
             val apiService = BankApiClient.getApiService(applicationContext)

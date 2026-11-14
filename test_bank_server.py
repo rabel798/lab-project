@@ -297,6 +297,51 @@ class BankServerTestCase(unittest.TestCase):
         self.assertEqual(len(user_ids), len(set(user_ids)))
         self.assertEqual(len(user_phones), len(set(user_phones)))
 
+    def test_14_p2p_transfer_between_distinct_users_credits_and_debits_correctly(self):
+        """P2P Transfer: User A (95 offline) sends 5 to User B (10 offline) -> User A has 90, User B has 15."""
+        app.init_db()
+        conn = app.get_db()
+        sukhpal_id = conn.execute("SELECT id FROM users WHERE phone = '9811122233'").fetchone()["id"]
+        priya_id = conn.execute("SELECT id FROM users WHERE phone = '8765432109'").fetchone()["id"]
+        conn.execute("UPDATE users SET emergency_balance = 95.0 WHERE id = ?", (sukhpal_id,))
+        conn.execute("UPDATE users SET emergency_balance = 10.0 WHERE id = ?", (priya_id,))
+        conn.commit()
+        conn.close()
+
+        # Sukhpal sends 5 to Priya
+        tx_payload = {
+            "user_id": sukhpal_id,
+            "transactions": [
+                {
+                    "tx_id": "TX-P2P-SUKHPAL-TO-PRIYA-001",
+                    "sender_id": sukhpal_id,
+                    "receiver_id": priya_id,
+                    "payee": "Priya Sharma",
+                    "amount": 5.0,
+                    "direction": "SENT",
+                    "note": "P2P Bluetooth transfer"
+                }
+            ]
+        }
+        resp = self.client.post("/api/transactions/sync", data=json.dumps(tx_payload), content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.data.decode())
+
+        # Sukhpal's sync response must show 90.0 (95 - 5)
+        self.assertEqual(data["emergency_balance"], 90.0)
+
+        # Check Priya's balance from the bank directly: must be 15.0 (10 + 5)
+        priya_resp = self.client.get(f"/api/users/{priya_id}")
+        self.assertEqual(priya_resp.status_code, 200)
+        priya_data = json.loads(priya_resp.data.decode())
+        self.assertEqual(priya_data["emergency_balance"], 15.0)
+
+        # When Priya syncs with Central Bank, she must receive 15.0 (NOT 90.0)
+        priya_sync = self.client.post("/api/transactions/sync", data=json.dumps({"user_id": priya_id, "transactions": []}), content_type="application/json")
+        self.assertEqual(priya_sync.status_code, 200)
+        priya_sync_data = json.loads(priya_sync.data.decode())
+        self.assertEqual(priya_sync_data["emergency_balance"], 15.0)
+
 
 if __name__ == "__main__":
     unittest.main()

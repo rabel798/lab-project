@@ -243,7 +243,8 @@ def serve_assets(filename):
 @app.route("/api/user", methods=["GET"])
 def api_get_user():
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
+    user_id = request.args.get("user_id") or request.args.get("id") or 1
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
     if user:
         return jsonify({
@@ -605,14 +606,31 @@ def api_transactions_sync():
                     direction = "RECEIVED"
 
                 sender_id = int(t.get("sender_id", user_id) or user_id)
-                receiver_id = t.get("receiver_id")
+                raw_receiver = t.get("receiver_id")
 
-                # Self-Transfer Protection: Based on unique identifiers (User ID, unique phone number, account ID) - NOT name
+                # Resolve receiver user ID if payee/receiver is a registered bank user
+                receiver_user_id = None
+                if raw_receiver:
+                    try:
+                        cand_id = int(raw_receiver)
+                        if conn.execute("SELECT id FROM users WHERE id = ?", (cand_id,)).fetchone():
+                            receiver_user_id = cand_id
+                    except (ValueError, TypeError):
+                        pass
+                if not receiver_user_id and payee:
+                    u_match = conn.execute(
+                        "SELECT id FROM users WHERE phone = ? OR LOWER(TRIM(name)) = LOWER(TRIM(?))",
+                        (payee.strip(), payee.strip())
+                    ).fetchone()
+                    if u_match:
+                        receiver_user_id = u_match["id"]
+
+                # Self-Transfer Protection: Based on unique identifiers (User ID, unique phone number) - NOT name
                 curr_user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
                 user_phone = str(curr_user["phone"]).strip() if curr_user else ""
                 expected_acc = f"ACC-{user_phone}" if user_phone else ""
                 is_self_transfer = (
-                    (receiver_id is not None and str(receiver_id).strip() != "" and str(sender_id) == str(receiver_id)) or
+                    (receiver_user_id is not None and sender_id == receiver_user_id) or
                     (bool(user_phone) and payee.strip() == user_phone) or
                     (bool(expected_acc) and expected_acc in payee.strip()) or
                     direction == "SELF"
@@ -621,36 +639,32 @@ def api_transactions_sync():
                 conn.execute("""
                     INSERT INTO transactions (tx_id, sender_id, receiver_id, payee, amount, status, channel, note, is_offline, method)
                     VALUES (?, ?, ?, ?, ?, 'completed', 'Bluetooth', ?, 1, 'BLUETOOTH')
-                """, (str(t_id), sender_id, receiver_id, payee, amount, note))
+                """, (str(t_id), sender_id, receiver_user_id or raw_receiver, payee, amount, note))
 
                 reconciled_count += 1
-                if is_self_transfer:
-                    # Self-transfer between same user's devices: Net bank balance change is strictly 0.00
-                    pass
-                elif direction == "RECEIVED":
-                    total_received += amount
-                else:
-                    total_spent += amount
+                if not is_self_transfer and amount > 0:
+                    # Bilateral Balance Adjustment:
+                    # Debit sender's emergency balance
+                    s_user = conn.execute("SELECT * FROM users WHERE id = ?", (sender_id,)).fetchone()
+                    if s_user:
+                        s_emg = float(s_user["emergency_balance"])
+                        s_bal = float(s_user["balance"])
+                        if s_emg >= amount:
+                            s_emg = round(s_emg - amount, 2)
+                        else:
+                            rem = amount - s_emg
+                            s_emg = 0.0
+                            s_bal = max(0.0, round(s_bal - rem, 2))
+                        conn.execute("UPDATE users SET balance = ?, emergency_balance = ? WHERE id = ?", (s_bal, s_emg, sender_id))
 
-    # Apply net offline balance adjustments to user's emergency balance
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    if user:
-        current_emg = float(user["emergency_balance"])
-        current_bal = float(user["balance"])
+                    # Credit receiver's emergency balance if receiver is a registered user
+                    if receiver_user_id:
+                        r_user = conn.execute("SELECT * FROM users WHERE id = ?", (receiver_user_id,)).fetchone()
+                        if r_user:
+                            r_emg = round(float(r_user["emergency_balance"]) + amount, 2)
+                            conn.execute("UPDATE users SET emergency_balance = ? WHERE id = ?", (r_emg, receiver_user_id))
 
-        current_emg += total_received
-
-        if current_emg >= total_spent:
-            new_emg = round(current_emg - total_spent, 2)
-            new_bal = round(current_bal, 2)
-        else:
-            remainder = total_spent - current_emg
-            new_emg = 0.0
-            new_bal = max(0.0, round(current_bal - remainder, 2))
-
-        conn.execute("UPDATE users SET balance = ?, emergency_balance = ? WHERE id = ?", (new_bal, new_emg, user_id))
-
-    # Also resolve any pending transactions pre-existing in the DB
+    # Also resolve any legacy pending transactions pre-existing in the DB
     pending_rows = conn.execute("SELECT * FROM transactions WHERE status = 'pending'").fetchall()
     if pending_rows:
         reconciled_count += len(pending_rows)
