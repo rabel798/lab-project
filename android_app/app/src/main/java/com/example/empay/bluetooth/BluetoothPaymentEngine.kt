@@ -61,7 +61,7 @@ class BluetoothPaymentEngine(private val context: Context) {
     fun startMerchantServer(
         onPaymentReceived: (PaymentPacket, AckPacket) -> Unit,
         onStatusLog: (String) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit = {}
     ) {
         if (isListening) return
         isListening = true

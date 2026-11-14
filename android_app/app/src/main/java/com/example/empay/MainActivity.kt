@@ -36,6 +36,7 @@ import com.example.empay.crypto.CryptoManager
 import com.example.empay.db.AppDatabase
 import com.example.empay.db.TransactionEntity
 import com.example.empay.network.BankApiClient
+import com.example.empay.repository.PaymentRepository
 import com.example.empay.network.NetworkManager
 import com.example.empay.network.SyncTransactionItem
 import com.example.empay.network.SyncTransactionsRequest
@@ -59,6 +60,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pinAuthManager: PinAuthManager
     private lateinit var appDatabase: AppDatabase
     private lateinit var bluetoothEngine: BluetoothPaymentEngine
+    private lateinit var paymentRepository: PaymentRepository
 
     // UI elements - App Bar
     private lateinit var tvNetworkStatusBadge: TextView
@@ -126,6 +128,7 @@ class MainActivity : AppCompatActivity() {
         pinAuthManager = PinAuthManager.getInstance(this)
         appDatabase = AppDatabase.getInstance(this)
         bluetoothEngine = BluetoothPaymentEngine(this)
+        paymentRepository = PaymentRepository.getInstance(this)
 
         initViews()
         // Request Bluetooth permissions up‑front (required for scanning on Android 12+)
@@ -450,7 +453,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun observeSession() {
         lifecycleScope.launch {
-            sessionManager.sessionState.collectLatest { user ->
+            paymentRepository.observeUserSession().collectLatest { user ->
                 updateUserUI(user)
             }
         }
@@ -492,52 +495,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun executeOnlineFundReservation(amount: Double) {
         val targetUrl = BankApiClient.getBaseUrl(this)
-        appendLog("RESERVATION", "Contacting Laptop Bank ($targetUrl) to reserve ₹$amount...")
+        appendLog("RESERVATION", "Contacting Central Bank ($targetUrl) to reserve ₹$amount...")
 
         lifecycleScope.launch {
-            try {
-                val apiService = BankApiClient.getApiService(this@MainActivity)
-                val request = TransferEmergencyRequest(userId = 1L, amount = amount)
+            val result = paymentRepository.reserveEmergencyFunds(amount)
+            result.onSuccess { data ->
+                val localWallet = paymentRepository.getOfflineWallet()
+                appendLog("BANK API", "✅ 200 OK: ${data.message}")
+                appendLog("BANK API", "Authoritative Bank Balances: Online = ₹${data.balance} | Reserve = ₹${data.emergencyBalance}")
+                appendLog("DATABASE", "Local SQLite wallet credited ₹$amount. New Local Offline Balance: ₹${localWallet?.balance}")
 
-                val response = withContext(Dispatchers.IO) {
-                    apiService.transferToEmergency(request)
-                }
-
-                if (response.isSuccessful && response.body() != null) {
-                    val result = response.body()!!
-                    if (result.success) {
-                        withContext(Dispatchers.IO) {
-                            appDatabase.walletDao.addBalance(amount)
-                        }
-
-                        sessionManager.updateBalances(result.balance, result.emergencyBalance)
-                        val localWallet = withContext(Dispatchers.IO) {
-                            appDatabase.walletDao.getWallet()
-                        }
-
-                        appendLog("BANK API", "✅ 200 OK: ${result.message}")
-                        appendLog("BANK API", "Authoritative Bank Balances: Online = ₹${result.balance} | Reserve = ₹${result.emergencyBalance}")
-                        appendLog("DATABASE", "Local SQLite wallet credited ₹$amount. New Local Offline Balance: ₹${localWallet?.balance}")
-
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Reserved ₹$amount to Emergency Wallet",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else {
-                        appendLog("RESERVATION", "❌ Bank Error: ${result.message}")
-                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
-                    }
-                } else {
-                    val code = response.code()
-                    val errorBody = response.errorBody()?.string() ?: "Unknown error"
-                    appendLog("RESERVATION", "❌ HTTP $code: $errorBody")
-                    Toast.makeText(this@MainActivity, "Reservation failed (HTTP $code)", Toast.LENGTH_LONG).show()
-                }
-            } catch (e: Exception) {
-                appendLog("RESERVATION", "❌ Connection Failed: ${e.localizedMessage ?: e.javaClass.simpleName}")
-                appendLog("HINT", "Ensure Laptop Bank server is running (app.py) and reachable via IP.")
-                Toast.makeText(this@MainActivity, "Cannot reach Laptop Bank", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this@MainActivity,
+                    "Reserved ₹$amount to Emergency Wallet",
+                    Toast.LENGTH_SHORT
+                ).show()
+                refreshLocalLedgerUI()
+            }.onFailure { error ->
+                appendLog("RESERVATION", "❌ Bank Notice: ${error.message}")
+                Toast.makeText(this@MainActivity, error.message ?: "Reservation failed", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -585,7 +561,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun executeLoopbackPayment(payeeName: String, amount: Double) {
         appendLog("P2P PAYMENT", "⚡ Initiating P2P Loopback Payment to $payeeName (₹$amount)...")
-        bluetoothEngine.simulateP2PLoopbackPayment(
+        paymentRepository.executeLoopbackPayment(
             receiverId = "MERCHANT_APEX",
             receiverName = payeeName,
             amount = amount,
@@ -595,11 +571,6 @@ class MainActivity : AppCompatActivity() {
                 appendLog("P2P PAYMENT", "✅ PAYMENT COMPLETED! Tx: ${packet.txId}")
                 appendLog("P2P PAYMENT", "Receipt Nonce: ${ack.ackNonce.take(8)} | Status: ${ack.status}")
                 Toast.makeText(this, "Payment Complete: -₹$amount to $payeeName", Toast.LENGTH_SHORT).show()
-
-                if (NetworkManager.isOnline(this@MainActivity)) {
-                    appendLog("AUTO-SYNC", "Online connection active. Auto-syncing offline receipt with Central Bank...")
-                    SyncManager.triggerImmediateSync(this@MainActivity)
-                }
             },
             onError = { errMsg ->
                 appendLog("P2P PAYMENT", "❌ $errMsg")
@@ -610,7 +581,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun executeRfcommPayment(payeeName: String, amount: Double) {
         val targetDevice: BluetoothDevice? = selectedBluetoothDevice ?: run {
-            val paired = bluetoothEngine.getPairedDevices()
+            val paired = paymentRepository.getPairedBluetoothDevices()
             if (paired.isNotEmpty()) paired.first() else null
         }
 
@@ -624,7 +595,7 @@ class MainActivity : AppCompatActivity() {
 
         appendLog("BLUETOOTH", "Attempting RFCOMM connection to ${targetDevice.name ?: "Peer"} [${targetDevice.address}]...")
 
-        bluetoothEngine.sendPaymentToDevice(
+        paymentRepository.executeBluetoothPayment(
             device = targetDevice,
             receiverId = "MERCHANT_PEER",
             receiverName = payeeName,
@@ -634,11 +605,6 @@ class MainActivity : AppCompatActivity() {
                 refreshLocalLedgerUI()
                 appendLog("P2P PAYMENT", "✅ Bluetooth RFCOMM Payment Confirmed by Peer!")
                 Toast.makeText(this, "Payment Sent via Bluetooth!", Toast.LENGTH_SHORT).show()
-
-                if (NetworkManager.isOnline(this@MainActivity)) {
-                    appendLog("AUTO-SYNC", "Online connection active. Auto-syncing offline receipt with Central Bank...")
-                    SyncManager.triggerImmediateSync(this@MainActivity)
-                }
             },
             onError = { errMsg ->
                 appendLog("BLUETOOTH", "❌ $errMsg")
@@ -666,19 +632,18 @@ class MainActivity : AppCompatActivity() {
                 appendLog("MERCHANT", "Discoverable intent notice: ${e.message}")
             }
 
-            bluetoothEngine.startMerchantServer(
+            paymentRepository.startMerchantRadar(
                 onPaymentReceived = { packet, ack ->
                     refreshLocalLedgerUI()
                     appendLog("MERCHANT", "🎉 Payment Received from ${packet.senderName}: +₹${packet.amount}")
                     appendLog("MERCHANT", "Signature & Nonce verified. Credited local balance.")
                     Toast.makeText(this, "Received ₹${packet.amount} from ${packet.senderName}", Toast.LENGTH_SHORT).show()
                 },
-                onStatusLog = { logMsg -> appendLog("MERCHANT", logMsg) },
-                onError = { errMsg -> appendLog("MERCHANT", "❌ $errMsg") }
+                onStatusLog = { logMsg -> appendLog("MERCHANT", logMsg) }
             )
         } else {
             isMerchantRadarRunning = false
-            bluetoothEngine.stopMerchantServer()
+            paymentRepository.stopMerchantRadar()
             tvMerchantStatusBeacon.text = "● Radar Standby"
             tvMerchantStatusBeacon.setTextColor(getColor(R.color.text_secondary))
             btnToggleMerchantRadar.text = "Start Merchant Listening Socket"
@@ -739,61 +704,14 @@ class MainActivity : AppCompatActivity() {
         appendLog("SYNC", "Initiating Bank Reconciliation against $targetUrl...")
 
         lifecycleScope.launch {
-            try {
-                val apiService = BankApiClient.getApiService(this@MainActivity)
-                val pendingTxs = withContext(Dispatchers.IO) {
-                    appDatabase.transactionDao.getPendingSyncTransactions()
-                }
-
-                if (pendingTxs.isNotEmpty()) {
-                    appendLog("SYNC", "Found ${pendingTxs.size} pending offline transactions. Uploading batch to bank...")
-                    val syncItems = pendingTxs.map {
-                        SyncTransactionItem(
-                            txId = it.txId,
-                            payee = it.receiverName,
-                            amount = it.amount,
-                            note = "Bluetooth Offline Payment (Direction: ${it.direction})",
-                            direction = it.direction,
-                            senderId = it.senderId,
-                            receiverId = it.receiverId
-                        )
-                    }
-
-                    val syncResponse = withContext(Dispatchers.IO) {
-                        apiService.syncTransactions(SyncTransactionsRequest(syncItems))
-                    }
-
-                    if (syncResponse.isSuccessful && syncResponse.body() != null) {
-                        val body = syncResponse.body()!!
-                        withContext(Dispatchers.IO) {
-                            pendingTxs.forEach { tx ->
-                                appDatabase.transactionDao.markAsSynced(tx.txId)
-                            }
-                            appDatabase.walletDao.updateBalance(body.emergencyBalance)
-                        }
-                        sessionManager.updateBalances(body.balance, body.emergencyBalance)
-                        appendLog("SYNC", "✅ 200 OK: Reconciled ${body.reconciledCount} pending transactions with Bank ledger!")
-                        appendLog("SYNC", "Bank Balance Settled: Online = ₹${body.balance} | Reserve = ₹${body.emergencyBalance}")
-                    } else {
-                        appendLog("SYNC", "⚠️ Sync upload returned HTTP ${syncResponse.code()}")
-                    }
-                } else {
-                    appendLog("SYNC", "Zero pending offline transactions. Refreshing account balance from bank...")
-                    val userResponse = withContext(Dispatchers.IO) {
-                        apiService.getUser()
-                    }
-                    if (userResponse.isSuccessful && userResponse.body() != null) {
-                        val bankUser = userResponse.body()!!
-                        sessionManager.updateBalances(bankUser.balance, bankUser.emergencyBalance)
-                        appendLog("SYNC", "✅ 200 OK: Latest Bank Balances: Online = ₹${bankUser.balance} | Reserve = ₹${bankUser.emergencyBalance}")
-                    }
-                }
-
+            val result = paymentRepository.syncPendingTransactions()
+            result.onSuccess { body ->
                 refreshLocalLedgerUI()
+                appendLog("SYNC", "✅ 200 OK: Reconciled ${body.reconciledCount} transactions with Bank ledger!")
+                appendLog("SYNC", "Bank Balance Settled: Online = ₹${body.balance} | Reserve = ₹${body.emergencyBalance}")
                 Toast.makeText(this@MainActivity, "Synchronized with Bank", Toast.LENGTH_SHORT).show()
-
-            } catch (e: Exception) {
-                appendLog("SYNC", "❌ Bank Sync Failed: ${e.localizedMessage ?: e.javaClass.simpleName}")
+            }.onFailure { error ->
+                appendLog("SYNC", "❌ Bank Sync Failed: ${error.message}")
                 Toast.makeText(this@MainActivity, "Sync Failed", Toast.LENGTH_SHORT).show()
             }
         }
@@ -1074,7 +992,7 @@ class MainActivity : AppCompatActivity() {
     private fun triggerWorkManagerSync() {
         appendLog("WORKMANAGER", "Manual sync request queued for Android WorkManager...")
         Toast.makeText(this, "Dispatched to WorkManager Queue", Toast.LENGTH_SHORT).show()
-        SyncManager.triggerImmediateSync(this)
+        paymentRepository.triggerBackgroundSync()
     }
 
     override fun onResume() {
@@ -1094,7 +1012,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        bluetoothEngine.stopMerchantServer()
+        paymentRepository.stopMerchantRadar()
         try {
             if (networkCallback != null && connectivityManager != null) {
                 connectivityManager?.unregisterNetworkCallback(networkCallback!!)
