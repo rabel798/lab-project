@@ -894,7 +894,7 @@ class MainActivity : AppCompatActivity() {
     private fun showUserProfileDialog() {
         val dialog = UserProfileDialog(
             context = this,
-            currentUserId = paymentRepository.getCurrentUser().id,
+            currentUser = paymentRepository.getCurrentUser(),
             onUserSelected = { selectedUser ->
                 lifecycleScope.launch {
                     val updated = paymentRepository.switchActiveUser(selectedUser)
@@ -915,9 +915,18 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val apiService = BankApiClient.getApiService(this@MainActivity)
-                val currentUserId = paymentRepository.getCurrentUser().id
+                val currentUser = paymentRepository.getCurrentUser()
                 val response = withContext(Dispatchers.IO) {
-                    apiService.getUserById(currentUserId)
+                    try {
+                        val phoneRes = apiService.getUserByPhone(currentUser.phone)
+                        if (phoneRes.isSuccessful && phoneRes.body() != null) {
+                            phoneRes
+                        } else {
+                            apiService.getUserById(currentUser.id)
+                        }
+                    } catch (_: Exception) {
+                        apiService.getUserById(currentUser.id)
+                    }
                 }
 
                 if (response.isSuccessful && response.body() != null) {
@@ -925,22 +934,34 @@ class MainActivity : AppCompatActivity() {
                     val hasPendingTxs = withContext(Dispatchers.IO) {
                         appDatabase.transactionDao.getPendingSyncTransactions().isNotEmpty()
                     }
-                    if (hasPendingTxs) {
-                        // Preserve local offline wallet deduction until pending transactions are synced
+                    val effectiveEmergency = if (hasPendingTxs) {
                         val localWallet = withContext(Dispatchers.IO) { appDatabase.walletDao.getWallet() }
-                        sessionManager.updateBalances(bankUser.balance, localWallet?.balance ?: bankUser.emergencyBalance)
+                        localWallet?.balance ?: bankUser.emergencyBalance
                     } else {
-                        sessionManager.updateBalances(bankUser.balance, bankUser.emergencyBalance)
+                        bankUser.emergencyBalance
+                    }
+
+                    // Update session with authentic server ID and balances
+                    val updatedUser = currentUser.copy(
+                        id = bankUser.id,
+                        name = bankUser.name,
+                        phone = bankUser.phone,
+                        balance = bankUser.balance,
+                        emergencyBalance = effectiveEmergency,
+                        isOnline = true
+                    )
+                    sessionManager.updateUser(updatedUser)
+
+                    if (!hasPendingTxs) {
                         withContext(Dispatchers.IO) {
                             appDatabase.walletDao.updateBalance(bankUser.emergencyBalance)
                         }
                     }
-                    sessionManager.updateOnlineStatus(true)
 
                     updateNetworkBadge(true)
 
-                    appendLog("BANK API", "200 OK: Authenticated as ${bankUser.name} (Phone: ${bankUser.phone})")
-                    appendLog("BANK API", "Online Balance: ₹${bankUser.balance} | Offline Reserve: ₹${bankUser.emergencyBalance}")
+                    appendLog("BANK API", "200 OK: Authenticated as ${bankUser.name} (ID: ${bankUser.id}, Phone: ${bankUser.phone})")
+                    appendLog("BANK API", "Online Balance: ₹${bankUser.balance} | Offline Reserve: ₹${effectiveEmergency}")
                     Toast.makeText(this@MainActivity, "Connected to Laptop Bank", Toast.LENGTH_SHORT).show()
                 } else {
                     val code = response.code()

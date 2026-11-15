@@ -65,10 +65,18 @@ class PaymentRepository private constructor(private val context: Context) {
         if (NetworkManager.isOnline(context)) {
             try {
                 val api = getApiService()
-                val resp = api.getUserById(user.id)
+                val resp = try {
+                    val phoneRes = api.getUserByPhone(user.phone)
+                    if (phoneRes.isSuccessful && phoneRes.body() != null) phoneRes else api.getUserById(user.id)
+                } catch (_: Exception) {
+                    api.getUserById(user.id)
+                }
                 if (resp.isSuccessful && resp.body() != null) {
                     val remote = resp.body()!!
                     val updated = user.copy(
+                        id = remote.id,
+                        name = remote.name,
+                        phone = remote.phone,
                         balance = remote.balance,
                         emergencyBalance = remote.emergencyBalance
                     )
@@ -196,11 +204,23 @@ class PaymentRepository private constructor(private val context: Context) {
                     )
                 }
             } else {
-                val currentUserId = sessionManager.getUser().id
-                val userResponse = apiService.getUserById(currentUserId)
+                val currentUser = sessionManager.getUser()
+                val userResponse = try {
+                    val phoneRes = apiService.getUserByPhone(currentUser.phone)
+                    if (phoneRes.isSuccessful && phoneRes.body() != null) phoneRes else apiService.getUserById(currentUser.id)
+                } catch (_: Exception) {
+                    apiService.getUserById(currentUser.id)
+                }
                 if (userResponse.isSuccessful && userResponse.body() != null) {
                     val bankUser = userResponse.body()!!
-                    sessionManager.updateBalances(bankUser.balance, bankUser.emergencyBalance)
+                    val updated = currentUser.copy(
+                        id = bankUser.id,
+                        name = bankUser.name,
+                        phone = bankUser.phone,
+                        balance = bankUser.balance,
+                        emergencyBalance = bankUser.emergencyBalance
+                    )
+                    sessionManager.updateUser(updated)
                     appDatabase.walletDao.updateBalance(bankUser.emergencyBalance)
                     return@withContext Result.success(
                         SyncTransactionsResponse(

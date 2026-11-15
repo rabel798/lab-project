@@ -342,6 +342,45 @@ class BankServerTestCase(unittest.TestCase):
         priya_sync_data = json.loads(priya_sync.data.decode())
         self.assertEqual(priya_sync_data["emergency_balance"], 15.0)
 
+    def test_15_all_users_login_and_demo_fallback_resolution(self):
+        """Verifies bank login succeeds for all demo users even if SQLite assigned different IDs."""
+        conn = app.get_db()
+        conn.execute("DELETE FROM users")
+        # Simulate arbitrary DB auto-increment IDs
+        conn.execute("INSERT INTO users (id, name, phone, balance, emergency_balance) VALUES (10, 'Rahul Sharma', '9876543210', 500.0, 100.0)")
+        conn.execute("INSERT INTO users (id, name, phone, balance, emergency_balance) VALUES (20, 'Sukhpal Singh', '9811122233', 500.0, 100.0)")
+        conn.execute("INSERT INTO users (id, name, phone, balance, emergency_balance) VALUES (30, 'Priya Sharma', '8765432109', 500.0, 100.0)")
+        conn.execute("INSERT INTO users (id, name, phone, balance, emergency_balance) VALUES (40, 'Dr. Rohan Verma', '7654321098', 500.0, 100.0)")
+        conn.execute("INSERT INTO users (id, name, phone, balance, emergency_balance) VALUES (50, 'Ananya Patel', '6543210987', 500.0, 100.0)")
+        conn.commit()
+        conn.close()
+
+        # 1. Login by demo ID fallback
+        for demo_id, expected_name in [(1, "Rahul Sharma"), (2, "Sukhpal Singh"), (3, "Priya Sharma"), (4, "Dr. Rohan Verma"), (5, "Ananya Patel")]:
+            resp = self.client.get(f"/api/users/{demo_id}")
+            self.assertEqual(resp.status_code, 200, f"Failed for demo ID {demo_id}")
+            data = json.loads(resp.data.decode())
+            self.assertEqual(data["name"], expected_name)
+
+        # 2. Login by phone endpoint
+        for phone, expected_name in [
+            ("9876543210", "Rahul Sharma"),
+            ("9811122233", "Sukhpal Singh"),
+            ("8765432109", "Priya Sharma"),
+            ("7654321098", "Dr. Rohan Verma"),
+            ("6543210987", "Ananya Patel")
+        ]:
+            resp = self.client.get(f"/api/users/phone/{phone}")
+            self.assertEqual(resp.status_code, 200, f"Failed for phone {phone}")
+            data = json.loads(resp.data.decode())
+            self.assertEqual(data["name"], expected_name)
+
+            # Also check query param /api/user?phone=
+            resp_q = self.client.get(f"/api/user?phone={phone}")
+            self.assertEqual(resp_q.status_code, 200)
+            data_q = json.loads(resp_q.data.decode())
+            self.assertEqual(data_q["name"], expected_name)
+
 
 if __name__ == "__main__":
     unittest.main()

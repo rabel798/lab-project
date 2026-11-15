@@ -237,14 +237,62 @@ def serve_assets(filename):
 
 
 # ==========================================
-# REST API ENDPOINTS
+# REST API ENDPOINTS & USER RESOLUTION
 # ==========================================
+
+DEMO_PHONE_MAP = {
+    1: "9876543210",  # Rahul Sharma
+    2: "9811122233",  # Sukhpal Singh
+    3: "8765432109",  # Priya Sharma
+    4: "7654321098",  # Dr. Rohan Verma
+    5: "6543210987",  # Ananya Patel
+}
+
+def resolve_user_id(conn, user_id):
+    """
+    Resolves an integer user ID or demo index to a valid database user ID.
+    If an auto-incremented database has different primary keys,
+    falls back to phone number lookup via DEMO_PHONE_MAP.
+    """
+    if user_id is None:
+        return 1
+    try:
+        uid = int(user_id)
+    except (ValueError, TypeError):
+        # Maybe it's a phone string
+        p_row = conn.execute("SELECT id FROM users WHERE phone = ?", (str(user_id).strip(),)).fetchone()
+        return p_row["id"] if p_row else None
+
+    # Check exact ID first
+    row = conn.execute("SELECT id FROM users WHERE id = ?", (uid,)).fetchone()
+    if row:
+        return row["id"]
+    # Fallback to phone mapping for demo users
+    if uid in DEMO_PHONE_MAP:
+        p_row = conn.execute("SELECT id FROM users WHERE phone = ?", (DEMO_PHONE_MAP[uid],)).fetchone()
+        if p_row:
+            return p_row["id"]
+    return uid
+
 
 @app.route("/api/user", methods=["GET"])
 def api_get_user():
     conn = get_db()
-    user_id = request.args.get("user_id") or request.args.get("id") or 1
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    phone = request.args.get("phone")
+    user_id = request.args.get("user_id") or request.args.get("id")
+    user = None
+
+    if phone:
+        user = conn.execute("SELECT * FROM users WHERE phone = ?", (phone.strip(),)).fetchone()
+
+    if not user and user_id is not None:
+        resolved_id = resolve_user_id(conn, user_id)
+        if resolved_id is not None:
+            user = conn.execute("SELECT * FROM users WHERE id = ?", (resolved_id,)).fetchone()
+
+    if not user and not phone and user_id is None:
+        user = conn.execute("SELECT * FROM users ORDER BY id ASC LIMIT 1").fetchone()
+
     conn.close()
     if user:
         return jsonify({
@@ -268,44 +316,55 @@ def api_get_all_users():
 @app.route("/api/bank/reset-demo", methods=["POST"])
 def api_bank_reset_demo():
     conn = get_db()
-    conn.execute("UPDATE users SET balance = 500.0, emergency_balance = 10.0 WHERE id = 1")
-    conn.execute("UPDATE users SET balance = 500.0, emergency_balance = 10.0 WHERE id != 1")
+    conn.execute("UPDATE users SET balance = 500.0, emergency_balance = 10.0")
     conn.commit()
-    user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
+    user = conn.execute("SELECT * FROM users ORDER BY id ASC LIMIT 1").fetchone()
     conn.close()
     return jsonify({"success": True, "message": "Reset to official demo balances (₹500.00 Online, ₹10.00 Emergency)", "user": dict(user)})
 
 
-@app.route("/api/users/<int:user_id>", methods=["GET", "PATCH"])
+@app.route("/api/users/<user_id>", methods=["GET", "PATCH"])
 def api_user_detail(user_id):
     conn = get_db()
+    resolved_id = resolve_user_id(conn, user_id)
+    user = None
+    if resolved_id is not None:
+        user = conn.execute("SELECT * FROM users WHERE id = ?", (resolved_id,)).fetchone()
+    if not user:
+        # Check by phone directly
+        user = conn.execute("SELECT * FROM users WHERE phone = ?", (str(user_id).strip(),)).fetchone()
+        if user:
+            resolved_id = user["id"]
+
+    if not user:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+
     if request.method == "PATCH":
         data = request.get_json(silent=True) or request.form
         name = data.get("name")
         phone = data.get("phone")
         if name:
-            conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
+            conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, resolved_id))
         if phone:
-            conn.execute("UPDATE users SET phone = ? WHERE id = ?", (phone, user_id))
+            conn.execute("UPDATE users SET phone = ? WHERE id = ?", (phone, resolved_id))
         conn.commit()
+        user = conn.execute("SELECT * FROM users WHERE id = ?", (resolved_id,)).fetchone()
 
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
-    if user:
-        return jsonify({
-            "id": user["id"],
-            "name": user["name"],
-            "phone": user["phone"],
-            "balance": user["balance"],
-            "emergency_balance": user["emergency_balance"]
-        })
-    return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "id": user["id"],
+        "name": user["name"],
+        "phone": user["phone"],
+        "balance": user["balance"],
+        "emergency_balance": user["emergency_balance"]
+    })
 
 
 @app.route("/api/users/phone/<phone>", methods=["GET"])
 def api_user_by_phone(phone):
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE phone = ?", (phone,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE phone = ?", (phone.strip(),)).fetchone()
     conn.close()
     if user:
         return jsonify({
@@ -323,12 +382,13 @@ def api_add_funds():
     data = request.get_json(silent=True) or request.form
     amount = float(data.get("amount", 0))
     target = data.get("target", "balance")  # "balance" or "emergency_balance"
-    user_id = int(data.get("user_id", 1))
+    raw_user_id = data.get("user_id", 1)
 
     if amount <= 0:
         return jsonify({"success": False, "message": "Invalid amount"}), 400
 
     conn = get_db()
+    user_id = resolve_user_id(conn, raw_user_id) or 1
     if target == "emergency_balance":
         conn.execute("UPDATE users SET emergency_balance = emergency_balance + ? WHERE id = ?", (amount, user_id))
     else:
@@ -340,8 +400,8 @@ def api_add_funds():
     return jsonify({
         "success": True,
         "message": f"Successfully added ₹{amount:.2f}",
-        "balance": user["balance"],
-        "emergency_balance": user["emergency_balance"]
+        "balance": user["balance"] if user else 0.0,
+        "emergency_balance": user["emergency_balance"] if user else 0.0
     })
 
 
@@ -353,12 +413,13 @@ def api_transfer_to_emergency():
     except (ValueError, TypeError):
         return jsonify({"success": False, "message": "Invalid amount"}), 400
 
-    user_id = int(data.get("user_id", 1))
+    raw_user_id = data.get("user_id", 1)
 
     if amount <= 0:
         return jsonify({"success": False, "message": "Amount must be greater than zero"}), 400
 
     conn = get_db()
+    user_id = resolve_user_id(conn, raw_user_id) or 1
     user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not user:
         conn.close()
@@ -585,8 +646,9 @@ def api_transactions_sync():
     """Reconciliation endpoint: Reconciles all pending offline mesh transactions when back online"""
     data = request.get_json(silent=True) or {}
     local_txs = data.get("transactions", [])
-    user_id = int(data.get("user_id", 1))
     conn = get_db()
+    raw_uid = data.get("user_id", 1)
+    user_id = resolve_user_id(conn, raw_uid) or 1
 
     reconciled_count = 0
     total_spent = 0.0
@@ -605,18 +667,17 @@ def api_transactions_sync():
                 if "RECEIVED" in note.upper():
                     direction = "RECEIVED"
 
-                sender_id = int(t.get("sender_id", user_id) or user_id)
+                sender_id = resolve_user_id(conn, t.get("sender_id", user_id) or user_id) or user_id
                 raw_receiver = t.get("receiver_id")
 
                 # Resolve receiver user ID if payee/receiver is a registered bank user
                 receiver_user_id = None
                 if raw_receiver:
-                    try:
-                        cand_id = int(raw_receiver)
-                        if conn.execute("SELECT id FROM users WHERE id = ?", (cand_id,)).fetchone():
+                    cand_id = resolve_user_id(conn, raw_receiver)
+                    if cand_id:
+                        r_chk = conn.execute("SELECT id FROM users WHERE id = ?", (cand_id,)).fetchone()
+                        if r_chk:
                             receiver_user_id = cand_id
-                    except (ValueError, TypeError):
-                        pass
                 if not receiver_user_id and payee:
                     u_match = conn.execute(
                         "SELECT id FROM users WHERE phone = ? OR LOWER(TRIM(name)) = LOWER(TRIM(?))",

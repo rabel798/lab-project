@@ -27,7 +27,7 @@ import java.util.Locale
  */
 class UserProfileDialog(
     private val context: Context,
-    private val currentUserId: Long,
+    private val currentUser: UserSession,
     private val onUserSelected: (UserSession) -> Unit
 ) {
 
@@ -58,9 +58,12 @@ class UserProfileDialog(
                     if (response.isSuccessful && response.body() != null) {
                         val bankUsers = response.body()!!
                         val mergedUsers = UserSession.DEMO_USERS.map { demo ->
-                            val match = bankUsers.find { it.id == demo.id }
+                            val match = bankUsers.find { it.phone == demo.phone || it.id == demo.id }
                             if (match != null) {
                                 demo.copy(
+                                    id = match.id,
+                                    name = match.name,
+                                    phone = match.phone,
                                     balance = match.balance,
                                     emergencyBalance = match.emergencyBalance
                                 )
@@ -100,7 +103,7 @@ class UserProfileDialog(
                 user.emergencyBalance
             )
 
-            val isCurrent = (user.id == currentUserId)
+            val isCurrent = (user.id == currentUser.id || user.phone == currentUser.phone)
             if (isCurrent) {
                 tvBadge.text = "✓ ACTIVE"
                 tvBadge.setTextColor(Color.WHITE)
