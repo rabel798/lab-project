@@ -155,6 +155,20 @@
                         android:textColor="@color/primary_dark"
                         android:textSize="11sp"
                         android:textStyle="bold" />
+
+                    <!-- Switch User Profile Pill Button -->
+                    <TextView
+                        android:id="@+id/btnSwitchUserProfile"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:paddingHorizontal="9dp"
+                        android:paddingVertical="4dp"
+                        android:background="@drawable/bg_badge"
+                        android:text="🔄 Switch User"
+                        android:textColor="@color/primary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <!-- Hardware Key Fingerprint Badge -->

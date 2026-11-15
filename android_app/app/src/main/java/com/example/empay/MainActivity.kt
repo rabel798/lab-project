@@ -72,6 +72,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvUserPhone: TextView
     private lateinit var tvAccountNumber: TextView
     private lateinit var tvPinStatusBadge: TextView
+    private lateinit var btnSwitchUserProfile: TextView
     private lateinit var tvKeyFingerprint: TextView
     private lateinit var tvOnlineBalance: TextView
     private lateinit var tvEmergencyBalance: TextView
@@ -162,6 +163,7 @@ class MainActivity : AppCompatActivity() {
         tvUserPhone = findViewById(R.id.tvUserPhone)
         tvAccountNumber = findViewById(R.id.tvAccountNumber)
         tvPinStatusBadge = findViewById(R.id.tvPinStatusBadge)
+        btnSwitchUserProfile = findViewById(R.id.btnSwitchUserProfile)
         tvKeyFingerprint = findViewById(R.id.tvKeyFingerprint)
         tvOnlineBalance = findViewById(R.id.tvOnlineBalance)
         tvEmergencyBalance = findViewById(R.id.tvEmergencyBalance)
@@ -220,8 +222,8 @@ class MainActivity : AppCompatActivity() {
             triggerWorkManagerSync()
         }
 
-        btnTestLogin.text = "Switch User"
-        btnTestLogin.setOnClickListener { showUserProfileDialog() }
+        btnTestLogin.setOnClickListener { performOnlineBankLogin() }
+        btnSwitchUserProfile.setOnClickListener { showUserProfileDialog() }
         tvUserName.setOnClickListener { showUserProfileDialog() }
         btnTestPin.setOnClickListener { showOfflinePinDialog() }
         btnTransferToOffline.setOnClickListener { initiateFundReservation() }
