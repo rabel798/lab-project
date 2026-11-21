@@ -19,6 +19,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -63,60 +64,86 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bluetoothEngine: BluetoothPaymentEngine
     private lateinit var paymentRepository: PaymentRepository
 
-    // UI elements - App Bar
+    // UI elements - Top Bar matching emergencypay.html
+    private lateinit var layoutSystemStatusBanner: View
+    private lateinit var viewStatusDot: View
     private lateinit var tvNetworkStatusBadge: TextView
-    private lateinit var btnSyncBank: Button
+    private lateinit var btnEmergencyToggle: View
+    private lateinit var btnNotificationBell: View
 
     // User Profile & Balances
     private lateinit var tvUserName: TextView
-    private lateinit var tvUserPhone: TextView
-    private lateinit var tvAccountNumber: TextView
-    private lateinit var tvPinStatusBadge: TextView
-    private lateinit var btnSwitchUserProfile: TextView
-    private lateinit var tvKeyFingerprint: TextView
+    private lateinit var tvWelcomeSub: TextView
     private lateinit var tvOnlineBalance: TextView
     private lateinit var tvEmergencyBalance: TextView
-
-    // Action buttons
     private lateinit var btnTransferToOffline: Button
-    private lateinit var btnTestLogin: Button
-    private lateinit var btnTestPin: Button
-    private lateinit var btnCryptoSelfTest: Button
-    private lateinit var btnTamperTest: Button
+    private lateinit var btnAddMoney: Button
 
-    // Phase 5 Bluetooth P2P
-    private lateinit var btnModePayer: Button
-    private lateinit var btnModeMerchant: Button
-    private lateinit var layoutPayerSection: LinearLayout
-    private lateinit var layoutMerchantSection: LinearLayout
-    private lateinit var etPayeeName: EditText
-    private lateinit var btnScanTerminal: Button
-    private lateinit var etBtAmount: EditText
-    private lateinit var btnBtChip2: Button
-    private lateinit var btnBtChip5: Button
-    private lateinit var btnPayLoopback: Button
-    private lateinit var btnPayRfcomm: Button
-    private lateinit var tvMerchantStatusBeacon: TextView
-    private lateinit var btnToggleMerchantRadar: Button
-    private var isMerchantRadarRunning = false
-    private var selectedBluetoothDevice: BluetoothDevice? = null
+    // Emergency Alert Banner
+    private lateinit var layoutEmergencyAlertBanner: View
 
-    // Local SQLite Ledger
-    private lateinit var tvPendingTxBadge: TextView
-    private lateinit var btnAddMockTx: Button
-    private lateinit var layoutLedgerContainer: LinearLayout
-    private lateinit var tvEmptyLedgerMsg: TextView
+    // Quick Actions
+    private lateinit var tvQuickActionsTitle: TextView
+    private lateinit var badgeEmergencyModeActive: TextView
+    private lateinit var btnActionScan: View
+    private lateinit var btnActionPayBt: View
+    private lateinit var btnActionMerchants: View
+    private lateinit var btnActionSendMoney: View
+    private lateinit var btnActionHistory: View
+    private lateinit var btnActionProfile: View
 
-    // Bank Config
-    private lateinit var etBankUrl: EditText
-    private lateinit var btnSaveBankUrl: Button
-    private lateinit var tvAutoSyncBadge: TextView
-    private lateinit var btnTriggerWorkManager: Button
+    // Essential Services Carousel
+    private lateinit var cardDailyFresh: View
+    private lateinit var cardApexPharmacy: View
+    private lateinit var cardLifeLine: View
+    private lateinit var cardNationalBook: View
+    private lateinit var cardQuickFix: View
+    private lateinit var btnViewAllMerchants: TextView
 
-    // Terminal
-    private lateinit var tvTerminalLog: TextView
+    // Recent Transactions
+    private lateinit var btnSeeAllTransactions: TextView
+    private lateinit var layoutRecentTransactionsContainer: LinearLayout
+    private lateinit var tvEmptyRecentTransactions: TextView
+
+    // Bottom Navigation
+    private lateinit var navTabHome: View
+    private lateinit var navTabScan: View
+    private lateinit var navTabPayBt: View
+    private lateinit var navTabHistory: View
+    private lateinit var navTabProfile: View
+
+    // Developer Diagnostics Panel (Collapsible)
+    private var layoutP2PControlsCard: View? = null
+    private var etPayeeName: EditText? = null
+    private var etBtAmount: EditText? = null
+    private var tvUserPhone: TextView? = null
+    private var tvAccountNumber: TextView? = null
+    private var tvPinStatusBadge: TextView? = null
+    private var btnSwitchUserProfile: TextView? = null
+    private var tvKeyFingerprint: TextView? = null
+    private var tvAutoSyncBadge: TextView? = null
+    private var etBankUrl: EditText? = null
+    private var btnSaveBankUrl: Button? = null
+    private var btnTriggerWorkManager: Button? = null
+    private var btnTestLogin: Button? = null
+    private var btnTestPin: Button? = null
+    private var btnCryptoSelfTest: Button? = null
+    private var btnTamperTest: Button? = null
+    private var btnAddMockTx: Button? = null
+    private var btnModePayer: Button? = null
+    private var btnModeMerchant: Button? = null
+    private var btnScanTerminal: Button? = null
+    private var btnBtChip2: Button? = null
+    private var btnBtChip5: Button? = null
+    private var btnPayLoopback: Button? = null
+    private var tvMerchantStatusBeacon: TextView? = null
+    private var btnToggleMerchantRadar: Button? = null
+    private var tvPendingTxBadge: TextView? = null
+    private var tvTerminalLog: TextView? = null
     private lateinit var scrollTerminal: ScrollView
-    private lateinit var btnClearTerminal: TextView
+
+    private var selectedBluetoothDevice: BluetoothDevice? = null
+    private var isMerchantRadarRunning = false
 
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
     private var connectivityManager: ConnectivityManager? = null
@@ -133,17 +160,13 @@ class MainActivity : AppCompatActivity() {
         paymentRepository = PaymentRepository.getInstance(this)
 
         initViews()
-        // Request Bluetooth permissions up‑front (required for scanning on Android 12+)
         initBluetoothFlow()
-        // Initialise UI to PAYER mode with correct contrast & readable text
-        updateP2PMode(isPayer = true)
         setupListeners()
         observeSession()
         monitorNetworkConnectivity()
         initHardwareCrypto()
         refreshLocalLedgerUI()
         initPhase6WorkManager()
-
 
         val localWallet = appDatabase.walletDao.getWallet()
         if (localWallet != null) {
@@ -156,132 +179,248 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
+        // Sticky Header / Top Bar
+        layoutSystemStatusBanner = findViewById(R.id.layoutSystemStatusBanner)
+        viewStatusDot = findViewById(R.id.viewStatusDot)
         tvNetworkStatusBadge = findViewById(R.id.tvNetworkStatusBadge)
-        btnSyncBank = findViewById(R.id.btnSyncBank)
+        btnEmergencyToggle = findViewById(R.id.btnEmergencyToggle)
+        btnNotificationBell = findViewById(R.id.btnNotificationBell)
 
+        // Welcome
         tvUserName = findViewById(R.id.tvUserName)
+        tvWelcomeSub = findViewById(R.id.tvWelcomeSub)
+
+        // Balance Card
+        tvOnlineBalance = findViewById(R.id.tvOnlineBalance)
+        tvEmergencyBalance = findViewById(R.id.tvEmergencyBalance)
+        btnTransferToOffline = findViewById(R.id.btnTransferToOffline)
+        btnAddMoney = findViewById(R.id.btnAddMoney)
+
+        // Alert Banner
+        layoutEmergencyAlertBanner = findViewById(R.id.layoutEmergencyAlertBanner)
+
+        // Quick Actions
+        tvQuickActionsTitle = findViewById(R.id.tvQuickActionsTitle)
+        badgeEmergencyModeActive = findViewById(R.id.badgeEmergencyModeActive)
+        btnActionScan = findViewById(R.id.btnActionScan)
+        btnActionPayBt = findViewById(R.id.btnActionPayBt)
+        btnActionMerchants = findViewById(R.id.btnActionMerchants)
+        btnActionSendMoney = findViewById(R.id.btnActionSendMoney)
+        btnActionHistory = findViewById(R.id.btnActionHistory)
+        btnActionProfile = findViewById(R.id.btnActionProfile)
+
+        // Essential Services
+        cardDailyFresh = findViewById(R.id.cardDailyFresh)
+        cardApexPharmacy = findViewById(R.id.cardApexPharmacy)
+        cardLifeLine = findViewById(R.id.cardLifeLine)
+        cardNationalBook = findViewById(R.id.cardNationalBook)
+        cardQuickFix = findViewById(R.id.cardQuickFix)
+        btnViewAllMerchants = findViewById(R.id.btnViewAllMerchants)
+
+        // Recent Transactions
+        btnSeeAllTransactions = findViewById(R.id.btnSeeAllTransactions)
+        layoutRecentTransactionsContainer = findViewById(R.id.layoutRecentTransactionsContainer)
+        tvEmptyRecentTransactions = findViewById(R.id.tvEmptyRecentTransactions)
+
+        // Bottom Navigation
+        navTabHome = findViewById(R.id.navTabHome)
+        navTabScan = findViewById(R.id.navTabScan)
+        navTabPayBt = findViewById(R.id.navTabPayBt)
+        navTabHistory = findViewById(R.id.navTabHistory)
+        navTabProfile = findViewById(R.id.navTabProfile)
+
+        scrollTerminal = findViewById(R.id.scrollTerminal)
+
+        // Developer Diagnostics Panel (Collapsible)
+        layoutP2PControlsCard = findViewById(R.id.layoutP2PControlsCard)
+        etBankUrl = findViewById(R.id.etBankUrl)
+        btnSaveBankUrl = findViewById(R.id.btnSaveBankUrl)
+        tvAutoSyncBadge = findViewById(R.id.tvAutoSyncBadge)
+        btnTriggerWorkManager = findViewById(R.id.btnTriggerWorkManager)
+        btnTestLogin = findViewById(R.id.btnTestLogin)
+        btnTestPin = findViewById(R.id.btnTestPin)
+        btnCryptoSelfTest = findViewById(R.id.btnCryptoSelfTest)
+        btnTamperTest = findViewById(R.id.btnTamperTest)
+        btnAddMockTx = findViewById(R.id.btnAddMockTx)
+        btnModePayer = findViewById(R.id.btnModePayer)
+        btnModeMerchant = findViewById(R.id.btnModeMerchant)
+        btnScanTerminal = findViewById(R.id.btnScanTerminal)
+        btnBtChip2 = findViewById(R.id.btnBtChip2)
+        btnBtChip5 = findViewById(R.id.btnBtChip5)
+        btnPayLoopback = findViewById(R.id.btnPayLoopback)
+        etPayeeName = findViewById(R.id.etPayeeName)
+        etBtAmount = findViewById(R.id.etBtAmount)
         tvUserPhone = findViewById(R.id.tvUserPhone)
         tvAccountNumber = findViewById(R.id.tvAccountNumber)
         tvPinStatusBadge = findViewById(R.id.tvPinStatusBadge)
         btnSwitchUserProfile = findViewById(R.id.btnSwitchUserProfile)
         tvKeyFingerprint = findViewById(R.id.tvKeyFingerprint)
-        tvOnlineBalance = findViewById(R.id.tvOnlineBalance)
-        tvEmergencyBalance = findViewById(R.id.tvEmergencyBalance)
+        tvTerminalLog = findViewById(R.id.tvConsoleLog)
 
-        btnTransferToOffline = findViewById(R.id.btnTransferToOffline)
-        btnTestLogin = findViewById(R.id.btnTestLogin)
-        btnTestPin = findViewById(R.id.btnTestPin)
-        btnCryptoSelfTest = findViewById(R.id.btnCryptoSelfTest)
-        btnTamperTest = findViewById(R.id.btnTamperTest)
-
-        // Phase 5 Bluetooth P2P
-        btnModePayer = findViewById(R.id.btnModePayer)
-        btnModeMerchant = findViewById(R.id.btnModeMerchant)
-        layoutPayerSection = findViewById(R.id.layoutPayerSection)
-        layoutMerchantSection = findViewById(R.id.layoutMerchantSection)
-        etPayeeName = findViewById(R.id.etPayeeName)
-        btnScanTerminal = findViewById(R.id.btnScanTerminal)
-        etBtAmount = findViewById(R.id.etBtAmount)
-        btnBtChip2 = findViewById(R.id.btnBtChip2)
-        btnBtChip5 = findViewById(R.id.btnBtChip5)
-        btnPayLoopback = findViewById(R.id.btnPayLoopback)
-        btnPayRfcomm = findViewById(R.id.btnPayRfcomm)
-        tvMerchantStatusBeacon = findViewById(R.id.tvMerchantStatusBeacon)
-        btnToggleMerchantRadar = findViewById(R.id.btnToggleMerchantRadar)
-
-        tvPendingTxBadge = findViewById(R.id.tvPendingTxBadge)
-        btnAddMockTx = findViewById(R.id.btnAddMockTx)
-        layoutLedgerContainer = findViewById(R.id.layoutLedgerContainer)
-        tvEmptyLedgerMsg = findViewById(R.id.tvEmptyLedgerMsg)
-
-        etBankUrl = findViewById(R.id.etBankUrl)
-        btnSaveBankUrl = findViewById(R.id.btnSaveBankUrl)
-        tvAutoSyncBadge = findViewById(R.id.tvAutoSyncBadge)
-        btnTriggerWorkManager = findViewById(R.id.btnTriggerWorkManager)
-
-        tvTerminalLog = findViewById(R.id.tvTerminalLog)
-        scrollTerminal = findViewById(R.id.scrollTerminal)
-        btnClearTerminal = findViewById(R.id.btnClearTerminal)
-
-        etBankUrl.setText(BankApiClient.getBaseUrl(this))
+        etBankUrl?.setText(BankApiClient.getBaseUrl(this))
     }
 
     private fun setupListeners() {
-        btnSaveBankUrl.setOnClickListener {
-            val inputUrl = etBankUrl.text.toString().trim()
+        // Top Bar: Toggle Online / Offline Mode on Status Pill click
+        layoutSystemStatusBanner.setOnClickListener {
+            val isCurrentlyOnline = sessionManager.getUser().isOnline
+            val newOnline = !isCurrentlyOnline
+            updateNetworkBadge(newOnline)
+            val modeName = if (newOnline) "Online (Central Bank Connected)" else "Emergency Mode Active (Offline Only)"
+            Toast.makeText(this, modeName, Toast.LENGTH_SHORT).show()
+        }
+
+        // Long press toggles Developer Diagnostics
+        layoutSystemStatusBanner.setOnLongClickListener {
+            toggleDevDiagnostics()
+            true
+        }
+
+        // Emergency Siren Button -> Toggles Emergency Mode
+        btnEmergencyToggle.setOnClickListener {
+            val isCurrentlyOnline = sessionManager.getUser().isOnline
+            val newOnline = !isCurrentlyOnline
+            updateNetworkBadge(newOnline)
+            Toast.makeText(this, if (newOnline) "Central Bank Online" else "🚨 Emergency Mode Activated", Toast.LENGTH_SHORT).show()
+        }
+
+
+        // Notifications Bell
+        btnNotificationBell.setOnClickListener {
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Notifications")
+                .setMessage("● Offline Payment Ready\nMesh network standby active for emergencies.\n\n● Welcome to EmergencyPay\nYour wallet is loaded and secured.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+
+        // Greeting / Profile
+        tvUserName.setOnClickListener { showUserProfileDialog() }
+        tvUserName.setOnLongClickListener {
+            toggleDevDiagnostics()
+            true
+        }
+
+        // Balance Card
+        btnTransferToOffline.setOnClickListener { initiateFundReservation() }
+        btnAddMoney.setOnClickListener { performOnlineBankLogin() }
+
+        // Quick Actions
+        btnActionScan.setOnClickListener {
+            startActivity(Intent(this, ScanActivity::class.java))
+        }
+        btnActionPayBt.setOnClickListener {
+            val intent = Intent(this, PayActivity::class.java).apply {
+                putExtra("PAYEE_NAME", "Apex City Care Pharmacy")
+                putExtra("DEFAULT_AMOUNT", "10.00")
+                putExtra("CHANNEL", "Bluetooth")
+            }
+            startActivity(intent)
+        }
+        btnActionMerchants.setOnClickListener {
+            startActivity(Intent(this, MerchantsActivity::class.java))
+        }
+        btnActionSendMoney.setOnClickListener {
+            if (NetworkManager.isOnline(this)) {
+                val intent = Intent(this, PayActivity::class.java).apply {
+                    putExtra("PAYEE_NAME", "Pooja Sharma")
+                    putExtra("DEFAULT_AMOUNT", "50.00")
+                    putExtra("CHANNEL", "UPI Online")
+                }
+                startActivity(intent)
+            } else {
+                Toast.makeText(this, "Send Money requires active Central Bank connection", Toast.LENGTH_SHORT).show()
+            }
+        }
+        btnActionHistory.setOnClickListener {
+            startActivity(Intent(this, TransactionHistoryActivity::class.java))
+        }
+        btnActionProfile.setOnClickListener { showUserProfileDialog() }
+
+        // Essential Services Quick Pay
+        cardDailyFresh.setOnClickListener {
+            openPayForMerchant("Daily Fresh Supermarket", "35.00")
+        }
+        cardApexPharmacy.setOnClickListener {
+            openPayForMerchant("Apex City Care Pharmacy", "12.00")
+        }
+        cardLifeLine.setOnClickListener {
+            openPayForMerchant("LifeLine Medicos", "25.00")
+        }
+        cardNationalBook.setOnClickListener {
+            openPayForMerchant("National Book Depot", "18.00")
+        }
+        cardQuickFix.setOnClickListener {
+            openPayForMerchant("City QuickFix Electrician", "50.00")
+        }
+        btnViewAllMerchants.setOnClickListener {
+            startActivity(Intent(this, MerchantsActivity::class.java))
+        }
+
+        // Recent Transactions: See All
+        btnSeeAllTransactions.setOnClickListener {
+            startActivity(Intent(this, TransactionHistoryActivity::class.java))
+        }
+
+        // Bottom Navigation Bar
+        navTabHome.setOnClickListener {
+            scrollTerminal.smoothScrollTo(0, 0)
+        }
+        navTabScan.setOnClickListener {
+            startActivity(Intent(this, ScanActivity::class.java))
+        }
+        navTabPayBt.setOnClickListener {
+            val intent = Intent(this, PayActivity::class.java).apply {
+                putExtra("PAYEE_NAME", "Apex City Care Pharmacy")
+                putExtra("DEFAULT_AMOUNT", "10.00")
+                putExtra("CHANNEL", "Bluetooth")
+            }
+            startActivity(intent)
+        }
+        navTabHistory.setOnClickListener {
+            startActivity(Intent(this, TransactionHistoryActivity::class.java))
+        }
+        navTabProfile.setOnClickListener { showUserProfileDialog() }
+
+        // Diagnostics Panel Controls
+        btnSaveBankUrl?.setOnClickListener {
+            val inputUrl = etBankUrl?.text.toString().trim()
             if (inputUrl.isNotEmpty()) {
                 BankApiClient.setBaseUrl(this, inputUrl)
                 val updatedUrl = BankApiClient.getBaseUrl(this)
-                etBankUrl.setText(updatedUrl)
+                etBankUrl?.setText(updatedUrl)
                 appendLog("CONFIG", "Updated Laptop Bank endpoint: $updatedUrl")
                 Toast.makeText(this, "Bank Server IP Saved", Toast.LENGTH_SHORT).show()
             }
         }
+        btnTriggerWorkManager?.setOnClickListener { triggerWorkManagerSync() }
+        btnTestLogin?.setOnClickListener { performOnlineBankLogin() }
+        btnTestPin?.setOnClickListener { showOfflinePinDialog() }
+        btnCryptoSelfTest?.setOnClickListener { runCryptoSelfTest() }
+        btnTamperTest?.setOnClickListener { runTamperVerificationTest() }
+        btnAddMockTx?.setOnClickListener { generateMockOfflineTransaction() }
+        btnModePayer?.setOnClickListener { updateP2PMode(isPayer = true) }
+        btnModeMerchant?.setOnClickListener { updateP2PMode(isPayer = false) }
+        btnScanTerminal?.setOnClickListener { showBluetoothDevicePicker() }
+        btnBtChip2?.setOnClickListener { etBtAmount?.setText("2.00") }
+        btnBtChip5?.setOnClickListener { etBtAmount?.setText("5.00") }
+        btnPayLoopback?.setOnClickListener { initiateP2PPayment(isLoopback = true) }
+    }
 
-        btnTriggerWorkManager.setOnClickListener {
-            triggerWorkManagerSync()
+    private fun openPayForMerchant(name: String, amount: String) {
+        val intent = Intent(this, PayActivity::class.java).apply {
+            putExtra("PAYEE_NAME", name)
+            putExtra("DEFAULT_AMOUNT", amount)
+            putExtra("CHANNEL", "Bluetooth")
         }
+        startActivity(intent)
+    }
 
-        btnTestLogin.setOnClickListener { performOnlineBankLogin() }
-        btnSwitchUserProfile.setOnClickListener { showUserProfileDialog() }
-        tvUserName.setOnClickListener { showUserProfileDialog() }
-        btnTestPin.setOnClickListener { showOfflinePinDialog() }
-        btnTransferToOffline.setOnClickListener { initiateFundReservation() }
-        btnSyncBank.setOnClickListener { performBankSync() }
-        btnCryptoSelfTest.setOnClickListener { runCryptoSelfTest() }
-        btnTamperTest.setOnClickListener { runTamperVerificationTest() }
-        btnAddMockTx.setOnClickListener { generateMockOfflineTransaction() }
-
-        // Phase 5 Mode Toggle: clean contrast without theme color blend
-        btnModePayer.setOnClickListener { updateP2PMode(isPayer = true) }
-        btnModeMerchant.setOnClickListener { updateP2PMode(isPayer = false) }
-
-        // Phase 5 Terminal Chooser / Scanner
-        btnScanTerminal.setOnClickListener { showBluetoothDevicePicker() }
-
-        btnBtChip2.setOnClickListener { etBtAmount.setText("2.00") }
-        btnBtChip5.setOnClickListener { etBtAmount.setText("5.00") }
-
-        btnPayLoopback.setOnClickListener {
-            initiateP2PPayment(isLoopback = true)
-        }
-
-        btnPayRfcomm.setOnClickListener {
-            initiateP2PPayment(isLoopback = false)
-        }
-
-        btnToggleMerchantRadar.setOnClickListener {
-            toggleMerchantRadar()
-        }
-
-        btnClearTerminal.setOnClickListener {
-            tvTerminalLog.text = ""
-            appendLog("TERMINAL", "Log cleared.")
-        }
-
-        // Enable independent touch scrolling on Activity Terminal inside the outer screen ScrollView
-        val terminalScrollTouchListener = View.OnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(true)
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(false)
-                }
-            }
-            v.onTouchEvent(event)
-        }
-        scrollTerminal.setOnTouchListener(terminalScrollTouchListener)
-        tvTerminalLog.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(true)
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(false)
-                }
-            }
-            false
+    private fun toggleDevDiagnostics() {
+        layoutP2PControlsCard?.let { card ->
+            card.visibility = if (card.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            val status = if (card.visibility == View.VISIBLE) "Visible" else "Hidden"
+            Toast.makeText(this, "Developer Diagnostics: $status", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -295,20 +434,16 @@ class MainActivity : AppCompatActivity() {
         val inactiveTextColor = Color.parseColor("#1E293B")
 
         if (isPayer) {
-            layoutPayerSection.visibility = View.VISIBLE
-            layoutMerchantSection.visibility = View.GONE
-            btnModePayer.backgroundTintList = activeBg
-            btnModePayer.setTextColor(activeTextColor)
-            btnModeMerchant.backgroundTintList = inactiveBg
-            btnModeMerchant.setTextColor(inactiveTextColor)
+            btnModePayer?.backgroundTintList = activeBg
+            btnModePayer?.setTextColor(activeTextColor)
+            btnModeMerchant?.backgroundTintList = inactiveBg
+            btnModeMerchant?.setTextColor(inactiveTextColor)
             appendLog("P2P", "Switched to PAYER mode (Send offline money via Bluetooth)")
         } else {
-            layoutPayerSection.visibility = View.GONE
-            layoutMerchantSection.visibility = View.VISIBLE
-            btnModeMerchant.backgroundTintList = activeBg
-            btnModeMerchant.setTextColor(activeTextColor)
-            btnModePayer.backgroundTintList = inactiveBg
-            btnModePayer.setTextColor(inactiveTextColor)
+            btnModeMerchant?.backgroundTintList = activeBg
+            btnModeMerchant?.setTextColor(activeTextColor)
+            btnModePayer?.backgroundTintList = inactiveBg
+            btnModePayer?.setTextColor(inactiveTextColor)
             appendLog("P2P", "Switched to MERCHANT mode (Receive & verify offline payments)")
         }
     }
@@ -324,7 +459,7 @@ class MainActivity : AppCompatActivity() {
                 checkAndRequestBluetoothPermissions(autoOpenPicker = false)
             },
             onDeviceSelected = { name, device, isDemoLoopback ->
-                etPayeeName.setText(name)
+                etPayeeName?.setText(name)
                 selectedBluetoothDevice = device
                 if (isDemoLoopback) {
                     appendLog("TERMINAL", "Selected simulated terminal: $name (Ready for 'P2P Loopback Pay')")
@@ -398,12 +533,12 @@ class MainActivity : AppCompatActivity() {
                 CryptoManager.getOrCreateKeyPair()
                 val fingerprint = CryptoManager.getPublicKeyFingerprint()
                 withContext(Dispatchers.Main) {
-                    tvKeyFingerprint.text = fingerprint
+                    tvKeyFingerprint?.text = fingerprint
                     appendLog("CRYPTO", "Hardware Keystore key initialized: $fingerprint")
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    tvKeyFingerprint.text = "secp256r1: Active"
+                    tvKeyFingerprint?.text = "secp256r1: Active"
                     appendLog("CRYPTO", "Keystore init note: ${e.message}")
                 }
             }
@@ -446,13 +581,21 @@ class MainActivity : AppCompatActivity() {
     private fun updateNetworkBadge(isOnline: Boolean) {
         sessionManager.updateOnlineStatus(isOnline)
         if (isOnline) {
-            tvNetworkStatusBadge.text = "● Bank Connected"
-            tvNetworkStatusBadge.setTextColor(getColor(R.color.primary_dark))
-            tvNetworkStatusBadge.setBackgroundResource(R.drawable.bg_badge)
+            tvNetworkStatusBadge.text = "Online"
+            tvNetworkStatusBadge.setTextColor(ContextCompat.getColor(this, R.color.status_online_text))
+            viewStatusDot.backgroundTintList = ContextCompat.getColorStateList(this, R.color.status_online)
+            layoutEmergencyAlertBanner.visibility = View.GONE
+            badgeEmergencyModeActive.visibility = View.GONE
+            tvQuickActionsTitle.text = "Quick Actions"
+            btnActionSendMoney.visibility = View.VISIBLE
         } else {
-            tvNetworkStatusBadge.text = "● Offline Mode"
-            tvNetworkStatusBadge.setTextColor(getColor(R.color.amber_warning))
-            tvNetworkStatusBadge.setBackgroundResource(R.drawable.bg_badge)
+            tvNetworkStatusBadge.text = "Emergency"
+            tvNetworkStatusBadge.setTextColor(ContextCompat.getColor(this, R.color.emergency_dark))
+            viewStatusDot.backgroundTintList = ContextCompat.getColorStateList(this, R.color.emergency)
+            layoutEmergencyAlertBanner.visibility = View.VISIBLE
+            badgeEmergencyModeActive.visibility = View.VISIBLE
+            tvQuickActionsTitle.text = "Emergency Actions"
+            btnActionSendMoney.visibility = View.GONE
         }
     }
 
@@ -465,11 +608,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateUserUI(user: UserSession) {
-        tvUserName.text = user.name
-        tvUserPhone.text = user.phone
-        tvAccountNumber.text = user.accountNumber
-        tvOnlineBalance.text = String.format(Locale.US, "₹%.2f", user.balance)
-        tvEmergencyBalance.text = String.format(Locale.US, "₹%.2f", user.emergencyBalance)
+        val firstName = user.name.split(" ").firstOrNull() ?: user.name
+        tvUserName.text = "Hi, $firstName"
+        tvUserPhone?.text = user.phone
+        tvAccountNumber?.text = user.accountNumber
+        tvOnlineBalance.text = String.format(Locale.US, "₹ %.2f", user.balance)
+        tvEmergencyBalance.text = String.format(Locale.US, "₹ %.2f", user.emergencyBalance)
     }
 
     private fun initiateFundReservation() {
@@ -527,9 +671,9 @@ class MainActivity : AppCompatActivity() {
      * Phase 5: P2P Bluetooth / Loopback Payment Flow
      */
     private fun initiateP2PPayment(isLoopback: Boolean) {
-        val amountStr = etBtAmount.text.toString().trim()
-        val amount = amountStr.toDoubleOrNull()
-        val payeeName = etPayeeName.text.toString().trim().ifEmpty { "Apex City Care Pharmacy" }
+        val amountStr = etBtAmount?.text?.toString()?.trim() ?: "10.00"
+        val amount = amountStr.toDoubleOrNull() ?: 10.0
+        val payeeName = etPayeeName?.text?.toString()?.trim()?.ifEmpty { "Apex City Care Pharmacy" } ?: "Apex City Care Pharmacy"
 
         val currentUser = paymentRepository.getCurrentUser()
         if (payeeName.trim().equals(currentUser.phone.trim(), ignoreCase = true) ||
@@ -638,10 +782,10 @@ class MainActivity : AppCompatActivity() {
     private fun toggleMerchantRadar() {
         if (!isMerchantRadarRunning) {
             isMerchantRadarRunning = true
-            tvMerchantStatusBeacon.text = "🟢 Radar ACTIVE (Listening)"
-            tvMerchantStatusBeacon.setTextColor(getColor(R.color.primary_dark))
-            btnToggleMerchantRadar.text = "Stop Merchant Radar"
-            btnToggleMerchantRadar.setBackgroundColor(getColor(R.color.error_red))
+            tvMerchantStatusBeacon?.text = "🟢 Radar ACTIVE (Listening)"
+            tvMerchantStatusBeacon?.setTextColor(getColor(R.color.primary_dark))
+            btnToggleMerchantRadar?.text = "Stop Merchant Radar"
+            btnToggleMerchantRadar?.setBackgroundColor(getColor(R.color.error_red))
 
             // Request Android to broadcast Bluetooth discoverability so payer devices can find this phone
             try {
@@ -666,10 +810,10 @@ class MainActivity : AppCompatActivity() {
         } else {
             isMerchantRadarRunning = false
             paymentRepository.stopMerchantRadar()
-            tvMerchantStatusBeacon.text = "● Radar Standby"
-            tvMerchantStatusBeacon.setTextColor(getColor(R.color.text_secondary))
-            btnToggleMerchantRadar.text = "Start Merchant Listening Socket"
-            btnToggleMerchantRadar.setBackgroundColor(getColor(R.color.primary))
+            tvMerchantStatusBeacon?.text = "● Radar Standby"
+            tvMerchantStatusBeacon?.setTextColor(getColor(R.color.text_secondary))
+            btnToggleMerchantRadar?.text = "Start Merchant Listening Socket"
+            btnToggleMerchantRadar?.setBackgroundColor(getColor(R.color.primary))
             appendLog("MERCHANT", "Merchant Radar stopped.")
         }
     }
@@ -850,41 +994,42 @@ class MainActivity : AppCompatActivity() {
             val pendingCount = appDatabase.transactionDao.getPendingSyncTransactions().size
 
             withContext(Dispatchers.Main) {
-                tvPendingTxBadge.text = "$pendingCount Pending Sync"
+                tvPendingTxBadge?.text = "$pendingCount Pending Sync"
 
-                layoutLedgerContainer.removeAllViews()
+                layoutRecentTransactionsContainer.removeAllViews()
 
                 if (transactions.isEmpty()) {
-                    tvEmptyLedgerMsg.visibility = View.VISIBLE
-                    layoutLedgerContainer.addView(tvEmptyLedgerMsg)
+                    tvEmptyRecentTransactions.visibility = View.VISIBLE
                 } else {
-                    tvEmptyLedgerMsg.visibility = View.GONE
+                    tvEmptyRecentTransactions.visibility = View.GONE
                     val inflater = LayoutInflater.from(this@MainActivity)
 
-                    transactions.take(5).forEach { tx ->
-                        val itemView = inflater.inflate(R.layout.item_ledger_transaction, layoutLedgerContainer, false)
-                        val tvDir = itemView.findViewById<TextView>(R.id.tvTxDirection)
+                    transactions.take(3).forEach { tx ->
+                        val itemView = inflater.inflate(R.layout.item_ledger_transaction, layoutRecentTransactionsContainer, false)
+                        val ivIcon = itemView.findViewById<ImageView>(R.id.ivTxIcon)
                         val tvPayee = itemView.findViewById<TextView>(R.id.tvTxPayee)
                         val tvAmount = itemView.findViewById<TextView>(R.id.tvTxAmount)
                         val tvId = itemView.findViewById<TextView>(R.id.tvTxId)
                         val tvStatus = itemView.findViewById<TextView>(R.id.tvTxStatusBadge)
 
-                        tvDir.text = tx.direction
-                        tvPayee.text = tx.receiverName
-                        tvAmount.text = String.format(Locale.US, "- ₹%.2f", tx.amount)
-                        tvId.text = "${tx.txId} · Nonce: ${tx.nonce.take(6)}"
+                        val isOut = tx.direction == TransactionEntity.DIRECTION_SENT
+                        tvPayee.text = if (isOut) tx.receiverName.ifEmpty { tx.receiverId } else tx.senderName.ifEmpty { tx.senderId }
+                        tvAmount.text = String.format(Locale.US, if (isOut) "- ₹%.2f" else "+ ₹%.2f", tx.amount)
+
+                        val dateStr = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(tx.timestamp))
+                        tvId.text = "Bluetooth • $dateStr"
 
                         if (tx.status == TransactionEntity.STATUS_PENDING_SYNC) {
-                            tvStatus.text = "PENDING_SYNC"
-                            tvStatus.setTextColor(getColor(R.color.amber_warning))
-                            tvStatus.setBackgroundResource(R.drawable.bg_badge)
+                            tvStatus.text = "Queued Sync"
+                            tvStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_offline_text))
+                            tvStatus.backgroundTintList = ContextCompat.getColorStateList(this@MainActivity, R.color.status_offline_bg)
                         } else {
-                            tvStatus.text = "SYNCED"
-                            tvStatus.setTextColor(getColor(R.color.primary_dark))
-                            tvStatus.setBackgroundResource(R.drawable.bg_badge)
+                            tvStatus.text = "Completed"
+                            tvStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_online_text))
+                            tvStatus.backgroundTintList = ContextCompat.getColorStateList(this@MainActivity, R.color.status_online_bg)
                         }
 
-                        layoutLedgerContainer.addView(itemView)
+                        layoutRecentTransactionsContainer.addView(itemView)
                     }
                 }
             }
@@ -983,7 +1128,7 @@ class MainActivity : AppCompatActivity() {
             actionTitle = "Authorize Offline Session",
             actionSubtitle = "Enter 4-digit PIN (Default: 1234)",
             onSuccess = {
-                tvPinStatusBadge.text = "✅ 1234 Verified"
+                tvPinStatusBadge?.text = "✅ 1234 Verified"
                 appendLog("PIN AUTH", "✅ 100% OFFLINE AUTH SUCCESS: Salted SHA-256 PIN verified locally via EncryptedSharedPreferences.")
                 appendLog("CRYPTO", "Session unlocked for Rahul Sharma without server connectivity.")
                 Toast.makeText(this, "PIN Verified Locally (Offline)", Toast.LENGTH_SHORT).show()
@@ -999,10 +1144,7 @@ class MainActivity : AppCompatActivity() {
         val timestamp = timeFormat.format(Date())
         val logLine = "[$timestamp] [$tag] $message\n"
         runOnUiThread {
-            tvTerminalLog.append(logLine)
-            scrollTerminal.post {
-                scrollTerminal.fullScroll(View.FOCUS_DOWN)
-            }
+            tvTerminalLog?.append(logLine)
         }
     }
 
@@ -1019,17 +1161,17 @@ class MainActivity : AppCompatActivity() {
             val workInfo = workInfoList.first()
             when (workInfo.state) {
                 WorkInfo.State.ENQUEUED -> {
-                    tvAutoSyncBadge.text = "● Auto-Sync: Enqueued"
-                    tvAutoSyncBadge.setTextColor(ContextCompat.getColor(this, R.color.primary_dark))
+                    tvAutoSyncBadge?.text = "● Auto-Sync: Enqueued"
+                    tvAutoSyncBadge?.setTextColor(ContextCompat.getColor(this, R.color.primary_dark))
                 }
                 WorkInfo.State.RUNNING -> {
-                    tvAutoSyncBadge.text = "● Auto-Sync: Syncing..."
-                    tvAutoSyncBadge.setTextColor(ContextCompat.getColor(this, R.color.primary))
+                    tvAutoSyncBadge?.text = "● Auto-Sync: Syncing..."
+                    tvAutoSyncBadge?.setTextColor(ContextCompat.getColor(this, R.color.primary))
                     appendLog("WORKMANAGER", "⏳ SyncWorker active: pushing pending offline ledger to Laptop Bank...")
                 }
                 WorkInfo.State.SUCCEEDED -> {
-                    tvAutoSyncBadge.text = "● Auto-Sync: Reconciled ✅"
-                    tvAutoSyncBadge.setTextColor(ContextCompat.getColor(this, R.color.primary_dark))
+                    tvAutoSyncBadge?.text = "● Auto-Sync: Reconciled ✅"
+                    tvAutoSyncBadge?.setTextColor(ContextCompat.getColor(this, R.color.primary_dark))
                     val count = workInfo.outputData.getInt("reconciled_count", 0)
                     val total = workInfo.outputData.getDouble("total_amount", 0.0)
                     if (count > 0) {
@@ -1040,8 +1182,8 @@ class MainActivity : AppCompatActivity() {
                     refreshLocalLedgerUI()
                 }
                 WorkInfo.State.FAILED -> {
-                    tvAutoSyncBadge.text = "● Auto-Sync: Retrying"
-                    tvAutoSyncBadge.setTextColor(ContextCompat.getColor(this, R.color.error_red))
+                    tvAutoSyncBadge?.text = "● Auto-Sync: Retrying"
+                    tvAutoSyncBadge?.setTextColor(ContextCompat.getColor(this, R.color.error_red))
                     val err = workInfo.outputData.getString("error") ?: "Server unreachable"
                     appendLog("WORKMANAGER", "⚠️ SyncWorker notice: $err")
                 }

@@ -46,6 +46,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".TransactionHistoryActivity"
+            android:exported="false"
+            android:label="Transaction History" />
+        <activity
+            android:name=".ScanActivity"
+            android:exported="false"
+            android:label="Scan &amp; Pay" />
+        <activity
+            android:name=".PayActivity"
+            android:exported="false"
+            android:label="Emergency Pay" />
+        <activity
+            android:name=".ReceiptActivity"
+            android:exported="false"
+            android:label="Payment Receipt" />
+        <activity
+            android:name=".MerchantsActivity"
+            android:exported="false"
+            android:label="Verified Merchants" />
     </application>
 
 </manifest>

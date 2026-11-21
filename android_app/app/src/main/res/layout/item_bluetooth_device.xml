@@ -3,56 +3,72 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:background="@drawable/card_bg"
-    android:backgroundTint="#F8FAFC"
+    android:gravity="center_vertical"
+    android:background="@drawable/bg_tx_item"
     android:padding="12dp"
-    android:layout_marginBottom="6dp"
-    android:gravity="center_vertical">
+    android:layout_marginBottom="8dp"
+    android:elevation="1dp">
 
-    <TextView
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:background="@drawable/bg_badge"
-        android:gravity="center"
-        android:text="📶"
-        android:textSize="16sp" />
+    <!-- Avatar circle -->
+    <FrameLayout
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@drawable/bg_action_circle">
 
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_bluetooth" />
+    </FrameLayout>
+
+    <!-- Details -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="12dp"
         android:orientation="vertical">
 
         <TextView
             android:id="@+id/tvDeviceName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Apex City Care Pharmacy"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp"
+            android:text="Spidey Store POS"
+            android:textColor="@color/text_main"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvDeviceAddress"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:text="98:D3:31:FD:24:1A · Paired"
-            android:textColor="@color/text_secondary"
-            android:textSize="10sp" />
+            android:layout_marginTop="2dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvDeviceAddress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.8m • BLE Ready"
+                android:textColor="@color/status_online_text"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
 
+    <!-- Connect / Pay Button -->
     <TextView
         android:id="@+id/tvDeviceBadge"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_badge"
-        android:paddingHorizontal="8dp"
-        android:paddingVertical="3dp"
-        android:text="Connect"
-        android:textColor="@color/primary_dark"
-        android:textSize="10sp"
+        android:layout_height="34dp"
+        android:background="@drawable/bg_btn_white_translucent"
+        android:backgroundTint="@color/primary"
+        android:paddingHorizontal="14dp"
+        android:gravity="center"
+        android:text="Pay"
+        android:textColor="@color/white"
+        android:textSize="12sp"
         android:textStyle="bold" />
-</LinearLayout>
 
+</LinearLayout>

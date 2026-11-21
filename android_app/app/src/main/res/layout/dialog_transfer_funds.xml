@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@drawable/card_bg"
+    android:background="@drawable/bg_service_card"
     android:padding="20dp">
 
     <!-- Header -->
@@ -11,8 +11,8 @@
         android:id="@+id/tvTransferDialogTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Reserve Offline Funds"
-        android:textColor="@color/text_primary"
+        android:text="Transfer to Emergency Reserve"
+        android:textColor="@color/text_main"
         android:textSize="18sp"
         android:textStyle="bold" />
 
@@ -20,74 +20,82 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:text="Lock funds from Central Bank into device emergency wallet"
-        android:textColor="@color/text_secondary"
+        android:text="Allocate funds from online balance into device offline wallet"
+        android:textColor="@color/text_muted"
         android:textSize="12sp" />
 
-    <!-- Offline Warning Banner (Shown only when disconnected) -->
+    <!-- Offline Warning Banner -->
     <LinearLayout
         android:id="@+id/bannerOfflineWarning"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:background="@drawable/card_bg"
-        android:backgroundTint="@color/amber_bg"
+        android:background="@drawable/bg_emergency_alert"
         android:orientation="horizontal"
         android:padding="10dp"
         android:gravity="center_vertical"
         android:visibility="gone">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="⚠️"
-            android:textSize="14sp"
-            android:layout_marginEnd="6dp" />
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_info" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Device is OFFLINE. Online connection to Laptop Bank is strictly required to reserve funds."
-            android:textColor="@color/amber_warning"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:layout_marginStart="8dp"
+            android:text="Device is offline. Connecting to Central Bank required to mint offline funds."
+            android:textColor="@color/emergency_dark"
+            android:textSize="11sp" />
     </LinearLayout>
 
-    <!-- Available Online Balance Info -->
+    <!-- Available Online Balance Preview Box -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:layout_marginTop="14dp"
+        android:background="@drawable/bg_status_pill"
+        android:backgroundTint="@color/primary_50"
+        android:orientation="horizontal"
+        android:padding="14dp"
         android:gravity="center_vertical">
 
-        <TextView
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Available Online Balance:"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tvDialogAvailableBalance"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="₹500.00"
-            android:textColor="@color/text_primary"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Available Online Balance"
+                android:textColor="#4338CA"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvDialogAvailableBalance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="₹ 500.00"
+                android:textColor="@color/primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- Amount Input -->
+    <!-- Transfer Amount Input -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="Amount to Reserve (₹)"
-        android:textColor="@color/text_primary"
-        android:textSize="12sp"
+        android:text="Transfer Amount"
+        android:textColor="@color/text_main"
+        android:textSize="13sp"
         android:textStyle="bold" />
 
     <EditText
@@ -95,101 +103,86 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_marginTop="6dp"
-        android:background="@drawable/card_bg"
+        android:background="@drawable/bg_tx_item"
         android:paddingHorizontal="14dp"
+        android:hint="₹ 0.00"
         android:inputType="numberDecimal"
-        android:hint="e.g. 10.00"
-        android:text="10.00"
-        android:textColor="@color/text_primary"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+        android:textColor="@color/text_main"
+        android:textColorHint="@color/text_muted"
+        android:textSize="16sp" />
 
-    <!-- Quick Selection Chips -->
+    <!-- Preset Chips -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:layout_marginTop="10dp"
-        android:gravity="center_vertical">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Quick: "
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp"
-            android:layout_marginEnd="6dp" />
+        android:orientation="horizontal">
 
         <Button
             android:id="@+id/btnChip5"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="36dp"
+            android:layout_weight="1"
             android:layout_marginEnd="6dp"
-            android:backgroundTint="@color/chip_bg"
-            android:text="+₹5"
-            android:textColor="@color/text_primary"
-            android:textSize="11sp"
+            android:backgroundTint="#F3F4F6"
+            android:text="+ ₹5"
+            android:textColor="@color/text_main"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnChip10"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="36dp"
+            android:layout_weight="1"
             android:layout_marginEnd="6dp"
-            android:backgroundTint="@color/chip_bg"
-            android:text="+₹10"
-            android:textColor="@color/text_primary"
-            android:textSize="11sp"
+            android:backgroundTint="#F3F4F6"
+            android:text="+ ₹10"
+            android:textColor="@color/text_main"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnChip20"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="36dp"
-            android:backgroundTint="@color/chip_bg"
-            android:text="+₹20"
-            android:textColor="@color/text_primary"
-            android:textSize="11sp"
+            android:layout_weight="1"
+            android:backgroundTint="#F3F4F6"
+            android:text="+ ₹20"
+            android:textColor="@color/text_main"
+            android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:text="🔒 Invariant: Offline money cannot be minted locally; it must be backed by a debit at the central bank."
-        android:textColor="@color/text_secondary"
-        android:textSize="10sp" />
 
     <!-- Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="18dp">
+        android:layout_marginTop="20dp"
+        android:orientation="horizontal">
 
         <Button
             android:id="@+id/btnCancelTransfer"
             android:layout_width="0dp"
             android:layout_height="44dp"
             android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:backgroundTint="@color/chip_bg"
+            android:layout_marginEnd="8dp"
+            android:backgroundTint="#F3F4F6"
             android:text="Cancel"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
+            android:textColor="@color/text_main"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnConfirmTransfer"
             android:layout_width="0dp"
             android:layout_height="44dp"
-            android:layout_weight="1.4"
-            android:layout_marginStart="6dp"
+            android:layout_weight="1"
             android:backgroundTint="@color/primary"
-            android:text="Confirm Reservation"
+            android:text="Authorize &amp; Reserve"
             android:textColor="@color/white"
             android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>
-</LinearLayout>
 
+</LinearLayout>

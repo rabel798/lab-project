@@ -3,110 +3,107 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@drawable/card_bg"
-    android:padding="20dp"
-    android:maxHeight="520dp">
+    android:background="@drawable/bg_service_card"
+    android:padding="16dp">
 
-    <!-- Header -->
+    <!-- Top Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
 
-        <LinearLayout
+        <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Nearby Bluetooth Terminals"
-                android:textColor="@color/text_primary"
-                android:textSize="17sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Select merchant or peer to transmit offline payment"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <ProgressBar
-            android:id="@+id/pbScanning"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:indeterminateTint="@color/primary"
-            android:visibility="gone" />
-    </LinearLayout>
-
-    <!-- Scan Button -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="14dp"
-        android:gravity="center_vertical">
+            android:text="Bluetooth Pay"
+            android:textColor="@color/text_main"
+            android:textSize="18sp"
+            android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnScanNearby"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="0dp"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
             android:backgroundTint="@color/primary"
-            android:text="🔍 Scan for Nearby Bluetooth Devices"
+            android:text="Scan Nearby"
             android:textColor="@color/white"
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Radar Visual Banner matching bluetooth.html -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_status_pill"
+        android:backgroundTint="@color/primary_50"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:gravity="center"
+        android:layout_marginBottom="14dp">
+
+        <FrameLayout
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="@drawable/bg_action_circle">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_bluetooth" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Searching for Nearby Terminals"
+            android:textColor="@color/text_main"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Hold device close to merchant terminal (BLE mesh)"
+            android:textColor="@color/text_muted"
+            android:textSize="11sp" />
+
+        <ProgressBar
+            android:id="@+id/pbScanning"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="160dp"
+            android:layout_height="4dp"
+            android:layout_marginTop="10dp"
+            android:indeterminate="true"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Device Lists Scroll -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
         android:maxHeight="320dp">
 
         <LinearLayout
-            android:id="@+id/layoutDeviceList"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- Discovered Devices -->
             <TextView
-                android:id="@+id/tvSectionPaired"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="PAIRED / BONDED DEVICES"
-                android:textColor="@color/text_secondary"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="6dp" />
-
-            <LinearLayout
-                android:id="@+id/containerPairedDevices"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-
-            <TextView
-                android:id="@+id/tvSectionDiscovered"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="DISCOVERED NEARBY"
-                android:textColor="@color/text_secondary"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="6dp" />
+                android:layout_marginBottom="6dp"
+                android:text="Discovered Terminals"
+                android:textColor="@color/text_main"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:id="@+id/containerDiscoveredDevices"
@@ -114,15 +111,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
+            <!-- Demo Terminals -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="ESSENTIAL DEMO MERCHANTS (SIMULATOR)"
-                android:textColor="@color/text_secondary"
-                android:textSize="10sp"
-                android:textStyle="bold"
                 android:layout_marginTop="8dp"
-                android:layout_marginBottom="6dp" />
+                android:layout_marginBottom="6dp"
+                android:text="Verified Offline Terminals"
+                android:textColor="@color/text_main"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:id="@+id/containerDemoDevices"
@@ -130,18 +128,34 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
+            <!-- Paired Hardware Devices -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="6dp"
+                android:text="Paired Terminals"
+                android:textColor="@color/text_main"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/containerPairedDevices"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
         </LinearLayout>
     </ScrollView>
 
-    <!-- Close Button -->
     <Button
         android:id="@+id/btnCloseDialog"
         android:layout_width="match_parent"
-        android:layout_height="40dp"
+        android:layout_height="42dp"
         android:layout_marginTop="12dp"
-        android:backgroundTint="@color/chip_bg"
-        android:text="Cancel"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
-</LinearLayout>
+        android:backgroundTint="#F3F4F6"
+        android:text="Dismiss"
+        android:textColor="@color/text_main"
+        android:textSize="13sp"
+        android:textStyle="bold" />
 
+</LinearLayout>

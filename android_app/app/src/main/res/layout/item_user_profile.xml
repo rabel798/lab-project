@@ -3,26 +3,36 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:background="@drawable/card_bg"
-    android:backgroundTint="#F8FAFC"
+    android:background="@drawable/bg_tx_item"
     android:padding="12dp"
     android:layout_marginBottom="8dp"
-    android:gravity="center_vertical">
+    android:gravity="center_vertical"
+    android:elevation="1dp">
 
-    <TextView
-        android:id="@+id/tvUserAvatar"
-        android:layout_width="38dp"
-        android:layout_height="38dp"
-        android:background="@drawable/pin_dot_filled"
-        android:gravity="center"
-        android:text="👤"
-        android:textSize="18sp" />
+    <!-- Avatar circle -->
+    <FrameLayout
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_action_circle">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_profile" />
+
+        <TextView
+            android:id="@+id/tvUserAvatar"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="12dp"
         android:orientation="vertical">
 
         <TextView
@@ -30,16 +40,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Rahul Sharma"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp"
+            android:textColor="@color/text_main"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvProfileDetails"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="+91 98765 43210 · ACC-9876543210-01"
-            android:textColor="@color/text_secondary"
+            android:text="+91 9876543210"
+            android:textColor="@color/text_muted"
             android:textSize="11sp" />
 
         <TextView
@@ -47,9 +57,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="Bank: ₹500.00 | Reserve: ₹10.00"
-            android:textColor="@color/primary_dark"
-            android:textSize="10.5sp"
+            android:text="Bank: ₹500.00 | Reserve: ₹100.00"
+            android:textColor="@color/primary"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -57,13 +67,13 @@
         android:id="@+id/tvProfileBadge"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_badge"
-        android:paddingHorizontal="8dp"
+        android:background="@drawable/bg_badge_pill"
+        android:backgroundTint="@color/primary_light"
+        android:paddingHorizontal="10dp"
         android:paddingVertical="4dp"
         android:text="Switch"
-        android:textColor="@color/primary_dark"
-        android:textSize="10.5sp"
+        android:textColor="@color/primary"
+        android:textSize="11sp"
         android:textStyle="bold" />
 
 </LinearLayout>
-
