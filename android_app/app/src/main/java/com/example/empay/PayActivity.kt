@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.example.empay.auth.AuthManager
 import com.example.empay.auth.SessionManager
 import com.example.empay.crypto.CryptoManager
 import com.example.empay.db.AppDatabase
@@ -193,10 +194,28 @@ class PayActivity : AppCompatActivity() {
             }
         }
 
-        showConfirmationSheet(amount, payeeName, note)
+        // Validate recipient exists in database or verified merchants registry
+        lifecycleScope.launch(Dispatchers.IO) {
+            val authManager = AuthManager.getInstance(this@PayActivity)
+            val verification = authManager.verifyRecipient(payeeName)
+
+            withContext(Dispatchers.Main) {
+                if (verification == null) {
+                    Toast.makeText(
+                        this@PayActivity,
+                        "❌ Recipient Not Found: '$payeeName' is not registered in the bank database or verified merchants registry.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return@withContext
+                }
+
+                // Recipient verified! Proceed to confirmation sheet
+                showConfirmationSheet(amount, verification.displayName, note, verification.details)
+            }
+        }
     }
 
-    private fun showConfirmationSheet(amount: Double, payee: String, note: String) {
+    private fun showConfirmationSheet(amount: Double, payee: String, note: String, details: String = "") {
         val dialog = Dialog(this)
         dialog.setContentView(R.layout.dialog_confirm_transfer)
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -211,9 +230,9 @@ class PayActivity : AppCompatActivity() {
         val btnEnterPin = dialog.findViewById<Button>(R.id.btnConfirmModalEnterPin)
 
         tvAmt.text = String.format(Locale.US, "₹ %.2f", amount)
-        tvPayee.text = payee
+        tvPayee.text = "$payee ✓"
         tvChan.text = if (isOnlineMode) "UPI (Online)" else "Bluetooth (Offline)"
-        tvNote.text = note
+        tvNote.text = if (details.isNotEmpty()) "$note\n($details)" else note
 
         if (isOnlineMode) {
             tvInfo.text = "🛡️ Online UPI payment: Amount will be deducted from your Available Balance."

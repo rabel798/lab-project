@@ -26,6 +26,14 @@ data class UserAccount(
     var emergencyBalance: Double = 100.0
 )
 
+data class RecipientVerificationResult(
+    val isRegistered: Boolean,
+    val displayName: String,
+    val phone: String,
+    val isMerchant: Boolean,
+    val details: String
+)
+
 /**
  * Manages user accounts, authentication (Rahul Sharma / rahul@12345),
  * and dynamic sign-up for multi-device Bluetooth peer testing.
@@ -228,5 +236,104 @@ class AuthManager private constructor(private val context: Context) {
 
     fun logout() {
         prefs.edit().remove(KEY_LOGGED_IN_ID).apply()
+    }
+
+    /**
+     * Checks if a recipient is actually registered in the local accounts database,
+     * the verified merchants directory, or the Central Bank remote ledger.
+     */
+    suspend fun verifyRecipient(query: String): RecipientVerificationResult? {
+        val q = query.trim()
+        if (q.isEmpty()) return null
+
+        val accounts = getRegisteredAccounts()
+        // 1. Check local registered accounts (Rahul Sharma, custom signed-up profiles, etc.)
+        val localMatch = accounts.find {
+            it.phone.equals(q, ignoreCase = true) ||
+            it.name.equals(q, ignoreCase = true) ||
+            it.accountNumber.equals(q, ignoreCase = true)
+        }
+        if (localMatch != null) {
+            val isMerch = localMatch.name.contains("Pharmacy", true) ||
+                          localMatch.name.contains("Market", true) ||
+                          localMatch.name.contains("Medicos", true) ||
+                          localMatch.name.contains("Services", true)
+            return RecipientVerificationResult(
+                isRegistered = true,
+                displayName = localMatch.name,
+                phone = localMatch.phone,
+                isMerchant = isMerch,
+                details = if (isMerch) "Verified Merchant • Account #${localMatch.accountNumber}"
+                          else "Registered User • +91 ${localMatch.phone}"
+            )
+        }
+
+        // 2. Check verified merchants registry
+        val merchants = listOf(
+            Triple("Apex City Care Pharmacy", "9811122233", "Healthcare Merchant"),
+            Triple("Daily Fresh Supermarket", "9822233344", "Groceries Merchant"),
+            Triple("LifeLine Emergency Medicos", "9833344455", "Emergency Healthcare Merchant"),
+            Triple("LifeLine Medicos", "9833344455", "Emergency Healthcare Merchant"),
+            Triple("National Book & Stationery Depot", "9844455566", "Retail Merchant"),
+            Triple("National Book Depot", "9844455566", "Retail Merchant"),
+            Triple("City QuickFix Electrical Services", "9855566677", "Emergency Services"),
+            Triple("City QuickFix Electrician", "9855566677", "Emergency Services")
+        )
+        val merchMatch = merchants.find {
+            it.first.equals(q, ignoreCase = true) ||
+            it.first.contains(q, ignoreCase = true) ||
+            it.second.equals(q, ignoreCase = true)
+        }
+        if (merchMatch != null) {
+            return RecipientVerificationResult(
+                isRegistered = true,
+                displayName = merchMatch.first,
+                phone = merchMatch.second,
+                isMerchant = true,
+                details = "Verified Merchant • ${merchMatch.third}"
+            )
+        }
+
+        // 3. If online, query the Central Bank server database (app.py)
+        if (NetworkManager.isOnline(context)) {
+            try {
+                val api = BankApiClient.getApiService(context)
+                val cleanPhone = q.replace("+91", "").replace(" ", "").trim()
+                if (cleanPhone.length in 7..15 && cleanPhone.all { it.isDigit() }) {
+                    val res = api.getUserByPhone(cleanPhone)
+                    if (res.isSuccessful && res.body() != null) {
+                        val u = res.body()!!
+                        return RecipientVerificationResult(
+                            isRegistered = true,
+                            displayName = u.name,
+                            phone = u.phone,
+                            isMerchant = false,
+                            details = "Central Bank Verified User • +91 ${u.phone}"
+                        )
+                    }
+                }
+
+                val allUsersRes = api.getAllUsers()
+                if (allUsersRes.isSuccessful && allUsersRes.body() != null) {
+                    val serverMatch = allUsersRes.body()!!.find {
+                        it.name.equals(q, ignoreCase = true) ||
+                        it.phone.equals(q, ignoreCase = true)
+                    }
+                    if (serverMatch != null) {
+                        return RecipientVerificationResult(
+                            isRegistered = true,
+                            displayName = serverMatch.name,
+                            phone = serverMatch.phone,
+                            isMerchant = false,
+                            details = "Central Bank Verified User • +91 ${serverMatch.phone}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                // Offline fallback handled by steps 1 & 2
+            }
+        }
+
+        return null
     }
 }

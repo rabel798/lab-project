@@ -36,11 +36,6 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         authManager = AuthManager.getInstance(this)
-        if (authManager.isLoggedIn()) {
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
-            return
-        }
 
         setContentView(R.layout.activity_login)
 
@@ -94,11 +89,20 @@ class LoginActivity : AppCompatActivity() {
             }
         }
 
+        val activeAcc = authManager.getActiveAccount()
+        if (activeAcc != null) {
+            btnQuickRahulLogin.text = "⚡ Continue as ${activeAcc.name}"
+            etLoginPhone.setText(activeAcc.phone)
+        } else {
+            btnQuickRahulLogin.text = "⚡ One-Tap: Login as Rahul Sharma"
+        }
+
         btnQuickRahulLogin.setOnClickListener {
-            val account = authManager.login("9876543210", "rahul@12345")
-            if (account != null) {
-                updateBluetoothName(account.name)
-                Toast.makeText(this, "Logged in as Rahul Sharma", Toast.LENGTH_SHORT).show()
+            val target = authManager.getActiveAccount() ?: authManager.login("9876543210", "rahul@12345")
+            if (target != null) {
+                authManager.setActiveAccount(target)
+                updateBluetoothName(target.name)
+                Toast.makeText(this, "Logged in as ${target.name}", Toast.LENGTH_SHORT).show()
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
             }
