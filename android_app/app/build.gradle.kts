@@ -58,6 +58,10 @@ dependencies {
     // Security & Encrypted Preferences (Offline PIN Auth)
     implementation(libs.androidx.security.crypto)
 
+    // Real Camera Barcode & QR Scanner (ZXing Embedded)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.google.zxing:core:3.5.3")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

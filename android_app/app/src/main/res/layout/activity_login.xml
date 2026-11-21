@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F8FAFC"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:gravity="center_horizontal">
+
+        <!-- App Brand Header -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="28dp">
+
+            <FrameLayout
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:background="@drawable/bg_action_circle"
+                android:backgroundTint="#EEF2FF">
+
+                <ImageView
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_wallet_card"
+                    app:tint="#3F3FE9" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="EmergencyPay"
+                android:textColor="#0F172A"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginTop="12dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Offline-First Resilient Mesh Wallet"
+                android:textColor="#64748B"
+                android:textSize="13sp"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <!-- Segmented Tab Switcher (Sign In vs Sign Up) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:background="@drawable/bg_btn_white_translucent"
+            android:backgroundTint="#E2E8F0"
+            android:padding="4dp"
+            android:layout_marginBottom="20dp">
+
+            <Button
+                android:id="@+id/btnTabSignIn"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="Sign In"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#3F3FE9"
+                app:cornerRadius="8dp" />
+
+            <Button
+                android:id="@+id/btnTabSignUp"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="Sign Up (New Device)"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#475569"
+                android:backgroundTint="@android:color/transparent"
+                app:cornerRadius="8dp" />
+        </LinearLayout>
+
+        <!-- SIGN IN SECTION -->
+        <LinearLayout
+            android:id="@+id/layoutSignInSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="visible">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Phone Number or Username"
+                android:textColor="#334155"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etLoginPhone"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_service_card"
+                android:hint="9876543210 or Rahul Sharma"
+                android:textColor="#0F172A"
+                android:textColorHint="#94A3B8"
+                android:textSize="15sp"
+                android:paddingHorizontal="16dp"
+                android:singleLine="true"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Password"
+                android:textColor="#334155"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etLoginPassword"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_service_card"
+                android:hint="Enter password (e.g. rahul@12345)"
+                android:inputType="textPassword"
+                android:textColor="#0F172A"
+                android:textColorHint="#94A3B8"
+                android:textSize="15sp"
+                android:paddingHorizontal="16dp"
+                android:singleLine="true"
+                android:layout_marginBottom="24dp" />
+
+            <Button
+                android:id="@+id/btnSubmitLogin"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:text="Sign In"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#3F3FE9"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="14dp" />
+
+            <!-- One-tap Quick Demo Login -->
+            <Button
+                android:id="@+id/btnQuickRahulLogin"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="⚡ One-Tap: Login as Rahul Sharma"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#3F3FE9"
+                android:backgroundTint="#EEF2FF"
+                app:cornerRadius="12dp" />
+        </LinearLayout>
+
+        <!-- SIGN UP SECTION -->
+        <LinearLayout
+            android:id="@+id/layoutSignUpSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Full Name"
+                android:textColor="#334155"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etSignUpName"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_service_card"
+                android:hint="e.g. Priya Sharma / Peer Tester"
+                android:textColor="#0F172A"
+                android:textColorHint="#94A3B8"
+                android:textSize="15sp"
+                android:paddingHorizontal="16dp"
+                android:singleLine="true"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Phone Number"
+                android:textColor="#334155"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etSignUpPhone"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_service_card"
+                android:hint="10-digit number (e.g. 9811223344)"
+                android:inputType="phone"
+                android:textColor="#0F172A"
+                android:textColorHint="#94A3B8"
+                android:textSize="15sp"
+                android:paddingHorizontal="16dp"
+                android:singleLine="true"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Password"
+                android:textColor="#334155"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etSignUpPassword"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_service_card"
+                android:hint="Create a secure password"
+                android:inputType="textPassword"
+                android:textColor="#0F172A"
+                android:textColorHint="#94A3B8"
+                android:textSize="15sp"
+                android:paddingHorizontal="16dp"
+                android:singleLine="true"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Initial Emergency Offline Reserve (₹)"
+                android:textColor="#334155"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etSignUpEmergencyBal"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_service_card"
+                android:hint="100.00"
+                android:text="100.00"
+                android:inputType="numberDecimal"
+                android:textColor="#0F172A"
+                android:textColorHint="#94A3B8"
+                android:textSize="15sp"
+                android:paddingHorizontal="16dp"
+                android:singleLine="true"
+                android:layout_marginBottom="24dp" />
+
+            <Button
+                android:id="@+id/btnSubmitSignUp"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:text="Create Account &amp; Test Bluetooth"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#3F3FE9"
+                app:cornerRadius="12dp" />
+        </LinearLayout>
+
+        <!-- Test info badge -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="@drawable/bg_badge_pill"
+            android:backgroundTint="#F1F5F9"
+            android:padding="12dp"
+            android:gravity="center_vertical"
+            android:layout_marginTop="32dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_bluetooth"
+                app:tint="#3F3FE9" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Multi-device Bluetooth Test: Sign up Profile A on Phone 1 and Profile B on Phone 2 to test peer discovery and offline payments."
+                android:textColor="#475569"
+                android:textSize="11sp"
+                android:lineSpacingExtra="2dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

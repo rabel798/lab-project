@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -326,9 +327,24 @@ class BluetoothPaymentEngine(private val context: Context) {
 
 
                 // 2. Connect to Merchant RFCOMM Socket
-                onStatusLog("Connecting to ${device.name} (${device.address})...")
-                socket = device.createRfcommSocketToServiceRecord(BluetoothConstants.SPP_UUID)
-                socket.connect()
+                try {
+                    if (bluetoothAdapter?.isDiscovering == true) {
+                        bluetoothAdapter?.cancelDiscovery()
+                    }
+                } catch (e: SecurityException) {
+                    // Ignored
+                }
+
+                onStatusLog("Connecting to ${device.name ?: "Peer"} (${device.address})...")
+                socket = try {
+                    device.createRfcommSocketToServiceRecord(BluetoothConstants.SPP_UUID)
+                } catch (e: Exception) {
+                    val m = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                    m.invoke(device, 1) as BluetoothSocket
+                }
+                withTimeout(7000L) {
+                    socket.connect()
+                }
                 onStatusLog("Connected to merchant! Preparing signed payment packet...")
 
                 // 3. Create & Sign PaymentPacket

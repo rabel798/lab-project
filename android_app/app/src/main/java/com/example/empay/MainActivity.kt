@@ -151,6 +151,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val authManager = com.example.empay.auth.AuthManager.getInstance(this)
+        if (!authManager.isLoggedIn()) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_main)
 
         sessionManager = SessionManager.getInstance(this)
@@ -310,27 +318,18 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ScanActivity::class.java))
         }
         btnActionPayBt.setOnClickListener {
-            val intent = Intent(this, PayActivity::class.java).apply {
-                putExtra("PAYEE_NAME", "Apex City Care Pharmacy")
-                putExtra("DEFAULT_AMOUNT", "10.00")
-                putExtra("CHANNEL", "Bluetooth")
-            }
-            startActivity(intent)
+            showBluetoothDevicePicker()
         }
         btnActionMerchants.setOnClickListener {
             startActivity(Intent(this, MerchantsActivity::class.java))
         }
         btnActionSendMoney.setOnClickListener {
-            if (NetworkManager.isOnline(this)) {
-                val intent = Intent(this, PayActivity::class.java).apply {
-                    putExtra("PAYEE_NAME", "Pooja Sharma")
-                    putExtra("DEFAULT_AMOUNT", "50.00")
-                    putExtra("CHANNEL", "UPI Online")
-                }
-                startActivity(intent)
-            } else {
-                Toast.makeText(this, "Send Money requires active Central Bank connection", Toast.LENGTH_SHORT).show()
+            val intent = Intent(this, PayActivity::class.java).apply {
+                putExtra("PAYEE_NAME", "")
+                putExtra("DEFAULT_AMOUNT", "25.00")
+                putExtra("CHANNEL", if (NetworkManager.isOnline(this@MainActivity)) "UPI Online" else "Bluetooth")
             }
+            startActivity(intent)
         }
         btnActionHistory.setOnClickListener {
             startActivity(Intent(this, TransactionHistoryActivity::class.java))
@@ -370,12 +369,7 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ScanActivity::class.java))
         }
         navTabPayBt.setOnClickListener {
-            val intent = Intent(this, PayActivity::class.java).apply {
-                putExtra("PAYEE_NAME", "Apex City Care Pharmacy")
-                putExtra("DEFAULT_AMOUNT", "10.00")
-                putExtra("CHANNEL", "Bluetooth")
-            }
-            startActivity(intent)
+            showBluetoothDevicePicker()
         }
         navTabHistory.setOnClickListener {
             startActivity(Intent(this, TransactionHistoryActivity::class.java))
@@ -461,14 +455,12 @@ class MainActivity : AppCompatActivity() {
             onDeviceSelected = { name, device, isDemoLoopback ->
                 etPayeeName?.setText(name)
                 selectedBluetoothDevice = device
-                if (isDemoLoopback) {
-                    appendLog("TERMINAL", "Selected simulated terminal: $name (Ready for 'P2P Loopback Pay')")
-                    Toast.makeText(this, "Selected $name (Demo Terminal)", Toast.LENGTH_SHORT).show()
-                } else {
-                    val addr = device?.address ?: "Discovered"
-                    appendLog("BLUETOOTH", "Selected peer terminal: $name [$addr]")
-                    Toast.makeText(this, "Target: $name", Toast.LENGTH_SHORT).show()
+                val intent = Intent(this, PayActivity::class.java).apply {
+                    putExtra("PAYEE_NAME", name)
+                    putExtra("DEFAULT_AMOUNT", "10.00")
+                    putExtra("CHANNEL", "Bluetooth")
                 }
+                startActivity(intent)
             }
         )
         picker.show()
