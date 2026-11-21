@@ -42,8 +42,9 @@
         android:theme="@style/Theme.EmPay"
         android:usesCleartextTraffic="true">
         <activity
-            android:name=".MainActivity"
+            android:name=".LoginActivity"
             android:exported="true"
+            android:label="@string/app_name"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -52,9 +53,8 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".LoginActivity"
+            android:name=".MainActivity"
             android:exported="false"
-            android:label="Sign In"
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".TransactionHistoryActivity"

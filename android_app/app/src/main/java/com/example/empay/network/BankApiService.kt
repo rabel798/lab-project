@@ -28,6 +28,11 @@ interface BankApiService {
         @Body request: TransferEmergencyRequest
     ): Response<TransferEmergencyResponse>
 
+    @POST("/api/user/register")
+    suspend fun registerUser(
+        @Body request: RegisterUserRequest
+    ): Response<RegisterUserResponse>
+
     @POST("/api/transactions/sync")
     suspend fun syncTransactions(
         @Body request: SyncTransactionsRequest

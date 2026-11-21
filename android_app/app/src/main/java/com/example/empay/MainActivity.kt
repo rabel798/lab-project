@@ -1207,7 +1207,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        paymentRepository.stopMerchantRadar()
+        if (::paymentRepository.isInitialized) {
+            paymentRepository.stopMerchantRadar()
+        }
         try {
             if (networkCallback != null && connectivityManager != null) {
                 connectivityManager?.unregisterNetworkCallback(networkCallback!!)

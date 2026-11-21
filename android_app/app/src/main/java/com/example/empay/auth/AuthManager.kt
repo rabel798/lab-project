@@ -4,8 +4,14 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.example.empay.db.AppDatabase
 import com.example.empay.db.WalletEntity
+import com.example.empay.network.BankApiClient
+import com.example.empay.network.NetworkManager
+import com.example.empay.network.RegisterUserRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Account model representing a registered user profile.
@@ -151,6 +157,26 @@ class AuthManager private constructor(private val context: Context) {
 
         saveAccountsList(accounts)
         setActiveAccount(account)
+
+        // Automatically register with Central Bank server if online, crediting ₹1000.00 bank balance
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (NetworkManager.isOnline(context)) {
+                    val api = BankApiClient.getApiService(context)
+                    api.registerUser(
+                        RegisterUserRequest(
+                            name = account.name,
+                            phone = account.phone,
+                            balance = account.balance,
+                            emergencyBalance = account.emergencyBalance
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                // Offline fallback - offline wallet and local session are already credited
+            }
+        }
+
         return account
     }
 

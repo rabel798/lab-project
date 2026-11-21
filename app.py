@@ -377,6 +377,43 @@ def api_user_by_phone(phone):
     return jsonify({"error": "User not found"}), 404
 
 
+@app.route("/api/user/register", methods=["POST"])
+def api_register_user():
+    data = request.get_json(silent=True) or request.form
+    name = (data.get("name") or "New Customer").strip()
+    phone = (data.get("phone") or "").strip()
+    try:
+        initial_balance = float(data.get("balance", 1000.0))
+    except (ValueError, TypeError):
+        initial_balance = 1000.0
+    try:
+        emergency_balance = float(data.get("emergency_balance", 100.0))
+    except (ValueError, TypeError):
+        emergency_balance = 100.0
+
+    if not phone:
+        return jsonify({"success": False, "message": "Phone number is required"}), 400
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE phone = ?", (phone,)).fetchone()
+    if user:
+        new_bal = max(float(user["balance"]), initial_balance)
+        conn.execute("UPDATE users SET name = ?, balance = ? WHERE id = ?", (name, new_bal, user["id"]))
+        conn.commit()
+        updated = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+        conn.close()
+        return jsonify({"success": True, "message": "User updated", "user": dict(updated)})
+    else:
+        conn.execute(
+            "INSERT INTO users (name, phone, balance, emergency_balance) VALUES (?, ?, ?, ?)",
+            (name, phone, initial_balance, emergency_balance)
+        )
+        conn.commit()
+        created = conn.execute("SELECT * FROM users WHERE phone = ?", (phone,)).fetchone()
+        conn.close()
+        return jsonify({"success": True, "message": f"User registered with ₹{initial_balance:.2f} online bank balance", "user": dict(created)})
+
+
 @app.route("/api/user/add-funds", methods=["POST"])
 def api_add_funds():
     data = request.get_json(silent=True) or request.form
