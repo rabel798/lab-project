@@ -1,20 +1,31 @@
 package com.example.empay
 
+import android.app.Dialog
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.empay.auth.SessionManager
 import com.example.empay.crypto.CryptoManager
 import com.example.empay.db.AppDatabase
 import com.example.empay.db.TransactionEntity
+import com.example.empay.network.BankApiClient
+import com.example.empay.network.NetworkManager
 import com.example.empay.repository.PaymentRepository
 import com.example.empay.ui.PinAuthDialog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.UUID
 
@@ -26,13 +37,19 @@ class PayActivity : AppCompatActivity() {
 
     private lateinit var etPayRecipient: EditText
     private lateinit var etPayAmountInput: EditText
+    private lateinit var etPayNote: EditText
     private lateinit var tvPayHeroTitle: TextView
     private lateinit var tvPayNetworkBadge: TextView
-    private lateinit var tvPayEmergencyBalPreview: TextView
+    private lateinit var ivMethodIcon: ImageView
+    private lateinit var tvMethodText: TextView
     private lateinit var tvPayOnlineBalPreview: TextView
+    private lateinit var tvPayEmergencyBalPreview: TextView
+    private lateinit var tvPayExecutionMode: TextView
     private lateinit var btnSubmitPayment: Button
+    private lateinit var btnPayCancel: Button
 
-    private var selectedChannel = "Bluetooth"
+    private var isOnlineMode = true
+    private var selectedChannel = "UPI"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,7 +61,7 @@ class PayActivity : AppCompatActivity() {
 
         initViews()
         setupListeners()
-        loadSessionData()
+        loadStateAndBalances()
     }
 
     private fun initViews() {
@@ -52,20 +69,49 @@ class PayActivity : AppCompatActivity() {
 
         etPayRecipient = findViewById(R.id.etPayRecipient)
         etPayAmountInput = findViewById(R.id.etPayAmountInput)
+        etPayNote = findViewById(R.id.etPayNote)
         tvPayHeroTitle = findViewById(R.id.tvPayHeroTitle)
         tvPayNetworkBadge = findViewById(R.id.tvPayNetworkBadge)
-        tvPayEmergencyBalPreview = findViewById(R.id.tvPayEmergencyBalPreview)
+        ivMethodIcon = findViewById(R.id.ivMethodIcon)
+        tvMethodText = findViewById(R.id.tvMethodText)
         tvPayOnlineBalPreview = findViewById(R.id.tvPayOnlineBalPreview)
+        tvPayEmergencyBalPreview = findViewById(R.id.tvPayEmergencyBalPreview)
+        tvPayExecutionMode = findViewById(R.id.tvPayExecutionMode)
         btnSubmitPayment = findViewById(R.id.btnSubmitPayment)
+        btnPayCancel = findViewById(R.id.btnPayCancel)
 
-        val targetPayee = intent.getStringExtra("PAYEE_NAME") ?: "Apex City Care Pharmacy"
-        val defaultAmt = intent.getStringExtra("DEFAULT_AMOUNT") ?: "10.00"
-        selectedChannel = intent.getStringExtra("CHANNEL") ?: "Bluetooth"
+        // Read intent extras
+        val targetPayee = intent.getStringExtra("PAYEE_NAME") ?: ""
+        val phone = intent.getStringExtra("PHONE") ?: ""
+        val defaultAmt = intent.getStringExtra("DEFAULT_AMOUNT") ?: ""
+        val channelParam = intent.getStringExtra("CHANNEL") ?: ""
 
-        etPayRecipient.setText(targetPayee)
-        etPayAmountInput.setText(defaultAmt)
-        tvPayHeroTitle.text = targetPayee
-        btnSubmitPayment.text = "Pay via $selectedChannel"
+        if (targetPayee.isNotEmpty()) {
+            etPayRecipient.setText(targetPayee)
+            tvPayHeroTitle.text = targetPayee
+        } else if (phone.isNotEmpty()) {
+            etPayRecipient.setText(phone)
+            tvPayHeroTitle.text = phone
+        } else {
+            tvPayHeroTitle.text = "Send Money"
+        }
+
+        if (defaultAmt.isNotEmpty()) {
+            etPayAmountInput.setText(defaultAmt)
+        }
+
+        // Determine online vs offline mode
+        val realOnline = NetworkManager.isOnline(this)
+        val userSessionOnline = sessionManager.getUser().isOnline
+        
+        // If explicitly requested Bluetooth channel, or device is offline, run offline mode
+        isOnlineMode = if (channelParam.equals("Bluetooth", ignoreCase = true)) {
+            false
+        } else {
+            realOnline && userSessionOnline
+        }
+
+        selectedChannel = if (isOnlineMode) "UPI" else "Bluetooth"
     }
 
     private fun setupListeners() {
@@ -74,49 +120,52 @@ class PayActivity : AppCompatActivity() {
         findViewById<Button>(R.id.chipAmount50).setOnClickListener { etPayAmountInput.setText("50.00") }
         findViewById<Button>(R.id.chipAmount100).setOnClickListener { etPayAmountInput.setText("100.00") }
 
-        findViewById<android.view.View>(R.id.channelBt).setOnClickListener {
-            selectedChannel = "Bluetooth"
-            btnSubmitPayment.text = "Pay via Bluetooth Mesh"
-        }
-        findViewById<android.view.View>(R.id.channelSound).setOnClickListener {
-            selectedChannel = "Sound Wave"
-            btnSubmitPayment.text = "Pay via Sound Wave"
-        }
-        findViewById<android.view.View>(R.id.channelQr).setOnClickListener {
-            selectedChannel = "QR Mesh"
-            btnSubmitPayment.text = "Pay via QR Mesh"
-        }
+        btnPayCancel.setOnClickListener { finish() }
 
         btnSubmitPayment.setOnClickListener {
-            processPayment()
+            validateAndShowConfirmSheet()
         }
     }
 
-    private fun loadSessionData() {
+    private fun loadStateAndBalances() {
         val user = sessionManager.getUser()
         val wallet = appDatabase.walletDao.getWallet()
         val offlineBal = wallet?.balance ?: user.emergencyBalance
 
-        tvPayEmergencyBalPreview.text = String.format(Locale.US, "₹ %.2f", offlineBal)
         tvPayOnlineBalPreview.text = String.format(Locale.US, "₹ %.2f", user.balance)
+        tvPayEmergencyBalPreview.text = String.format(Locale.US, "₹ %.2f", offlineBal)
 
-        if (user.isOnline) {
+        if (isOnlineMode) {
             tvPayNetworkBadge.text = "● Online"
-            tvPayNetworkBadge.setTextColor(ContextCompat.getColor(this, R.color.status_online_text))
+            tvPayNetworkBadge.setTextColor(Color.parseColor("#15803D"))
+            ivMethodIcon.setImageResource(R.drawable.ic_wallet_card)
+            tvMethodText.text = "UPI Payment (Online)"
+            tvPayExecutionMode.text = "UPI (Instant Online)"
         } else {
-            tvPayNetworkBadge.text = "● Emergency"
-            tvPayNetworkBadge.setTextColor(ContextCompat.getColor(this, R.color.emergency_dark))
+            tvPayNetworkBadge.text = "● Offline"
+            tvPayNetworkBadge.setTextColor(Color.parseColor("#B45309"))
+            ivMethodIcon.setImageResource(R.drawable.ic_bluetooth)
+            tvMethodText.text = "Bluetooth Payment (Offline)"
+            tvPayExecutionMode.text = "Bluetooth (Offline Emergency)"
         }
     }
 
-    private fun processPayment() {
+    private fun validateAndShowConfirmSheet() {
         val amountStr = etPayAmountInput.text.toString().trim()
         val amount = amountStr.toDoubleOrNull()
-        val payeeName = etPayRecipient.text.toString().trim().ifEmpty { "Apex City Care Pharmacy" }
+        val payeeName = etPayRecipient.text.toString().trim()
+        val note = etPayNote.text.toString().trim().ifEmpty {
+            if (isOnlineMode) "UPI Payment" else "Offline Payment"
+        }
+
+        if (payeeName.isEmpty()) {
+            Toast.makeText(this, "Please enter a valid recipient phone or UPI VPA", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         val currentUser = paymentRepository.getCurrentUser()
-        if (payeeName.trim().equals(currentUser.phone.trim(), ignoreCase = true) ||
-            payeeName.trim().equals(currentUser.accountNumber.trim(), ignoreCase = true) ||
+        if (payeeName.equals(currentUser.phone.trim(), ignoreCase = true) ||
+            payeeName.equals(currentUser.accountNumber.trim(), ignoreCase = true) ||
             payeeName.equals("Self", ignoreCase = true) ||
             payeeName.equals("Myself", ignoreCase = true)) {
             Toast.makeText(this, "Self-transfer not allowed: Cannot send money to yourself.", Toast.LENGTH_LONG).show()
@@ -128,34 +177,121 @@ class PayActivity : AppCompatActivity() {
             return
         }
 
-        val localWallet = appDatabase.walletDao.getWallet()
-        val currentBal = localWallet?.balance ?: sessionManager.getUser().emergencyBalance
+        val user = sessionManager.getUser()
+        val wallet = appDatabase.walletDao.getWallet()
+        val offlineBal = wallet?.balance ?: user.emergencyBalance
 
-        if (currentBal < amount) {
-            Toast.makeText(this, "Insufficient offline wallet balance (₹$currentBal)", Toast.LENGTH_LONG).show()
-            return
+        if (isOnlineMode) {
+            if (user.balance < amount) {
+                Toast.makeText(this, "Insufficient Available Balance (₹${user.balance}) for this online transfer.", Toast.LENGTH_LONG).show()
+                return
+            }
+        } else {
+            if (offlineBal < amount) {
+                Toast.makeText(this, "Insufficient Emergency Balance (₹${offlineBal}) for this offline transfer.", Toast.LENGTH_LONG).show()
+                return
+            }
         }
 
-        // Open PIN Authentication Dialog matching pin.html
+        showConfirmationSheet(amount, payeeName, note)
+    }
+
+    private fun showConfirmationSheet(amount: Double, payee: String, note: String) {
+        val dialog = Dialog(this)
+        dialog.setContentView(R.layout.dialog_confirm_transfer)
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+        val tvAmt = dialog.findViewById<TextView>(R.id.tvConfirmModalAmount)
+        val tvPayee = dialog.findViewById<TextView>(R.id.tvConfirmModalPayee)
+        val tvChan = dialog.findViewById<TextView>(R.id.tvConfirmModalChannel)
+        val tvNote = dialog.findViewById<TextView>(R.id.tvConfirmModalNote)
+        val tvInfo = dialog.findViewById<TextView>(R.id.tvConfirmModalInfo)
+        val btnCancel = dialog.findViewById<Button>(R.id.btnConfirmModalCancel)
+        val btnEnterPin = dialog.findViewById<Button>(R.id.btnConfirmModalEnterPin)
+
+        tvAmt.text = String.format(Locale.US, "₹ %.2f", amount)
+        tvPayee.text = payee
+        tvChan.text = if (isOnlineMode) "UPI (Online)" else "Bluetooth (Offline)"
+        tvNote.text = note
+
+        if (isOnlineMode) {
+            tvInfo.text = "🛡️ Online UPI payment: Amount will be deducted from your Available Balance."
+            tvInfo.setTextColor(Color.parseColor("#15803D"))
+        } else {
+            tvInfo.text = "ℹ️ Offline Bluetooth payment: Amount will be deducted from your Emergency Balance."
+            tvInfo.setTextColor(Color.parseColor("#B45309"))
+        }
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnEnterPin.setOnClickListener {
+            dialog.dismiss()
+            openPinDialog(amount, payee, note)
+        }
+
+        dialog.show()
+    }
+
+    private fun openPinDialog(amount: Double, payee: String, note: String) {
         PinAuthDialog(
             context = this,
-            actionTitle = "UPI Authorization",
-            actionSubtitle = "Enter 4-digit PIN to authorize payment",
+            actionTitle = if (isOnlineMode) "UPI Authorization" else "Authorize Offline Transfer",
+            actionSubtitle = "Enter 4-digit PIN to sign and authorize payment",
             onSuccess = {
+                executeTransfer(amount, payee, note)
+            },
+            onFailed = { error ->
+                Toast.makeText(this, "PIN Authentication Failed: $error", Toast.LENGTH_SHORT).show()
+            }
+        ).show()
+    }
+
+    private fun executeTransfer(amount: Double, payee: String, note: String) {
+        val currentUser = paymentRepository.getCurrentUser()
+        val txId = "TXN-" + UUID.randomUUID().toString().take(12).uppercase()
+        val nonce = UUID.randomUUID().toString().take(8)
+        val timestamp = System.currentTimeMillis()
+
+        if (isOnlineMode) {
+            // Online UPI execution
+            lifecycleScope.launch(Dispatchers.IO) {
+                val newBal = currentUser.balance - amount
+                sessionManager.updateBalances(newBal, currentUser.emergencyBalance)
+
+                // Insert into local DB
+                val txEntity = TransactionEntity(
+                    txId = txId,
+                    senderId = currentUser.id.toString(),
+                    senderName = currentUser.name,
+                    receiverId = payee,
+                    receiverName = payee,
+                    amount = amount,
+                    timestamp = timestamp,
+                    nonce = nonce,
+                    signature = "UPI_VERIFIED_" + UUID.randomUUID().toString().take(8),
+                    status = TransactionEntity.STATUS_SYNCED,
+                    direction = TransactionEntity.DIRECTION_SENT
+                )
+                appDatabase.transactionDao.insertTransaction(txEntity)
+
+                withContext(Dispatchers.Main) {
+                    navigateToReceipt(amount, payee, "UPI Online", txId, txEntity.signature, timestamp)
+                }
+            }
+        } else {
+            // Offline Bluetooth execution
+            lifecycleScope.launch(Dispatchers.IO) {
                 // Deduct from offline wallet
                 appDatabase.walletDao.deductBalance(amount)
                 val newWalletBal = appDatabase.walletDao.getWallet()?.balance ?: 0.0
                 sessionManager.updateBalances(sessionManager.getUser().balance, newWalletBal)
 
-                // Generate cryptographic token
-                val txId = "TXN-" + UUID.randomUUID().toString().take(12).uppercase()
-                val nonce = UUID.randomUUID().toString().take(8)
-                val timestamp = System.currentTimeMillis()
                 val signature = try {
                     val canonicalBytes = CryptoManager.getCanonicalBytes(
                         txId = txId,
                         senderId = currentUser.id.toString(),
-                        receiverId = payeeName,
+                        receiverId = payee,
                         amount = amount,
                         timestamp = timestamp,
                         nonce = nonce
@@ -165,13 +301,13 @@ class PayActivity : AppCompatActivity() {
                     "SIG-" + UUID.randomUUID().toString().take(16).uppercase()
                 }
 
-                // Insert into local SQLite ledger
+                // Insert into local DB as PENDING_SYNC
                 val txEntity = TransactionEntity(
                     txId = txId,
                     senderId = currentUser.id.toString(),
                     senderName = currentUser.name,
-                    receiverId = payeeName,
-                    receiverName = payeeName,
+                    receiverId = payee,
+                    receiverName = payee,
                     amount = amount,
                     timestamp = timestamp,
                     nonce = nonce,
@@ -181,21 +317,23 @@ class PayActivity : AppCompatActivity() {
                 )
                 appDatabase.transactionDao.insertTransaction(txEntity)
 
-                // Navigate to ReceiptActivity matching receipt.html
-                val receiptIntent = Intent(this, ReceiptActivity::class.java).apply {
-                    putExtra("AMOUNT", amount)
-                    putExtra("PAYEE", payeeName)
-                    putExtra("CHANNEL", selectedChannel)
-                    putExtra("TX_ID", txId)
-                    putExtra("SIGNATURE", signature)
-                    putExtra("TIMESTAMP", timestamp)
+                withContext(Dispatchers.Main) {
+                    navigateToReceipt(amount, payee, "Bluetooth", txId, signature, timestamp)
                 }
-                startActivity(receiptIntent)
-                finish()
-            },
-            onFailed = { error ->
-                Toast.makeText(this, "PIN Authentication Failed: $error", Toast.LENGTH_SHORT).show()
             }
-        ).show()
+        }
+    }
+
+    private fun navigateToReceipt(amount: Double, payee: String, channel: String, txId: String, signature: String, timestamp: Long) {
+        val receiptIntent = Intent(this, ReceiptActivity::class.java).apply {
+            putExtra("AMOUNT", amount)
+            putExtra("PAYEE", payee)
+            putExtra("CHANNEL", channel)
+            putExtra("TX_ID", txId)
+            putExtra("SIGNATURE", signature)
+            putExtra("TIMESTAMP", timestamp)
+        }
+        startActivity(receiptIntent)
+        finish()
     }
 }

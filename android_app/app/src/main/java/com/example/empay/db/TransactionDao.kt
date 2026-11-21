@@ -8,5 +8,6 @@ interface TransactionDao {
     fun markAsSynced(txId: String): Boolean
     fun markAsRejected(txId: String): Boolean
     fun isNonceUsed(nonce: String): Boolean
+    fun clearAllTransactions(): Boolean
 }
 

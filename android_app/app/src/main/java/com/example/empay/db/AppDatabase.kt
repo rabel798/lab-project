@@ -283,6 +283,11 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
             return cursor.use { it.count > 0 }
         }
 
+        override fun clearAllTransactions(): Boolean {
+            val db = writableDatabase
+            return db.delete(TABLE_TRANSACTIONS, null, null) >= 0
+        }
+
         private fun cursorToTransaction(cursor: Cursor): TransactionEntity {
             return TransactionEntity(
                 txId = cursor.getString(cursor.getColumnIndexOrThrow("tx_id")),

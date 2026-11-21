@@ -303,7 +303,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Greeting / Profile
-        tvUserName.setOnClickListener { showUserProfileDialog() }
+        tvUserName.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+        }
         tvUserName.setOnLongClickListener {
             toggleDevDiagnostics()
             true
@@ -318,7 +320,7 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ScanActivity::class.java))
         }
         btnActionPayBt.setOnClickListener {
-            showBluetoothDevicePicker()
+            startActivity(Intent(this, BluetoothActivity::class.java))
         }
         btnActionMerchants.setOnClickListener {
             startActivity(Intent(this, MerchantsActivity::class.java))
@@ -334,7 +336,9 @@ class MainActivity : AppCompatActivity() {
         btnActionHistory.setOnClickListener {
             startActivity(Intent(this, TransactionHistoryActivity::class.java))
         }
-        btnActionProfile.setOnClickListener { showUserProfileDialog() }
+        btnActionProfile.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+        }
 
         // Essential Services Quick Pay
         cardDailyFresh.setOnClickListener {
@@ -369,12 +373,14 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ScanActivity::class.java))
         }
         navTabPayBt.setOnClickListener {
-            showBluetoothDevicePicker()
+            startActivity(Intent(this, BluetoothActivity::class.java))
         }
         navTabHistory.setOnClickListener {
             startActivity(Intent(this, TransactionHistoryActivity::class.java))
         }
-        navTabProfile.setOnClickListener { showUserProfileDialog() }
+        navTabProfile.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+        }
 
         // Diagnostics Panel Controls
         btnSaveBankUrl?.setOnClickListener {

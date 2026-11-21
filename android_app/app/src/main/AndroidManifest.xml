@@ -54,28 +54,36 @@
         </activity>
         <activity
             android:name=".MainActivity"
-            android:exported="false"
+            android:exported="true"
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".TransactionHistoryActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="Transaction History" />
         <activity
             android:name=".ScanActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="Scan &amp; Pay" />
         <activity
             android:name=".PayActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="Emergency Pay" />
         <activity
             android:name=".ReceiptActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="Payment Receipt" />
         <activity
             android:name=".MerchantsActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="Verified Merchants" />
+        <activity
+            android:name=".BluetoothActivity"
+            android:exported="true"
+            android:label="Bluetooth Pay" />
+        <activity
+            android:name=".ProfileActivity"
+            android:exported="true"
+            android:label="Profile &amp; Settings" />
     </application>
 
 </manifest>
