@@ -357,7 +357,7 @@
                                 android:id="@+id/btnTransferToOffline"
                                 android:layout_width="wrap_content"
                                 android:layout_height="34dp"
-                                android:background="@drawable/bg_btn_white_translucent"
+                                android:background="@drawable/bg_btn_orange_accent"
                                 android:backgroundTint="@null"
                                 android:paddingHorizontal="10dp"
                                 android:text="Transfer to Emergency"

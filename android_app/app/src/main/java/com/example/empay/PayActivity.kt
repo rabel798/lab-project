@@ -138,16 +138,24 @@ class PayActivity : AppCompatActivity() {
 
         if (isOnlineMode) {
             tvPayNetworkBadge.text = "● Online"
-            tvPayNetworkBadge.setTextColor(Color.parseColor("#15803D"))
+            tvPayNetworkBadge.setTextColor(ContextCompat.getColor(this, R.color.status_online_text))
+            tvPayNetworkBadge.backgroundTintList = ContextCompat.getColorStateList(this, R.color.status_online_bg)
             ivMethodIcon.setImageResource(R.drawable.ic_wallet_card)
+            ivMethodIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.primary)
             tvMethodText.text = "UPI Payment (Online)"
             tvPayExecutionMode.text = "UPI (Instant Online)"
+            btnSubmitPayment.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
+            btnSubmitPayment.text = "Authorize Payment 🔒"
         } else {
             tvPayNetworkBadge.text = "● Offline"
-            tvPayNetworkBadge.setTextColor(Color.parseColor("#B45309"))
+            tvPayNetworkBadge.setTextColor(ContextCompat.getColor(this, R.color.emergency_dark))
+            tvPayNetworkBadge.backgroundTintList = ContextCompat.getColorStateList(this, R.color.emergency_bg)
             ivMethodIcon.setImageResource(R.drawable.ic_bluetooth)
+            ivMethodIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.electric_orange)
             tvMethodText.text = "Bluetooth Payment (Offline)"
             tvPayExecutionMode.text = "Bluetooth (Offline Emergency)"
+            btnSubmitPayment.backgroundTintList = ContextCompat.getColorStateList(this, R.color.electric_orange)
+            btnSubmitPayment.text = "Authorize Offline Payment ⚡"
         }
     }
 

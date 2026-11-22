@@ -33,7 +33,7 @@
                     android:layout_height="38dp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_wallet_card"
-                    app:tint="#3F3FE9" />
+                    app:tint="@color/primary" />
             </FrameLayout>
 
             <TextView
@@ -43,7 +43,7 @@
                 android:textColor="#0F172A"
                 android:textSize="24sp"
                 android:textStyle="bold"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="@font/inter"
                 android:layout_marginTop="12dp" />
 
             <TextView
@@ -74,7 +74,7 @@
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:backgroundTint="#3F3FE9"
+                android:backgroundTint="@color/primary"
                 app:cornerRadius="8dp" />
 
             <Button
@@ -151,11 +151,11 @@
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:backgroundTint="#3F3FE9"
+                android:backgroundTint="@color/primary"
                 app:cornerRadius="12dp"
                 android:layout_marginBottom="14dp" />
 
-            <!-- One-tap Quick Demo Login -->
+            <!-- One-tap Quick Demo Login with Electric Orange -->
             <Button
                 android:id="@+id/btnQuickRahulLogin"
                 android:layout_width="match_parent"
@@ -163,8 +163,8 @@
                 android:text="⚡ One-Tap: Login as Rahul Sharma"
                 android:textSize="13sp"
                 android:textStyle="bold"
-                android:textColor="#3F3FE9"
-                android:backgroundTint="#EEF2FF"
+                android:textColor="@color/electric_orange"
+                android:backgroundTint="@color/electric_orange_light"
                 app:cornerRadius="12dp" />
         </LinearLayout>
 
@@ -276,17 +276,17 @@
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:backgroundTint="#3F3FE9"
+                android:backgroundTint="@color/primary"
                 app:cornerRadius="12dp" />
         </LinearLayout>
 
-        <!-- Test info badge -->
+        <!-- Test info badge with Electric Orange accent -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:background="@drawable/bg_badge_pill"
-            android:backgroundTint="#F1F5F9"
+            android:backgroundTint="@color/electric_orange_light"
             android:padding="12dp"
             android:gravity="center_vertical"
             android:layout_marginTop="32dp">
@@ -295,7 +295,7 @@
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/ic_bluetooth"
-                app:tint="#3F3FE9" />
+                app:tint="@color/electric_orange" />
 
             <TextView
                 android:layout_width="0dp"

@@ -1,8 +1,28 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!-- Base application theme with Inter Typography, Electric Blue, White & Orange. -->
     <style name="Base.Theme.EmPay" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowDisablePreview">true</item>
-        <item name="android:windowBackground">#F8FAFC</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorSecondary">@color/electric_orange</item>
+        <item name="colorAccent">@color/electric_orange</item>
+        
+        <!-- Universal Typography -->
+        <item name="android:textViewStyle">@style/Widget.EmPay.TextView</item>
+        <item name="materialButtonStyle">@style/Widget.EmPay.Button</item>
+    </style>
+
+    <style name="Widget.EmPay.TextView" parent="android:Widget.TextView">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
+    </style>
+
+    <style name="Widget.EmPay.Button" parent="Widget.Material3.Button">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
     </style>
 
     <style name="Theme.EmPay" parent="Base.Theme.EmPay" />

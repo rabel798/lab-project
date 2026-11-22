@@ -15,6 +15,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.example.empay.auth.SessionManager
 import com.example.empay.bluetooth.BluetoothPaymentEngine
 import com.example.empay.db.AppDatabase
@@ -133,20 +134,23 @@ class BluetoothActivity : AppCompatActivity() {
     }
 
     private fun updateTabsUi() {
-        if (activeTab == "merchants") {
-            tvTabBtMerchantsText.setTextColor(Color.parseColor("#3F3FE9"))
-            tvTabBtMerchantsText.paint.isFakeBoldText = true
-            indicatorBtMerchants.setBackgroundColor(Color.parseColor("#3F3FE9"))
+        val primaryColor = ContextCompat.getColor(this, R.color.primary)
+        val mutedColor = ContextCompat.getColor(this, R.color.text_muted)
 
-            tvTabBtUsersText.setTextColor(Color.parseColor("#6B7280"))
+        if (activeTab == "merchants") {
+            tvTabBtMerchantsText.setTextColor(primaryColor)
+            tvTabBtMerchantsText.paint.isFakeBoldText = true
+            indicatorBtMerchants.setBackgroundColor(primaryColor)
+
+            tvTabBtUsersText.setTextColor(mutedColor)
             tvTabBtUsersText.paint.isFakeBoldText = false
             indicatorBtUsers.setBackgroundColor(Color.TRANSPARENT)
         } else {
-            tvTabBtUsersText.setTextColor(Color.parseColor("#3F3FE9"))
+            tvTabBtUsersText.setTextColor(primaryColor)
             tvTabBtUsersText.paint.isFakeBoldText = true
-            indicatorBtUsers.setBackgroundColor(Color.parseColor("#3F3FE9"))
+            indicatorBtUsers.setBackgroundColor(primaryColor)
 
-            tvTabBtMerchantsText.setTextColor(Color.parseColor("#6B7280"))
+            tvTabBtMerchantsText.setTextColor(mutedColor)
             tvTabBtMerchantsText.paint.isFakeBoldText = false
             indicatorBtMerchants.setBackgroundColor(Color.TRANSPARENT)
         }

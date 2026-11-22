@@ -32,7 +32,13 @@ object BankApiClient {
 
     fun getBaseUrl(context: Context): String {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        currentBaseUrl = prefs.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
+        val saved = prefs.getString(KEY_BASE_URL, null)
+        if (saved == null || saved.contains("10.0.2.2")) {
+            prefs.edit().putString(KEY_BASE_URL, CLOUD_BASE_URL).apply()
+            currentBaseUrl = CLOUD_BASE_URL
+        } else {
+            currentBaseUrl = saved
+        }
         return currentBaseUrl
     }
 
@@ -88,7 +94,11 @@ object BankApiClient {
                 .build()
 
             val fallbackRequest = originalRequest.newBuilder().url(fallbackUrl).build()
-            chain.proceed(fallbackRequest)
+            try {
+                chain.proceed(fallbackRequest)
+            } catch (fallbackErr: IOException) {
+                throw IOException("Bank Server offline (${originalRequest.url.host})")
+            }
         }
 
         val okHttpClient = OkHttpClient.Builder()

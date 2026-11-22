@@ -198,7 +198,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="OFFLINE CRYPTOGRAPHIC TOKEN"
-                        android:textColor="#4338CA"
+                        android:textColor="@color/primary_dark"
                         android:textSize="10sp"
                         android:textStyle="bold"
                         android:letterSpacing="0.05" />

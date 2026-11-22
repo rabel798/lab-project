@@ -68,7 +68,7 @@
         android:id="@+id/tvDeviceBadge"
         android:layout_width="72dp"
         android:layout_height="38dp"
-        android:backgroundTint="#3F3FE9"
+        android:backgroundTint="@color/primary"
         android:padding="0dp"
         android:text="Pay"
         android:textColor="#FFFFFF"

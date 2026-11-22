@@ -281,7 +281,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:text="UPI Payment (Online)"
-                        android:textColor="#3F3FE9"
+                        android:textColor="@color/primary"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -373,7 +373,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
                     android:layout_marginTop="22dp"
-                    android:backgroundTint="#3F3FE9"
+                    android:backgroundTint="@color/primary"
                     android:text="Authorize Payment 🔒"
                     android:textColor="#FFFFFF"
                     android:textSize="15sp"

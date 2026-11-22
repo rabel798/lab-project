@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="₹ 0.00"
-            android:textColor="#3F3FE9"
+            android:textColor="@color/primary"
             android:textSize="26sp"
             android:textStyle="bold" />
 
@@ -140,7 +140,7 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:backgroundTint="#3F3FE9"
+            android:backgroundTint="@color/primary"
             android:text="Enter PIN →"
             android:textColor="#FFFFFF"
             android:textSize="14sp"

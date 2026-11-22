@@ -586,6 +586,7 @@ class MainActivity : AppCompatActivity() {
             tvNetworkStatusBadge.text = "Online"
             tvNetworkStatusBadge.setTextColor(ContextCompat.getColor(this, R.color.status_online_text))
             viewStatusDot.backgroundTintList = ContextCompat.getColorStateList(this, R.color.status_online)
+            layoutSystemStatusBanner.backgroundTintList = ContextCompat.getColorStateList(this, R.color.status_online_bg)
             layoutEmergencyAlertBanner.visibility = View.GONE
             badgeEmergencyModeActive.visibility = View.GONE
             tvQuickActionsTitle.text = "Quick Actions"
@@ -594,8 +595,11 @@ class MainActivity : AppCompatActivity() {
             tvNetworkStatusBadge.text = "Emergency"
             tvNetworkStatusBadge.setTextColor(ContextCompat.getColor(this, R.color.emergency_dark))
             viewStatusDot.backgroundTintList = ContextCompat.getColorStateList(this, R.color.emergency)
+            layoutSystemStatusBanner.backgroundTintList = ContextCompat.getColorStateList(this, R.color.emergency_bg)
             layoutEmergencyAlertBanner.visibility = View.VISIBLE
             badgeEmergencyModeActive.visibility = View.VISIBLE
+            badgeEmergencyModeActive.backgroundTintList = ContextCompat.getColorStateList(this, R.color.electric_orange)
+            badgeEmergencyModeActive.setTextColor(Color.WHITE)
             tvQuickActionsTitle.text = "Emergency Actions"
             btnActionSendMoney.visibility = View.GONE
         }
@@ -1155,7 +1159,7 @@ class MainActivity : AppCompatActivity() {
 
                     appendLog("BANK API", "200 OK: Authenticated as ${bankUser.name} (ID: ${bankUser.id}, Phone: ${bankUser.phone})")
                     appendLog("BANK API", "Online Balance: ₹${bankUser.balance} | Offline Reserve: ₹${effectiveEmergency}")
-                    Toast.makeText(this@MainActivity, "Connected to Laptop Bank", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Connected to Bank Server", Toast.LENGTH_SHORT).show()
                 } else {
                     val code = response.code()
                     val errorMsg = response.errorBody()?.string() ?: "Unknown error"
@@ -1164,8 +1168,8 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 appendLog("BANK API", "Connection Failed: ${e.localizedMessage ?: e.javaClass.simpleName}")
-                appendLog("HINT", "Verify laptop bank server is running (app.py) and reachable via Wi-Fi/IP.")
-                Toast.makeText(this@MainActivity, "Cannot reach Laptop Bank", Toast.LENGTH_LONG).show()
+                appendLog("HINT", "Verify bank server is reachable via network or use offline emergency mode.")
+                Toast.makeText(this@MainActivity, "Bank Server Unavailable (Offline Active)", Toast.LENGTH_SHORT).show()
             }
         }
     }
