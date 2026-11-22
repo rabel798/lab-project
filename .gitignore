@@ -8,4 +8,5 @@ labvenv/
 __pycache__/
 *.pyc
 database.db
-connection-status.json
+connection-status.json
+*.apk
