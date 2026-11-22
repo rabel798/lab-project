@@ -785,6 +785,10 @@ def api_transactions_sync():
 
 
 if __name__ == "__main__":
-    from waitress import serve
-    print("Waitress serving on http://0.0.0.0:5000")
-    serve(app, host="0.0.0.0", port=5000)
+    try:
+        from waitress import serve
+        print("Waitress serving on http://0.0.0.0:5000")
+        serve(app, host="0.0.0.0", port=5000)
+    except ImportError:
+        print("Starting Flask built-in server on http://0.0.0.0:5000")
+        app.run(host="0.0.0.0", port=5000, debug=False)

@@ -380,6 +380,168 @@ class BankServerTestCase(unittest.TestCase):
             data_q = json.loads(resp_q.data.decode())
             self.assertEqual(data_q["name"], expected_name)
 
+    def test_16_adversarial_rollback_and_cloned_state_detection(self):
+        """Adversarial Attack 1: User rolls back local storage to an earlier state and tries to re-spend allocated funds."""
+        self.client.post("/api/bank/reset-demo")
+        # Baseline: Rahul has ₹500 online, ₹10 emergency
+        # Allocate ₹100 from online to emergency -> online ₹400, emergency ₹110
+        self.client.post(
+            "/api/user/transfer-to-emergency",
+            data=json.dumps({"amount": 100.0}),
+            content_type="application/json"
+        )
+        
+        # Legitimate spend of ₹90 offline
+        legit_tx = {
+            "transactions": [
+                {
+                    "tx_id": "TX-ADV-LEGIT-001",
+                    "payee": "LifeLine Emergency Medicos",
+                    "amount": 90.0,
+                    "direction": "SENT",
+                    "note": "Emergency Medical Kit"
+                }
+            ]
+        }
+        resp1 = self.client.post("/api/transactions/sync", data=json.dumps(legit_tx), content_type="application/json")
+        self.assertEqual(resp1.status_code, 200)
+        user_after = json.loads(self.client.get("/api/user").data.decode())
+        self.assertEqual(user_after["emergency_balance"], 20.0) # 110 - 90 = 20
+
+        # Adversary attempts Rollback Attack: sends another ₹90 transaction claiming their allocation was still ₹110
+        rollback_tx = {
+            "transactions": [
+                {
+                    "tx_id": "TX-ADV-ROLLBACK-002",
+                    "payee": "Apex City Care Pharmacy",
+                    "amount": 90.0,
+                    "direction": "SENT",
+                    "note": "Rollback attempt"
+                }
+            ]
+        }
+        resp2 = self.client.post("/api/transactions/sync", data=json.dumps(rollback_tx), content_type="application/json")
+        self.assertEqual(resp2.status_code, 200)
+        user_final = json.loads(self.client.get("/api/user").data.decode())
+        # Emergency balance cannot go negative: clamped to 0.0, and remainder deducted from online balance
+        self.assertEqual(user_final["emergency_balance"], 0.0)
+        self.assertEqual(user_final["balance"], 330.0) # 400 - 70 overflow = 330
+
+    def test_17_concurrent_spending_double_spend_race(self):
+        """Adversarial Attack 2: Concurrent double-spend attempt at two merchants exceeding allocation."""
+        self.client.post("/api/bank/reset-demo")
+        # Reset to ₹500 online, ₹10 emergency
+        # Merchant A and Merchant B both receive an offline payment of ₹10 (total ₹20, but emergency is only ₹10)
+        double_spend_payload = {
+            "transactions": [
+                {
+                    "tx_id": "TX-CONCURRENT-A",
+                    "payee": "Merchant Alpha",
+                    "amount": 10.0,
+                    "direction": "SENT",
+                    "note": "Offline Rations"
+                },
+                {
+                    "tx_id": "TX-CONCURRENT-B",
+                    "payee": "Merchant Beta",
+                    "amount": 10.0,
+                    "direction": "SENT",
+                    "note": "Offline Fuel"
+                }
+            ]
+        }
+        resp = self.client.post("/api/transactions/sync", data=json.dumps(double_spend_payload), content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.data.decode())
+        self.assertEqual(data["reconciled_count"], 2)
+        # Invariant: Emergency allocation is strictly exhausted to 0.0, overflow debited from online
+        user = json.loads(self.client.get("/api/user").data.decode())
+        self.assertEqual(user["emergency_balance"], 0.0)
+        self.assertEqual(user["balance"], 490.0) # 500 - 10 overflow = 490
+
+    def test_18_replay_attack_with_tampered_payload(self):
+        """Adversarial Attack 3: Adversary replays a valid settled tx_id with an inflated amount."""
+        tx_payload = {
+            "transactions": [
+                {
+                    "tx_id": "TX-TAMPER-TARGET",
+                    "payee": "National Book Depot",
+                    "amount": 25.0,
+                    "direction": "SENT",
+                    "note": "Stationery"
+                }
+            ]
+        }
+        # First legitimate submission
+        resp1 = self.client.post("/api/transactions/sync", data=json.dumps(tx_payload), content_type="application/json")
+        self.assertEqual(resp1.status_code, 200)
+
+        # Tampered replay submission: same tx_id, but amount changed to ₹500.0
+        tampered_payload = {
+            "transactions": [
+                {
+                    "tx_id": "TX-TAMPER-TARGET",
+                    "payee": "National Book Depot",
+                    "amount": 500.0,
+                    "direction": "SENT",
+                    "note": "Tampered Inflated Claim"
+                }
+            ]
+        }
+        resp2 = self.client.post("/api/transactions/sync", data=json.dumps(tampered_payload), content_type="application/json")
+        self.assertEqual(resp2.status_code, 200)
+
+        # Verify the ledger still has exactly ONE record and the amount remains ₹25.0 (tampered ignored)
+        conn = sqlite3.connect(self.temp_db_path)
+        conn.row_factory = sqlite3.Row
+        records = conn.execute("SELECT * FROM transactions WHERE tx_id = 'TX-TAMPER-TARGET'").fetchall()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["amount"], 25.0)
+        conn.close()
+
+    def test_19_merchant_replay_duplicate_batches(self):
+        """Adversarial Attack 4: Merchant resubmits an entire batch of already settled offline receipts."""
+        batch = {
+            "transactions": [
+                {"tx_id": "TX-BATCH-001", "payee": "City QuickFix", "amount": 15.0},
+                {"tx_id": "TX-BATCH-002", "payee": "Daily Fresh", "amount": 30.0}
+            ]
+        }
+        # First sync
+        r1 = self.client.post("/api/transactions/sync", data=json.dumps(batch), content_type="application/json")
+        self.assertEqual(r1.status_code, 200)
+        d1 = json.loads(r1.data.decode())
+        self.assertEqual(d1["reconciled_count"], 2)
+
+        bal_after_r1 = json.loads(self.client.get("/api/user").data.decode())
+
+        # Second identical sync (duplicate merchant resubmission)
+        r2 = self.client.post("/api/transactions/sync", data=json.dumps(batch), content_type="application/json")
+        self.assertEqual(r2.status_code, 200)
+        d2 = json.loads(r2.data.decode())
+        self.assertEqual(d2["reconciled_count"], 0) # Zero newly reconciled
+
+        bal_after_r2 = json.loads(self.client.get("/api/user").data.decode())
+        # Invariant: Balances MUST NOT change on duplicate batch replay
+        self.assertEqual(bal_after_r1["balance"], bal_after_r2["balance"])
+        self.assertEqual(bal_after_r1["emergency_balance"], bal_after_r2["emergency_balance"])
+
+    def test_20_malicious_zero_and_negative_transaction_injection(self):
+        """Adversarial Attack 5: Malicious payload with zero or negative amounts attempting balance inflation."""
+        malicious_payload = {
+            "transactions": [
+                {"tx_id": "TX-MALICIOUS-NEG", "payee": "Attacker", "amount": -100.0, "note": "Negative exploit"},
+                {"tx_id": "TX-MALICIOUS-ZERO", "payee": "Attacker", "amount": 0.0, "note": "Zero exploit"}
+            ]
+        }
+        resp = self.client.post("/api/transactions/sync", data=json.dumps(malicious_payload), content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+
+        # Invariant: Negative or zero transactions must NOT credit the user or alter balances
+        user = json.loads(self.client.get("/api/user").data.decode())
+        self.assertGreaterEqual(user["balance"], 0)
+        self.assertGreaterEqual(user["emergency_balance"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

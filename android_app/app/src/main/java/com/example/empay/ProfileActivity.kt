@@ -17,16 +17,16 @@ import com.example.empay.auth.AuthManager
 import com.example.empay.auth.SessionManager
 import com.example.empay.crypto.CryptoManager
 import com.example.empay.db.AppDatabase
+import com.example.empay.network.AddFundsRequest
+import com.example.empay.network.BankApiClient
 import com.example.empay.network.NetworkManager
 import com.example.empay.repository.PaymentRepository
 import com.example.empay.sync.SyncManager
 import com.example.empay.ui.TransferFundsDialog
-import com.example.empay.ui.UserProfileDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
-import java.util.UUID
 
 class ProfileActivity : AppCompatActivity() {
 
@@ -40,7 +40,7 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var tvProfileEmergencyBal: TextView
     private lateinit var tvProfileNetStatusBadge: TextView
     private lateinit var switchEmergencyMode: SwitchCompat
-    private lateinit var tvProfilePublicKey: TextView
+    private lateinit var tvProfileKeystoreStatus: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,7 +67,7 @@ class ProfileActivity : AppCompatActivity() {
         tvProfileEmergencyBal = findViewById(R.id.tvProfileEmergencyBal)
         tvProfileNetStatusBadge = findViewById(R.id.tvProfileNetStatusBadge)
         switchEmergencyMode = findViewById(R.id.switchEmergencyMode)
-        tvProfilePublicKey = findViewById(R.id.tvProfilePublicKey)
+        tvProfileKeystoreStatus = findViewById(R.id.tvProfileKeystoreStatus)
 
         // Bottom Nav
         findViewById<View>(R.id.navProfileHome).setOnClickListener {
@@ -94,6 +94,10 @@ class ProfileActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btnProfileTransfer).setOnClickListener {
+            if (!NetworkManager.isOnline(this)) {
+                Toast.makeText(this, "Cannot reserve funds offline. Active internet required.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
             TransferFundsDialog(
                 context = this,
                 availableOnlineBalance = sessionManager.getUser().balance,
@@ -120,60 +124,31 @@ class ProfileActivity : AppCompatActivity() {
             addMoneyPrompt()
         }
 
-        switchEmergencyMode.setOnCheckedChangeListener { _, isChecked ->
-            val newIsOnline = !isChecked
-            sessionManager.updateOnlineStatus(newIsOnline)
-            updateNetworkBadge(newIsOnline)
+        // Emergency mode is driven by real network, inform user on click
+        switchEmergencyMode.setOnClickListener {
+            val isOnline = NetworkManager.isOnline(this)
+            switchEmergencyMode.isChecked = !isOnline
             Toast.makeText(
                 this,
-                if (isChecked) "Emergency Mode: Offline P2P enabled" else "Online Mode restored",
+                if (isOnline) "Internet Connected: Emergency Mode is inactive" else "No Internet: Emergency Mode is automatically active",
                 Toast.LENGTH_SHORT
             ).show()
         }
 
-        findViewById<Button>(R.id.btnProfileSyncNow).setOnClickListener {
-            Toast.makeText(this, "Reconciling offline transactions with Central Bank...", Toast.LENGTH_SHORT).show()
-            SyncManager.triggerImmediateSync(this)
-            lifecycleScope.launch(Dispatchers.IO) {
-                kotlinx.coroutines.delay(1200)
-                withContext(Dispatchers.Main) {
-                    loadUserData()
-                    Toast.makeText(this@ProfileActivity, "Sync completed! Balances reconciled.", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-
-        findViewById<Button>(R.id.btnProfileClearHistory).setOnClickListener {
+        findViewById<Button>(R.id.btnProfileLogout).setOnClickListener {
             AlertDialog.Builder(this)
-                .setTitle("Clear Transaction History")
-                .setMessage("Are you sure you want to purge all local transactions?")
-                .setPositiveButton("Clear") { _, _ ->
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        appDatabase.transactionDao.clearAllTransactions()
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@ProfileActivity, "Transaction history cleared successfully!", Toast.LENGTH_SHORT).show()
-                        }
+                .setTitle("Log Out")
+                .setMessage("Are you sure you want to log out of ${sessionManager.getUser().name}?")
+                .setPositiveButton("Log Out") { _, _ ->
+                    AuthManager.getInstance(this).logout()
+                    val intent = Intent(this, LoginActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     }
+                    startActivity(intent)
+                    finish()
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
-        }
-
-        findViewById<Button>(R.id.btnProfileSwitchUser).setOnClickListener {
-            UserProfileDialog(
-                context = this,
-                currentUser = sessionManager.getUser(),
-                onUserSelected = { updatedUser ->
-                    sessionManager.updateUser(updatedUser)
-                    loadUserData()
-                }
-            ).show()
-        }
-
-        findViewById<Button>(R.id.btnProfileRegenerateKey).setOnClickListener {
-            val newKey = "PK_ECC_secp256k1_" + UUID.randomUUID().toString().replace("-", "").take(24)
-            tvProfilePublicKey.text = newKey
-            Toast.makeText(this, "New asymmetric ECC keypair generated for offline transaction signing!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -190,16 +165,14 @@ class ProfileActivity : AppCompatActivity() {
         tvProfileEmergencyBal.text = String.format(Locale.US, "₹ %.2f", offlineBal)
 
         val realOnline = NetworkManager.isOnline(this)
-        val isEffectiveOnline = user.isOnline && realOnline
-
-        switchEmergencyMode.isChecked = !user.isOnline
-        updateNetworkBadge(isEffectiveOnline)
+        switchEmergencyMode.isChecked = !realOnline
+        updateNetworkBadge(realOnline)
 
         try {
-            val pubKey = CryptoManager.getPublicKeyBase64()
-            tvProfilePublicKey.text = if (pubKey.isNotEmpty()) "PK_ECC_secp256r1_${pubKey.take(24)}" else "PK_ECC_secp256k1_7f8a9b2c3d4e5f6081a2b3c4d5e6"
-        } catch (e: Exception) {
-            tvProfilePublicKey.text = "PK_ECC_secp256k1_7f8a9b2c3d4e5f6081a2b3c4d5e6"
+            val fp = CryptoManager.getPublicKeyFingerprint()
+            tvProfileKeystoreStatus.text = "TEE Hardware ($fp)"
+        } catch (_: Exception) {
+            tvProfileKeystoreStatus.text = "Hardware Keystore Active"
         }
     }
 
@@ -237,21 +210,48 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun addMoneyPrompt() {
+        if (!NetworkManager.isOnline(this)) {
+            Toast.makeText(this, "Cannot add money while offline. Connect to internet first.", Toast.LENGTH_LONG).show()
+            return
+        }
+
         val inputAmt = EditText(this).apply {
             hint = "Enter amount (e.g. 500)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         }
         AlertDialog.Builder(this)
-            .setTitle("Add Funds to Available Balance")
+            .setTitle("Add Funds to Bank Account")
             .setView(inputAmt)
             .setPositiveButton("Add") { _, _ ->
                 val amt = inputAmt.text.toString().trim().toDoubleOrNull()
                 if (amt != null && amt > 0) {
                     val user = sessionManager.getUser()
-                    val newBal = user.balance + amt
-                    sessionManager.updateBalances(newBal, user.emergencyBalance)
-                    loadUserData()
-                    Toast.makeText(this, "Added ₹$amt to Available Balance!", Toast.LENGTH_SHORT).show()
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            val api = BankApiClient.getApiService(this@ProfileActivity)
+                            val resp = api.addFunds(AddFundsRequest(userId = user.id, amount = amt))
+                            withContext(Dispatchers.Main) {
+                                if (resp.isSuccessful && resp.body()?.success == true) {
+                                    val newBal = resp.body()!!.balance
+                                    sessionManager.updateBalances(newBal, user.emergencyBalance)
+                                    loadUserData()
+                                    Toast.makeText(this@ProfileActivity, "✅ Added ₹$amt to Bank Account!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val localBal = user.balance + amt
+                                    sessionManager.updateBalances(localBal, user.emergencyBalance)
+                                    loadUserData()
+                                    Toast.makeText(this@ProfileActivity, "Added ₹$amt to Available Balance!", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                val localBal = user.balance + amt
+                                sessionManager.updateBalances(localBal, user.emergencyBalance)
+                                loadUserData()
+                                Toast.makeText(this@ProfileActivity, "Added ₹$amt (Local Update: ${e.message})", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
                 }
             }
             .setNegativeButton("Cancel", null)

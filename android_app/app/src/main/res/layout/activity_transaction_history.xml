@@ -33,15 +33,6 @@
             android:textColor="@color/text_main"
             android:textSize="18sp"
             android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnSyncFromHistory"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:text="Sync Ledger"
-            android:textSize="11sp"
-            android:textColor="@color/white"
-            android:backgroundTint="@color/primary" />
     </LinearLayout>
 
     <ScrollView

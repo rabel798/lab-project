@@ -52,11 +52,6 @@ class TransactionHistoryActivity : AppCompatActivity() {
 
     private fun initViews() {
         findViewById<ImageButton>(R.id.btnBackHome).setOnClickListener { finish() }
-        findViewById<Button>(R.id.btnSyncFromHistory).setOnClickListener {
-            SyncManager.triggerImmediateSync(this)
-            Toast.makeText(this, "Batch Sync Triggered", Toast.LENGTH_SHORT).show()
-            loadTransactions()
-        }
 
         layoutHistoryContainer = findViewById(R.id.layoutHistoryContainer)
         tvEmptyState = findViewById(R.id.tvEmptyState)

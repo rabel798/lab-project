@@ -1,22 +1,28 @@
 package com.example.empay.network
 
 import android.content.Context
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * Singleton managing Retrofit client and dynamic Laptop Bank base URL configuration.
+ * Singleton managing Retrofit client with smart automatic failover between
+ * the live cloud bank server (20.219.56.82:5000) and local emulator (10.0.2.2:5000).
  */
 object BankApiClient {
 
     private const val PREFS_NAME = "empay_network_prefs"
     private const val KEY_BASE_URL = "laptop_bank_base_url"
 
-    // Default: Android Emulator alias for host machine localhost:5000
-    const val DEFAULT_BASE_URL = "http://10.0.2.2:5000/"
+    // Primary: Cloud server specified by project; Secondary: Local host emulator alias
+    const val CLOUD_BASE_URL = "http://20.219.56.82:5000/"
+    const val LOCAL_BASE_URL = "http://10.0.2.2:5000/"
+    const val DEFAULT_BASE_URL = CLOUD_BASE_URL
 
     @Volatile
     private var currentBaseUrl: String = DEFAULT_BASE_URL
@@ -61,11 +67,36 @@ object BankApiClient {
             level = HttpLoggingInterceptor.Level.BODY
         }
 
+        // Automatic Failover Interceptor: If cloud fails, fallback to local (or vice-versa)
+        val failoverInterceptor = Interceptor { chain ->
+            val originalRequest = chain.request()
+            try {
+                val response = chain.proceed(originalRequest)
+                if (response.isSuccessful || response.code < 500) {
+                    return@Interceptor response
+                }
+                response.close()
+            } catch (_: IOException) {
+                // Connection failed or timed out -> attempt alternate host
+            }
+
+            val currentHost = originalRequest.url.host
+            val alternateHost = if (currentHost == "20.219.56.82") "10.0.2.2" else "20.219.56.82"
+            val fallbackUrl = originalRequest.url.newBuilder()
+                .host(alternateHost)
+                .port(5000)
+                .build()
+
+            val fallbackRequest = originalRequest.newBuilder().url(fallbackUrl).build()
+            chain.proceed(fallbackRequest)
+        }
+
         val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor(failoverInterceptor)
             .addInterceptor(loggingInterceptor)
             .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(5, TimeUnit.SECONDS)
-            .writeTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            .writeTimeout(8, TimeUnit.SECONDS)
             .build()
 
         val retrofit = Retrofit.Builder()

@@ -36,6 +36,7 @@ import com.example.empay.bluetooth.BluetoothPaymentEngine
 import com.example.empay.crypto.CryptoManager
 import com.example.empay.db.AppDatabase
 import com.example.empay.db.TransactionEntity
+import com.example.empay.network.AddFundsRequest
 import com.example.empay.network.BankApiClient
 import com.example.empay.repository.PaymentRepository
 import com.example.empay.network.NetworkManager
@@ -269,13 +270,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        // Top Bar: Toggle Online / Offline Mode on Status Pill click
+        // Top Bar: Real Network Status Banner Info (governed by actual internet)
         layoutSystemStatusBanner.setOnClickListener {
-            val isCurrentlyOnline = sessionManager.getUser().isOnline
-            val newOnline = !isCurrentlyOnline
-            updateNetworkBadge(newOnline)
-            val modeName = if (newOnline) "Online (Central Bank Connected)" else "Emergency Mode Active (Offline Only)"
-            Toast.makeText(this, modeName, Toast.LENGTH_SHORT).show()
+            val isOnline = NetworkManager.isOnline(this)
+            val msg = if (isOnline) "● Central Bank Online: Internet connected. Auto-sync and online transfers active."
+                      else "● Emergency Mode Active: No internet. 100% offline Bluetooth payments active."
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
         }
 
         // Long press toggles Developer Diagnostics
@@ -284,12 +284,16 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
-        // Emergency Siren Button -> Toggles Emergency Mode
+        // Emergency Siren Button -> Explains Real Network State
         btnEmergencyToggle.setOnClickListener {
-            val isCurrentlyOnline = sessionManager.getUser().isOnline
-            val newOnline = !isCurrentlyOnline
-            updateNetworkBadge(newOnline)
-            Toast.makeText(this, if (newOnline) "Central Bank Online" else "🚨 Emergency Mode Activated", Toast.LENGTH_SHORT).show()
+            val isOnline = NetworkManager.isOnline(this)
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(if (isOnline) "Network Status: Online" else "Network Status: Emergency Mode")
+                .setMessage(if (isOnline)
+                    "You are connected to the Central Bank.\n\nOnline transfers, fund reservations, and automatic ledger synchronization are fully operational."
+                    else "No internet connection detected.\n\nEmergency Mode is actively securing your wallet. You can make secure 100% offline payments via Bluetooth or QR codes. Balances will auto-sync when internet reconnects.")
+                .setPositiveButton("OK", null)
+                .show()
         }
 
 
@@ -313,7 +317,7 @@ class MainActivity : AppCompatActivity() {
 
         // Balance Card
         btnTransferToOffline.setOnClickListener { initiateFundReservation() }
-        btnAddMoney.setOnClickListener { performOnlineBankLogin() }
+        btnAddMoney.setOnClickListener { showAddMoneyDialog() }
 
         // Quick Actions
         btnActionScan.setOnClickListener {
@@ -612,6 +616,52 @@ class MainActivity : AppCompatActivity() {
         tvAccountNumber?.text = user.accountNumber
         tvOnlineBalance.text = String.format(Locale.US, "₹ %.2f", user.balance)
         tvEmergencyBalance.text = String.format(Locale.US, "₹ %.2f", user.emergencyBalance)
+    }
+
+    private fun showAddMoneyDialog() {
+        if (!NetworkManager.isOnline(this)) {
+            appendLog("BANK API", "❌ BLOCKED: Device is offline. Cannot add funds to bank account.")
+            Toast.makeText(this, "Cannot add money while offline. Connect to internet first.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val inputAmt = EditText(this).apply {
+            hint = "Enter amount (e.g. 500)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText("500.00")
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Add Funds to Bank Account")
+            .setMessage("Top up your available online balance on the Central Bank ledger:")
+            .setView(inputAmt)
+            .setPositiveButton("Add Money") { _, _ ->
+                val amt = inputAmt.text.toString().trim().toDoubleOrNull()
+                if (amt != null && amt > 0) {
+                    val user = sessionManager.getUser()
+                    lifecycleScope.launch {
+                        try {
+                            val api = BankApiClient.getApiService(this@MainActivity)
+                            val resp = withContext(Dispatchers.IO) {
+                                api.addFunds(AddFundsRequest(userId = user.id, amount = amt))
+                            }
+                            if (resp.isSuccessful && resp.body()?.success == true) {
+                                val newBal = resp.body()!!.balance
+                                sessionManager.updateBalances(newBal, user.emergencyBalance)
+                                appendLog("BANK API", "✅ Top-up Success: ₹$amt added to Central Bank. New Balance: ₹$newBal")
+                                Toast.makeText(this@MainActivity, "✅ Added ₹$amt to Bank Account!", Toast.LENGTH_SHORT).show()
+                                refreshLocalLedgerUI()
+                            } else {
+                                performOnlineBankLogin()
+                            }
+                        } catch (e: Exception) {
+                            appendLog("BANK API", "Add Funds Notice: ${e.message}")
+                            performOnlineBankLogin()
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun initiateFundReservation() {
@@ -1198,6 +1248,16 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        val authManager = com.example.empay.auth.AuthManager.getInstance(this)
+        if (!authManager.isLoggedIn()) {
+            val intent = Intent(this, LoginActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            startActivity(intent)
+            finish()
+            return
+        }
+        updateNetworkBadge(NetworkManager.isOnline(this))
         if (NetworkManager.isOnline(this)) {
             lifecycleScope.launch(Dispatchers.IO) {
                 val pending = appDatabase.transactionDao.getPendingSyncTransactions()
