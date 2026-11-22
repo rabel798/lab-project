@@ -170,7 +170,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Default demo account for Rahul Sharma"
+                    android:text="Default account (rabel)"
                     android:textColor="#94A3B8"
                     android:textSize="12sp"
                     android:textStyle="bold"
@@ -180,7 +180,7 @@
                     android:id="@+id/tvDemoCredentialsText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Username: 9876543210 or rabel / rahul  •  Password: rahul@12345"
+                    android:text="Username: rabel (or 9876543210)  •  Password: rabel"
                     android:textColor="#94A3B8"
                     android:textSize="11sp"
                     android:layout_marginTop="3dp"

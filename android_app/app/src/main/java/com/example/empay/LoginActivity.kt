@@ -94,11 +94,11 @@ class LoginActivity : AppCompatActivity() {
             }
         }
 
-        // Tapping the light helper note fills default demo credentials for quick testing
+        // Tapping the light helper note fills default credentials for quick testing
         layoutDemoAccountHint.setOnClickListener {
-            etLoginPhone.setText("9876543210")
-            etLoginPassword.setText("rahul@12345")
-            Toast.makeText(this, "Rahul Sharma credentials applied", Toast.LENGTH_SHORT).show()
+            etLoginPhone.setText("rabel")
+            etLoginPassword.setText("rabel")
+            Toast.makeText(this, "rabel credentials applied", Toast.LENGTH_SHORT).show()
         }
 
         btnSubmitSignUp.setOnClickListener {
