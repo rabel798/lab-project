@@ -141,13 +141,12 @@ class BankServerTestCase(unittest.TestCase):
         self.assertEqual(tx_map["TX-TEST-BT-002"]["amount"], 40.0)
 
         # Verify emergency balance was permanently deducted and not reset
-        conn = sqlite3.connect(self.temp_db_path)
-        conn.row_factory = sqlite3.Row
         user = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
         self.assertEqual(data["reconciled_count"], 2)
         # In setUp: emergency_balance starts at 500.0. Spent 25 + 40 = 65.0 -> 435.0
         self.assertEqual(user["emergency_balance"], 435.0)
         self.assertEqual(data["emergency_balance"], 435.0)
+        conn.close()
         conn.close()
 
         # Verify subsequent GET /api/user also retains the deducted balance
