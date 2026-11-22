@@ -778,10 +778,18 @@ class MainActivity : AppCompatActivity() {
             amount = amount,
             onStatusLog = { logMsg -> appendLog("BLUETOOTH", logMsg) },
             onSuccess = { packet, ack ->
-                refreshLocalLedgerUI()
-                appendLog("P2P PAYMENT", "✅ PAYMENT COMPLETED! Tx: ${packet.txId}")
-                appendLog("P2P PAYMENT", "Receipt Nonce: ${ack.ackNonce.take(8)} | Status: ${ack.status}")
-                Toast.makeText(this, "Payment Complete: -₹$amount to $payeeName", Toast.LENGTH_SHORT).show()
+                lifecycleScope.launch {
+                    if (NetworkManager.isOnline(this@MainActivity)) {
+                        appendLog("AUTO-SYNC", "🟢 Device online. Immediately syncing Bluetooth payment with Central Bank...")
+                        withContext(Dispatchers.IO) {
+                            SyncManager.syncNow(this@MainActivity)
+                        }
+                    }
+                    refreshLocalLedgerUI()
+                    appendLog("P2P PAYMENT", "✅ PAYMENT COMPLETED! Tx: ${packet.txId}")
+                    appendLog("P2P PAYMENT", "Receipt Nonce: ${ack.ackNonce.take(8)} | Status: ${ack.status}")
+                    Toast.makeText(this@MainActivity, "Payment Complete: -₹$amount to $payeeName", Toast.LENGTH_SHORT).show()
+                }
             },
             onError = { errMsg ->
                 appendLog("P2P PAYMENT", "❌ $errMsg")
@@ -820,9 +828,17 @@ class MainActivity : AppCompatActivity() {
             amount = amount,
             onStatusLog = { logMsg -> appendLog("BLUETOOTH", logMsg) },
             onSuccess = { packet, ack ->
-                refreshLocalLedgerUI()
-                appendLog("P2P PAYMENT", "✅ Bluetooth RFCOMM Payment Confirmed by Peer!")
-                Toast.makeText(this, "Payment Sent via Bluetooth!", Toast.LENGTH_SHORT).show()
+                lifecycleScope.launch {
+                    if (NetworkManager.isOnline(this@MainActivity)) {
+                        appendLog("AUTO-SYNC", "🟢 Device online. Immediately syncing Bluetooth payment with Central Bank...")
+                        withContext(Dispatchers.IO) {
+                            SyncManager.syncNow(this@MainActivity)
+                        }
+                    }
+                    refreshLocalLedgerUI()
+                    appendLog("P2P PAYMENT", "✅ Bluetooth RFCOMM Payment Confirmed by Peer!")
+                    Toast.makeText(this@MainActivity, "Payment Sent via Bluetooth!", Toast.LENGTH_SHORT).show()
+                }
             },
             onError = { errMsg ->
                 appendLog("BLUETOOTH", "❌ $errMsg")
@@ -1028,7 +1044,12 @@ class MainActivity : AppCompatActivity() {
 
                         if (NetworkManager.isOnline(this@MainActivity)) {
                             appendLog("AUTO-SYNC", "Online connection active. Auto-syncing offline receipt with Central Bank...")
-                            SyncManager.triggerImmediateSync(this@MainActivity)
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                SyncManager.syncNow(this@MainActivity)
+                                withContext(Dispatchers.Main) {
+                                    refreshLocalLedgerUI()
+                                }
+                            }
                         }
                     }
                 }
@@ -1262,13 +1283,17 @@ class MainActivity : AppCompatActivity() {
             return
         }
         updateNetworkBadge(NetworkManager.isOnline(this))
+        refreshLocalLedgerUI()
         if (NetworkManager.isOnline(this)) {
             lifecycleScope.launch(Dispatchers.IO) {
                 val pending = appDatabase.transactionDao.getPendingSyncTransactions()
                 if (pending.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
                         appendLog("AUTO-SYNC", "App in foreground with ${pending.size} pending offline receipts. Auto-syncing with Central Bank...")
-                        SyncManager.triggerImmediateSync(this@MainActivity)
+                    }
+                    SyncManager.syncNow(this@MainActivity)
+                    withContext(Dispatchers.Main) {
+                        refreshLocalLedgerUI()
                     }
                 }
             }

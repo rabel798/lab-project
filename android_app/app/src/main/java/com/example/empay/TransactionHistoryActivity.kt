@@ -12,8 +12,12 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.example.empay.auth.SessionManager
 import com.example.empay.db.AppDatabase
 import com.example.empay.db.TransactionEntity
+import com.example.empay.network.BankApiClient
+import com.example.empay.network.NetworkManager
 import com.example.empay.sync.SyncManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,6 +29,7 @@ import java.util.Locale
 class TransactionHistoryActivity : AppCompatActivity() {
 
     private lateinit var appDatabase: AppDatabase
+    private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var layoutHistoryContainer: LinearLayout
     private lateinit var tvEmptyState: TextView
     private lateinit var tvTotalOfflineExchanged: TextView
@@ -53,6 +58,12 @@ class TransactionHistoryActivity : AppCompatActivity() {
     private fun initViews() {
         findViewById<ImageButton>(R.id.btnBackHome).setOnClickListener { finish() }
 
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
+        swipeRefreshLayout.setColorSchemeColors(
+            ContextCompat.getColor(this, R.color.primary),
+            ContextCompat.getColor(this, R.color.electric_orange)
+        )
+
         layoutHistoryContainer = findViewById(R.id.layoutHistoryContainer)
         tvEmptyState = findViewById(R.id.tvEmptyState)
         tvTotalOfflineExchanged = findViewById(R.id.tvTotalOfflineExchanged)
@@ -65,6 +76,10 @@ class TransactionHistoryActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        swipeRefreshLayout.setOnRefreshListener {
+            performRefreshAndSync()
+        }
+
         btnFilterAll.setOnClickListener {
             currentFilter = "ALL"
             updateFilterTabs()
@@ -100,15 +115,58 @@ class TransactionHistoryActivity : AppCompatActivity() {
         btnFilterSynced.setTextColor(if (currentFilter == "SYNCED") activeText else inactiveText)
     }
 
-    private fun loadTransactions() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val txs = appDatabase.transactionDao.getAllTransactions()
-            withContext(Dispatchers.Main) {
-                allTransactions = txs
-                updateSummary(txs)
-                renderTransactions()
+    private fun performRefreshAndSync() {
+        lifecycleScope.launch {
+            val isOnline = NetworkManager.isOnline(this@TransactionHistoryActivity)
+            var syncSuccess = false
+
+            if (isOnline) {
+                withContext(Dispatchers.IO) {
+                    // 1. Direct synchronous ledger sync with Central Bank
+                    syncSuccess = SyncManager.syncNow(this@TransactionHistoryActivity)
+
+                    // 2. Fetch fresh bank balance
+                    try {
+                        val sessionManager = SessionManager.getInstance(this@TransactionHistoryActivity)
+                        val apiService = BankApiClient.getApiService(this@TransactionHistoryActivity)
+                        val userResp = apiService.getUserById(sessionManager.getUser().id.toLong())
+                        if (userResp.isSuccessful && userResp.body() != null) {
+                            val bankUser = userResp.body()!!
+                            sessionManager.updateBalances(bankUser.balance, bankUser.emergencyBalance)
+                            appDatabase.walletDao.updateBalance(bankUser.emergencyBalance)
+                        }
+                    } catch (_: Exception) {
+                        // Ignore individual profile poll failure
+                    }
+                }
+            }
+
+            // 3. Reload transactions from Room DB
+            val txs = withContext(Dispatchers.IO) {
+                appDatabase.transactionDao.getAllTransactions()
+            }
+            allTransactions = txs
+            updateSummary(txs)
+            renderTransactions()
+
+            // 4. Stop swipe spinner
+            swipeRefreshLayout.isRefreshing = false
+
+            if (isOnline) {
+                val pendingRemaining = txs.count { it.status == TransactionEntity.STATUS_PENDING_SYNC }
+                if (pendingRemaining == 0) {
+                    Toast.makeText(this@TransactionHistoryActivity, "Ledger synchronized: All payments settled", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@TransactionHistoryActivity, "Ledger updated ($pendingRemaining queued sync)", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(this@TransactionHistoryActivity, "Offline: Loaded from local offline ledger", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun loadTransactions() {
+        performRefreshAndSync()
     }
 
     private fun updateSummary(txs: List<TransactionEntity>) {

@@ -12,6 +12,13 @@ import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.example.empay.auth.SessionManager
+import com.example.empay.db.AppDatabase
+import com.example.empay.network.BankApiClient
+import com.example.empay.network.SyncTransactionItem
+import com.example.empay.network.SyncTransactionsRequest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
@@ -69,6 +76,72 @@ object SyncManager {
      */
     fun getImmediateSyncWorkInfo(context: Context): LiveData<List<WorkInfo>> {
         return WorkManager.getInstance(context).getWorkInfosForUniqueWorkLiveData(IMMEDIATE_WORK_NAME)
+    }
+
+    /**
+     * Direct synchronous reconciliation: executes immediate network sync against Central Bank
+     * without waiting for WorkManager scheduler queue.
+     * Marks reconciled transactions as SYNCED in SQLite and updates session balance.
+     * Returns true if sync completed successfully, false otherwise.
+     */
+    suspend fun syncNow(context: Context): Boolean = withContext(Dispatchers.IO) {
+        val appDatabase = AppDatabase.getInstance(context)
+        val sessionManager = SessionManager.getInstance(context)
+        val transactionDao = appDatabase.transactionDao
+
+        val pendingTxs = transactionDao.getPendingSyncTransactions()
+        if (pendingTxs.isEmpty()) {
+            return@withContext true
+        }
+
+        val totalAmount = pendingTxs.sumOf { it.amount }
+        val syncItems = pendingTxs.map { tx ->
+            SyncTransactionItem(
+                txId = tx.txId,
+                payee = tx.receiverName,
+                amount = tx.amount,
+                note = "Bluetooth Offline Payment (Direction: ${tx.direction})",
+                direction = tx.direction,
+                senderId = tx.senderId,
+                receiverId = tx.receiverId
+            )
+        }
+
+        val request = SyncTransactionsRequest(
+            transactions = syncItems,
+            userId = sessionManager.getUser().id
+        )
+
+        try {
+            val apiService = BankApiClient.getApiService(context)
+            val response = apiService.syncTransactions(request)
+
+            if (response.isSuccessful && response.body()?.status == "success") {
+                val body = response.body()!!
+
+                // Update local SQLite ledger: Transition PENDING_SYNC -> SYNCED
+                for (tx in pendingTxs) {
+                    transactionDao.markAsSynced(tx.txId)
+                }
+
+                // Update local wallet and session with reconciled bank balance
+                sessionManager.updateBalances(body.balance, body.emergencyBalance)
+                appDatabase.walletDao.updateBalance(body.emergencyBalance)
+
+                // Dispatch system notification
+                SyncNotificationHelper.showSyncSuccessNotification(
+                    context = context,
+                    reconciledCount = pendingTxs.size,
+                    totalAmount = totalAmount
+                )
+
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 }
 

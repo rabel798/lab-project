@@ -22,7 +22,10 @@ import com.example.empay.db.AppDatabase
 import com.example.empay.db.TransactionEntity
 import com.example.empay.network.BankApiClient
 import com.example.empay.network.NetworkManager
+import com.example.empay.network.SyncTransactionItem
+import com.example.empay.network.SyncTransactionsRequest
 import com.example.empay.repository.PaymentRepository
+import com.example.empay.sync.SyncManager
 import com.example.empay.ui.PinAuthDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -328,7 +331,40 @@ class PayActivity : AppCompatActivity() {
                     "SIG-" + UUID.randomUUID().toString().take(16).uppercase()
                 }
 
-                // Insert into local DB as PENDING_SYNC
+                val isOnline = NetworkManager.isOnline(this@PayActivity)
+                
+                // If online, immediately reconcile with Central Bank so it transitions to COMPLETED (SYNCED)
+                var initialStatus = TransactionEntity.STATUS_PENDING_SYNC
+                if (isOnline) {
+                    try {
+                        val apiService = BankApiClient.getApiService(applicationContext)
+                        val syncReq = SyncTransactionsRequest(
+                            transactions = listOf(
+                                SyncTransactionItem(
+                                    txId = txId,
+                                    payee = payee,
+                                    amount = amount,
+                                    note = "Bluetooth Payment (Online Instant Settlement)",
+                                    direction = TransactionEntity.DIRECTION_SENT,
+                                    senderId = currentUser.id.toString(),
+                                    receiverId = payee
+                                )
+                            ),
+                            userId = currentUser.id
+                        )
+                        val syncResp = apiService.syncTransactions(syncReq)
+                        if (syncResp.isSuccessful && syncResp.body()?.status == "success") {
+                            initialStatus = TransactionEntity.STATUS_SYNCED
+                            val body = syncResp.body()!!
+                            sessionManager.updateBalances(body.balance, body.emergencyBalance)
+                            appDatabase.walletDao.updateBalance(body.emergencyBalance)
+                        }
+                    } catch (_: Exception) {
+                        initialStatus = TransactionEntity.STATUS_PENDING_SYNC
+                    }
+                }
+
+                // Insert into local DB
                 val txEntity = TransactionEntity(
                     txId = txId,
                     senderId = currentUser.id.toString(),
@@ -339,10 +375,14 @@ class PayActivity : AppCompatActivity() {
                     timestamp = timestamp,
                     nonce = nonce,
                     signature = signature,
-                    status = TransactionEntity.STATUS_PENDING_SYNC,
+                    status = initialStatus,
                     direction = TransactionEntity.DIRECTION_SENT
                 )
                 appDatabase.transactionDao.insertTransaction(txEntity)
+
+                if (initialStatus == TransactionEntity.STATUS_PENDING_SYNC) {
+                    SyncManager.triggerImmediateSync(applicationContext)
+                }
 
                 withContext(Dispatchers.Main) {
                     navigateToReceipt(amount, payee, "Bluetooth", txId, signature, timestamp)

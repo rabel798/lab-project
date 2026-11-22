@@ -55,6 +55,9 @@ dependencies {
     // Background Auto-Sync Engine (WorkManager)
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Pull-to-refresh SwipeRefreshLayout
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
     // Security & Encrypted Preferences (Offline PIN Auth)
     implementation(libs.androidx.security.crypto)
 

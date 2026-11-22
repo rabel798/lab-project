@@ -20,8 +20,10 @@ import com.example.empay.network.SyncTransactionsResponse
 import com.example.empay.network.TransferEmergencyRequest
 import com.example.empay.network.TransferEmergencyResponse
 import com.example.empay.sync.SyncManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -261,7 +263,9 @@ class PaymentRepository private constructor(private val context: Context) {
             onStatusLog = onStatusLog,
             onSuccess = { packet, ack ->
                 if (NetworkManager.isOnline(context)) {
-                    SyncManager.triggerImmediateSync(context)
+                    CoroutineScope(Dispatchers.IO).launch {
+                        SyncManager.syncNow(context)
+                    }
                 }
                 onSuccess(packet, ack)
             },
@@ -289,7 +293,9 @@ class PaymentRepository private constructor(private val context: Context) {
             onStatusLog = onStatusLog,
             onSuccess = { packet, ack ->
                 if (NetworkManager.isOnline(context)) {
-                    SyncManager.triggerImmediateSync(context)
+                    CoroutineScope(Dispatchers.IO).launch {
+                        SyncManager.syncNow(context)
+                    }
                 }
                 onSuccess(packet, ack)
             },
