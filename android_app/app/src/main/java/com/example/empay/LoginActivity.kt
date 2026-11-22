@@ -80,7 +80,7 @@ class LoginActivity : AppCompatActivity() {
 
             val account = authManager.login(phoneOrName, password)
             if (account != null) {
-                updateBluetoothName(account.name)
+                com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, account.name, account.phone)
                 Toast.makeText(this, "Welcome back, ${account.name}!", Toast.LENGTH_SHORT).show()
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
@@ -101,7 +101,7 @@ class LoginActivity : AppCompatActivity() {
             val target = authManager.getActiveAccount() ?: authManager.login("9876543210", "rahul@12345")
             if (target != null) {
                 authManager.setActiveAccount(target)
-                updateBluetoothName(target.name)
+                com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, target.name, target.phone)
                 Toast.makeText(this, "Logged in as ${target.name}", Toast.LENGTH_SHORT).show()
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
@@ -121,7 +121,7 @@ class LoginActivity : AppCompatActivity() {
             }
 
             val newAccount = authManager.signUp(name, phone, password, emergencyBal)
-            updateBluetoothName(newAccount.name)
+            com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, newAccount.name, newAccount.phone)
             Toast.makeText(this, "Profile created for ${newAccount.name}! Ready for Bluetooth testing.", Toast.LENGTH_LONG).show()
             startActivity(Intent(this, MainActivity::class.java))
             finish()

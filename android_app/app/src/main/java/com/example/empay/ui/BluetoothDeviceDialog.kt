@@ -22,6 +22,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import com.example.empay.R
+import com.example.empay.bluetooth.BluetoothHelper
 import com.example.empay.bluetooth.BluetoothPaymentEngine
 
 /**
@@ -50,21 +51,25 @@ class BluetoothDeviceDialog(
                     val device: BluetoothDevice? =
                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                     if (device != null) {
-                        val name = device.name ?: "Unknown Bluetooth Device"
-                        val address = device.address ?: ""
-                        if (!discoveredDevicesSet.contains(address)) {
-                            discoveredDevicesSet.add(address)
-                            addDeviceItem(
-                                container = containerDiscovered,
-                                name = name,
-                                address = "$address · Discovered Nearby",
-                                badgeText = "Pair & Pay",
-                                onClick = {
-                                    cleanup()
-                                    dialog.dismiss()
-                                    onDeviceSelected(name, device, false)
-                                }
-                            )
+                        val peer = BluetoothHelper.parseEmPayPeer(context, device)
+                        if (peer != null) {
+                            val address = device.address ?: ""
+                            if (!discoveredDevicesSet.contains(address)) {
+                                discoveredDevicesSet.add(address)
+                                val displayName = peer.name
+                                val displaySub = if (peer.phone.isNotEmpty()) "${peer.phone} • Nearby EmPay User" else "$address • EmPay Device"
+                                addDeviceItem(
+                                    container = containerDiscovered,
+                                    name = displayName,
+                                    address = displaySub,
+                                    badgeText = "Pay Offline",
+                                    onClick = {
+                                        cleanup()
+                                        dialog.dismiss()
+                                        onDeviceSelected(displayName, device, false)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -144,20 +149,32 @@ class BluetoothDeviceDialog(
             containerPaired.addView(emptyTv)
             containerPaired.addView(btnOpenSettings)
         } else {
+            var empayPairedCount = 0
             pairedDevices.forEach { device ->
-                val name = device.name ?: "Bluetooth Device"
-                val address = device.address ?: ""
+                val peer = BluetoothHelper.parseEmPayPeer(context, device) ?: return@forEach
+                empayPairedCount++
+                val displayName = peer.name
+                val displaySub = if (peer.phone.isNotEmpty()) "${peer.phone} • EmPay Peer" else "${device.address} • EmPay Hardware"
                 addDeviceItem(
                     container = containerPaired,
-                    name = name,
-                    address = "$address · Paired Hardware",
+                    name = displayName,
+                    address = displaySub,
                     badgeText = "Connect",
                     onClick = {
                         cleanup()
                         dialog.dismiss()
-                        onDeviceSelected(name, device, false)
+                        onDeviceSelected(displayName, device, false)
                     }
                 )
+            }
+            if (empayPairedCount == 0) {
+                val noEmpayTv = TextView(context).apply {
+                    text = "No paired EmPay devices found. Tap 'Scan for Nearby EmPay Devices' below:"
+                    setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+                    textSize = 11f
+                    setPadding(8, 4, 8, 8)
+                }
+                containerPaired.addView(noEmpayTv)
             }
         }
     }

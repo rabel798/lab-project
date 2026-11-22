@@ -1,14 +1,17 @@
 package com.example.empay
 
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -17,7 +20,9 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.example.empay.auth.AuthManager
 import com.example.empay.auth.SessionManager
+import com.example.empay.bluetooth.BluetoothHelper
 import com.example.empay.bluetooth.BluetoothPaymentEngine
 import com.example.empay.db.AppDatabase
 import com.example.empay.repository.PaymentRepository
@@ -59,12 +64,19 @@ class BluetoothActivity : AppCompatActivity() {
         PeerItem(5, "City QuickFix Electrical Services", "Emergency Services", 1.8, true)
     )
 
-    private val usersList = mutableListOf(
-        PeerItem(2, "Sukhpal Singh", "9811122233", 2.4, false),
-        PeerItem(3, "Priya Sharma", "8765432109", 3.1, false),
-        PeerItem(4, "Dr. Rohan Verma", "7654321098", 4.5, false),
-        PeerItem(5, "Ananya Patel", "6543210987", 5.2, false)
-    )
+    private val usersList = mutableListOf<PeerItem>()
+
+    private var isReceiverRegistered = false
+    private val btDiscoveryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val action = intent?.action ?: return
+            if (BluetoothDevice.ACTION_FOUND == action) {
+                val device: BluetoothDevice? =
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                device?.let { handleDiscoveredDevice(it) }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,20 +87,42 @@ class BluetoothActivity : AppCompatActivity() {
         paymentRepository = PaymentRepository.getInstance(this)
         bluetoothEngine = BluetoothPaymentEngine(this)
 
+        val currentUser = sessionManager.getUser()
+        BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
+
         initViews()
         setupListeners()
         loadBalances()
+        populateKnownUsers()
         scanPairedAndNearbyDevices()
         renderList()
     }
 
     override fun onResume() {
         super.onResume()
+        val currentUser = sessionManager.getUser()
+        BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
+
         loadBalances()
         lifecycleScope.launch {
             paymentRepository.refreshAuthoritativeBalances()
             loadBalances()
         }
+
+        populateKnownUsers()
+        scanPairedAndNearbyDevices()
+        startActiveDiscovery()
+        renderList()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopActiveDiscovery()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopActiveDiscovery()
     }
 
     private fun initViews() {
@@ -174,29 +208,145 @@ class BluetoothActivity : AppCompatActivity() {
         tvBtEmergencyBalance.text = String.format(Locale.US, "₹ %.2f", offlineBal)
     }
 
+    private fun populateKnownUsers() {
+        val currentPhone = sessionManager.getUser().phone
+        val registeredAccounts = AuthManager.getInstance(this).getRegisteredAccounts()
+
+        registeredAccounts.forEach { account ->
+            if (account.phone != currentPhone) {
+                val exists = usersList.any { it.categoryOrPhone == account.phone }
+                if (!exists) {
+                    usersList.add(
+                        PeerItem(
+                            id = usersList.size + 1L,
+                            name = account.name,
+                            categoryOrPhone = account.phone,
+                            distanceMeters = 1.0 + (usersList.size * 0.8),
+                            isMerchant = false
+                        )
+                    )
+                }
+            }
+        }
+    }
+
     private fun scanPairedAndNearbyDevices() {
         try {
             val paired = paymentRepository.getPairedBluetoothDevices()
-            var offset = 100L
+            val currentPhone = sessionManager.getUser().phone
+
             for (dev in paired) {
-                val devName = dev.name ?: "Bluetooth Terminal"
-                val isMerch = devName.contains("Pharmacy", true) || devName.contains("Mart", true) || devName.contains("Shop", true)
-                val item = PeerItem(
-                    id = offset++,
-                    name = devName,
-                    categoryOrPhone = if (isMerch) "Paired Merchant" else dev.address,
-                    distanceMeters = 0.5,
-                    isMerchant = isMerch,
-                    rawDevice = dev
-                )
-                if (isMerch) {
-                    if (merchantsList.none { it.name.equals(devName, true) }) merchantsList.add(0, item)
+                val peer = BluetoothHelper.parseEmPayPeer(this, dev) ?: continue
+                if (peer.phone == currentPhone) continue // Skip self
+
+                if (peer.isMerchant) {
+                    if (merchantsList.none { it.name.equals(peer.name, true) }) {
+                        merchantsList.add(
+                            0,
+                            PeerItem(
+                                id = 1000L + merchantsList.size,
+                                name = peer.name,
+                                categoryOrPhone = "Emergency Merchant",
+                                distanceMeters = 0.5,
+                                isMerchant = true,
+                                rawDevice = dev
+                            )
+                        )
+                    }
                 } else {
-                    if (usersList.none { it.name.equals(devName, true) }) usersList.add(0, item)
+                    if (usersList.none { it.categoryOrPhone == peer.phone }) {
+                        usersList.add(
+                            0,
+                            PeerItem(
+                                id = 2000L + usersList.size,
+                                name = peer.name,
+                                categoryOrPhone = peer.phone,
+                                distanceMeters = 0.8,
+                                isMerchant = false,
+                                rawDevice = dev
+                            )
+                        )
+                    }
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun startActiveDiscovery() {
+        if (!BluetoothHelper.hasScanPermission(this)) return
+        try {
+            val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
+            if (!isReceiverRegistered) {
+                registerReceiver(btDiscoveryReceiver, filter)
+                isReceiverRegistered = true
+            }
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if (adapter?.isEnabled == true) {
+                if (adapter.isDiscovering) {
+                    adapter.cancelDiscovery()
+                }
+                adapter.startDiscovery()
+            }
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun stopActiveDiscovery() {
+        try {
+            if (isReceiverRegistered) {
+                unregisterReceiver(btDiscoveryReceiver)
+                isReceiverRegistered = false
+            }
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if (adapter != null && BluetoothHelper.hasScanPermission(this) && adapter.isDiscovering) {
+                adapter.cancelDiscovery()
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun handleDiscoveredDevice(device: BluetoothDevice) {
+        val peer = BluetoothHelper.parseEmPayPeer(this, device) ?: return
+        val currentPhone = sessionManager.getUser().phone
+        if (peer.phone == currentPhone) return
+
+        var updated = false
+        if (peer.isMerchant) {
+            if (merchantsList.none { it.name.equals(peer.name, true) }) {
+                merchantsList.add(
+                    0,
+                    PeerItem(
+                        id = 3000L + merchantsList.size,
+                        name = peer.name,
+                        categoryOrPhone = "Emergency Merchant",
+                        distanceMeters = 1.0,
+                        isMerchant = true,
+                        rawDevice = device
+                    )
+                )
+                updated = true
+            }
+        } else {
+            if (usersList.none { it.categoryOrPhone == peer.phone }) {
+                usersList.add(
+                    0,
+                    PeerItem(
+                        id = 4000L + usersList.size,
+                        name = peer.name,
+                        categoryOrPhone = peer.phone,
+                        distanceMeters = 1.2,
+                        isMerchant = false,
+                        rawDevice = device
+                    )
+                )
+                updated = true
+            }
+        }
+
+        if (updated) {
+            runOnUiThread { renderList() }
         }
     }
 
@@ -211,7 +361,7 @@ class BluetoothActivity : AppCompatActivity() {
 
         if (filtered.isEmpty()) {
             val emptyTv = TextView(this).apply {
-                text = "No $activeTab found nearby"
+                text = if (activeTab == "merchants") "No EmPay Merchants found nearby" else "No EmPay Users found nearby"
                 textSize = 14f
                 setTextColor(Color.parseColor("#6B7280"))
                 gravity = android.view.Gravity.CENTER

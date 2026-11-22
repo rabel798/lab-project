@@ -32,6 +32,7 @@ import androidx.work.WorkInfo
 import com.example.empay.auth.PinAuthManager
 import com.example.empay.auth.SessionManager
 import com.example.empay.auth.UserSession
+import com.example.empay.bluetooth.BluetoothHelper
 import com.example.empay.bluetooth.BluetoothPaymentEngine
 import com.example.empay.crypto.CryptoManager
 import com.example.empay.db.AppDatabase
@@ -515,6 +516,8 @@ class MainActivity : AppCompatActivity() {
             val allGranted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
             if (allGranted) {
                 appendLog("PERMISSIONS", "🟢 Bluetooth permissions granted.")
+                val currentUser = sessionManager.getUser()
+                BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
                 if (pendingLaunchDevicePicker) {
                     pendingLaunchDevicePicker = false
                     showBluetoothDevicePicker()
@@ -530,6 +533,10 @@ class MainActivity : AppCompatActivity() {
     // Call this early (e.g., after UI init) to prompt permissions without forcibly showing the picker dialog
     private fun initBluetoothFlow() {
         checkAndRequestBluetoothPermissions(autoOpenPicker = false)
+        if (BluetoothHelper.hasConnectPermission(this)) {
+            val currentUser = sessionManager.getUser()
+            BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
+        }
     }
 
     private fun initHardwareCrypto() {
@@ -1291,6 +1298,10 @@ class MainActivity : AppCompatActivity() {
         }
         updateNetworkBadge(NetworkManager.isOnline(this))
         refreshLocalLedgerUI()
+        val currentUser = sessionManager.getUser()
+        if (BluetoothHelper.hasConnectPermission(this)) {
+            BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
+        }
         lifecycleScope.launch {
             paymentRepository.refreshAuthoritativeBalances()
         }
