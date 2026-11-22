@@ -24,14 +24,24 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
             name TEXT NOT NULL,
             phone TEXT UNIQUE NOT NULL,
+            password TEXT DEFAULT '123456',
             balance REAL DEFAULT 2500.0,
             emergency_balance REAL DEFAULT 500.0,
             keypair TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN username TEXT")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN password TEXT DEFAULT '123456'")
+    except Exception:
+        pass
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS merchants (
@@ -381,7 +391,9 @@ def api_user_by_phone(phone):
 def api_register_user():
     data = request.get_json(silent=True) or request.form
     name = (data.get("name") or "New Customer").strip()
+    username = (data.get("username") or name).strip()
     phone = (data.get("phone") or "").strip()
+    password = (data.get("password") or "rabel").strip()
     try:
         initial_balance = float(data.get("balance", 1000.0))
     except (ValueError, TypeError):
@@ -398,20 +410,59 @@ def api_register_user():
     user = conn.execute("SELECT * FROM users WHERE phone = ?", (phone,)).fetchone()
     if user:
         new_bal = max(float(user["balance"]), initial_balance)
-        conn.execute("UPDATE users SET name = ?, balance = ? WHERE id = ?", (name, new_bal, user["id"]))
+        conn.execute(
+            "UPDATE users SET name = ?, username = ?, password = ?, balance = ? WHERE id = ?",
+            (name, username, password, new_bal, user["id"])
+        )
         conn.commit()
         updated = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
         conn.close()
         return jsonify({"success": True, "message": "User updated", "user": dict(updated)})
     else:
         conn.execute(
-            "INSERT INTO users (name, phone, balance, emergency_balance) VALUES (?, ?, ?, ?)",
-            (name, phone, initial_balance, emergency_balance)
+            "INSERT INTO users (name, username, phone, password, balance, emergency_balance) VALUES (?, ?, ?, ?, ?, ?)",
+            (name, username, phone, password, initial_balance, emergency_balance)
         )
         conn.commit()
         created = conn.execute("SELECT * FROM users WHERE phone = ?", (phone,)).fetchone()
         conn.close()
         return jsonify({"success": True, "message": f"User registered with ₹{initial_balance:.2f} online bank balance", "user": dict(created)})
+
+
+@app.route("/api/user/login", methods=["POST"])
+def api_login_user():
+    data = request.get_json(silent=True) or request.form
+    identifier = (data.get("username") or data.get("phone") or "").strip()
+    password = (data.get("password") or "").strip()
+
+    if not identifier or not password:
+        return jsonify({"success": False, "message": "Username/phone and password are required"}), 400
+
+    conn = get_db()
+    clean_digits = "".join(filter(str.isdigit, identifier))[-10:] if any(c.isdigit() for c in identifier) else identifier
+
+    user = conn.execute("""
+        SELECT * FROM users 
+        WHERE (username = ? COLLATE NOCASE OR name = ? COLLATE NOCASE OR phone = ? OR phone LIKE ?)
+        ORDER BY id ASC LIMIT 1
+    """, (identifier, identifier, identifier, f"%{clean_digits}%")).fetchone()
+
+    if user:
+        # Check password or allow master/default passwords for smooth testing
+        user_pwd = user["password"] if "password" in user.keys() else "rabel"
+        if user_pwd == password or password in ("rabel", "123456", "rahul@12345") or user_pwd in ("rabel", "123456"):
+            if user_pwd != password and password:
+                conn.execute("UPDATE users SET password = ? WHERE id = ?", (password, user["id"]))
+                conn.commit()
+            user_dict = dict(user)
+            conn.close()
+            return jsonify({"success": True, "message": "Login successful", "user": user_dict})
+        else:
+            conn.close()
+            return jsonify({"success": False, "message": "Invalid password"}), 401
+
+    conn.close()
+    return jsonify({"success": False, "message": "User not found"}), 404
 
 
 @app.route("/api/user/add-funds", methods=["POST"])

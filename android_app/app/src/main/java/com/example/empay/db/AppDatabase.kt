@@ -19,6 +19,7 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
 
         private const val TABLE_WALLET = "wallet"
         private const val TABLE_TRANSACTIONS = "transactions"
+        private const val TABLE_USERS = "users"
 
         @Volatile
         private var instance: AppDatabase? = null
@@ -60,13 +61,29 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
             );
         """.trimIndent()
 
+        val createUsersTable = """
+            CREATE TABLE IF NOT EXISTS $TABLE_USERS (
+                id INTEGER PRIMARY KEY,
+                username TEXT,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                password TEXT NOT NULL,
+                account_number TEXT,
+                balance REAL DEFAULT 1000.0,
+                emergency_balance REAL DEFAULT 100.0,
+                is_remembered INTEGER DEFAULT 1,
+                created_at INTEGER
+            );
+        """.trimIndent()
+
         db.execSQL(createWalletTable)
         db.execSQL(createTransactionsTable)
+        db.execSQL(createUsersTable)
 
         val initialWallet = ContentValues().apply {
             put("id", 1L)
             put("user_id", "USER_1001")
-            put("user_name", "Rahul Sharma")
+            put("user_name", "rabel")
             put("balance", 10.0)
             put("offline_max_limit", 10.0)
             put("emergency_threshold", 5.0)
@@ -76,10 +93,113 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
         db.insert(TABLE_WALLET, null, initialWallet)
     }
 
+    override fun onOpen(db: SQLiteDatabase) {
+        super.onOpen(db)
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS $TABLE_USERS (
+                id INTEGER PRIMARY KEY,
+                username TEXT,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                password TEXT NOT NULL,
+                account_number TEXT,
+                balance REAL DEFAULT 1000.0,
+                emergency_balance REAL DEFAULT 100.0,
+                is_remembered INTEGER DEFAULT 1,
+                created_at INTEGER
+            );
+        """.trimIndent())
+    }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         db.execSQL("DROP TABLE IF EXISTS $TABLE_WALLET")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_TRANSACTIONS")
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
         onCreate(db)
+    }
+
+    val userDao: UserDao = object : UserDao {
+        override fun insertOrUpdateUser(user: com.example.empay.auth.UserAccount, isRemembered: Boolean): Long {
+            val db = writableDatabase
+            val values = ContentValues().apply {
+                put("id", user.id)
+                put("username", user.name)
+                put("name", user.name)
+                put("phone", user.phone)
+                put("password", user.password)
+                put("account_number", user.accountNumber)
+                put("balance", user.balance)
+                put("emergency_balance", user.emergencyBalance)
+                put("is_remembered", if (isRemembered) 1 else 0)
+                put("created_at", System.currentTimeMillis())
+            }
+            return db.insertWithOnConflict(TABLE_USERS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        }
+
+        override fun getUserByUsernameOrPhone(query: String): com.example.empay.auth.UserAccount? {
+            val trimmed = query.trim()
+            val digits = trimmed.filter { it.isDigit() }.takeLast(10)
+            val db = readableDatabase
+            val cursor = db.rawQuery(
+                """
+                SELECT * FROM $TABLE_USERS 
+                WHERE username = ? COLLATE NOCASE 
+                   OR name = ? COLLATE NOCASE 
+                   OR phone = ? 
+                   OR (length(?) >= 7 AND phone LIKE ?)
+                ORDER BY id ASC LIMIT 1
+                """.trimIndent(),
+                arrayOf(trimmed, trimmed, trimmed, digits, "%$digits%")
+            )
+            return cursor.use {
+                if (it.moveToFirst()) cursorToUser(it) else null
+            }
+        }
+
+        override fun getAllUsers(): List<com.example.empay.auth.UserAccount> {
+            val db = readableDatabase
+            val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS ORDER BY id ASC", null)
+            val list = mutableListOf<com.example.empay.auth.UserAccount>()
+            cursor.use {
+                while (it.moveToNext()) {
+                    list.add(cursorToUser(it))
+                }
+            }
+            return list
+        }
+
+        override fun getRememberedUser(): com.example.empay.auth.UserAccount? {
+            val db = readableDatabase
+            val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS WHERE is_remembered = 1 ORDER BY created_at DESC LIMIT 1", null)
+            return cursor.use {
+                if (it.moveToFirst()) cursorToUser(it) else null
+            }
+        }
+
+        override fun setRemembered(userId: Long, isRemembered: Boolean) {
+            val db = writableDatabase
+            db.execSQL("UPDATE $TABLE_USERS SET is_remembered = 0")
+            if (isRemembered) {
+                db.execSQL("UPDATE $TABLE_USERS SET is_remembered = 1 WHERE id = ?", arrayOf(userId))
+            }
+        }
+
+        override fun clearAllRemembered() {
+            val db = writableDatabase
+            db.execSQL("UPDATE $TABLE_USERS SET is_remembered = 0")
+        }
+
+        private fun cursorToUser(c: Cursor): com.example.empay.auth.UserAccount {
+            return com.example.empay.auth.UserAccount(
+                id = c.getLong(c.getColumnIndexOrThrow("id")),
+                name = c.getString(c.getColumnIndexOrThrow("name")),
+                phone = c.getString(c.getColumnIndexOrThrow("phone")),
+                password = c.getString(c.getColumnIndexOrThrow("password")),
+                accountNumber = c.getString(c.getColumnIndexOrThrow("account_number")),
+                balance = c.getDouble(c.getColumnIndexOrThrow("balance")),
+                emergencyBalance = c.getDouble(c.getColumnIndexOrThrow("emergency_balance"))
+            )
+        }
     }
 
     val walletDao: WalletDao = object : WalletDao {

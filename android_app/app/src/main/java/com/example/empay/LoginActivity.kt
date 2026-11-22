@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -23,6 +24,7 @@ class LoginActivity : AppCompatActivity() {
 
     private lateinit var etLoginPhone: EditText
     private lateinit var etLoginPassword: EditText
+    private lateinit var cbRememberMe: CheckBox
     private lateinit var btnSubmitLogin: Button
     private lateinit var layoutDemoAccountHint: View
 
@@ -36,6 +38,21 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         authManager = AuthManager.getInstance(this)
+
+        // If user is already remembered/logged in, skip the login screen automatically!
+        if (authManager.isLoggedIn()) {
+            val rememberedUser = authManager.getActiveAccount()
+            if (rememberedUser != null) {
+                com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(
+                    this,
+                    rememberedUser.name,
+                    rememberedUser.phone
+                )
+            }
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+            return
+        }
 
         setContentView(R.layout.activity_login)
 
@@ -51,6 +68,7 @@ class LoginActivity : AppCompatActivity() {
 
         etLoginPhone = findViewById(R.id.etLoginPhone)
         etLoginPassword = findViewById(R.id.etLoginPassword)
+        cbRememberMe = findViewById(R.id.cbRememberMe)
         btnSubmitLogin = findViewById(R.id.btnSubmitLogin)
         layoutDemoAccountHint = findViewById(R.id.layoutDemoAccountHint)
 
@@ -63,6 +81,7 @@ class LoginActivity : AppCompatActivity() {
         // Fields start empty by default — user enters their username/phone and password
         etLoginPhone.setText("")
         etLoginPassword.setText("")
+        cbRememberMe.isChecked = true
     }
 
     private fun setupListeners() {
@@ -72,6 +91,7 @@ class LoginActivity : AppCompatActivity() {
         btnSubmitLogin.setOnClickListener {
             val phoneOrName = etLoginPhone.text.toString().trim()
             val password = etLoginPassword.text.toString().trim()
+            val rememberMe = cbRememberMe.isChecked
 
             if (phoneOrName.isEmpty()) {
                 Toast.makeText(this, "Please enter your username or phone number", Toast.LENGTH_SHORT).show()
@@ -83,7 +103,7 @@ class LoginActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val account = authManager.login(phoneOrName, password)
+            val account = authManager.login(phoneOrName, password, rememberMe)
             if (account != null) {
                 com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, account.name, account.phone)
                 Toast.makeText(this, "Welcome, ${account.name}!", Toast.LENGTH_SHORT).show()
@@ -113,9 +133,10 @@ class LoginActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val newAccount = authManager.signUp(name, phone, password, emergencyBal)
+            // Permanently registers account in SQLite & bank server, keeping user logged in
+            val newAccount = authManager.signUp(name, phone, password, emergencyBal, rememberMe = true)
             com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, newAccount.name, newAccount.phone)
-            Toast.makeText(this, "Profile created for ${newAccount.name}! Ready for Bluetooth testing.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Profile created for ${newAccount.name}!", Toast.LENGTH_LONG).show()
             startActivity(Intent(this, MainActivity::class.java))
             finish()
         }

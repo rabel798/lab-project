@@ -141,7 +141,19 @@
                 android:textSize="15sp"
                 android:paddingHorizontal="16dp"
                 android:singleLine="true"
-                android:layout_marginBottom="24dp" />
+                android:layout_marginBottom="12dp" />
+
+            <CheckBox
+                android:id="@+id/cbRememberMe"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remember Me"
+                android:checked="true"
+                android:textColor="#475569"
+                android:textSize="14sp"
+                android:fontFamily="@font/inter"
+                android:buttonTint="@color/primary"
+                android:layout_marginBottom="18dp" />
 
             <Button
                 android:id="@+id/btnSubmitLogin"
