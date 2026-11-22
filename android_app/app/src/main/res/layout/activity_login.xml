@@ -112,7 +112,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:background="@drawable/bg_service_card"
-                android:hint="9876543210 or Rahul Sharma"
+                android:hint="Phone number or username"
                 android:textColor="#0F172A"
                 android:textColorHint="#94A3B8"
                 android:textSize="15sp"
@@ -134,7 +134,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:background="@drawable/bg_service_card"
-                android:hint="Enter password (e.g. rahul@12345)"
+                android:hint="Enter your password"
                 android:inputType="textPassword"
                 android:textColor="#0F172A"
                 android:textColorHint="#94A3B8"
@@ -155,17 +155,37 @@
                 app:cornerRadius="12dp"
                 android:layout_marginBottom="14dp" />
 
-            <!-- One-tap Quick Demo Login with Electric Orange -->
-            <Button
-                android:id="@+id/btnQuickRahulLogin"
+            <!-- Light helper note for Rahul Sharma's default credentials -->
+            <LinearLayout
+                android:id="@+id/layoutDemoAccountHint"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="⚡ One-Tap: Login as Rahul Sharma"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="@color/electric_orange"
-                android:backgroundTint="@color/electric_orange_light"
-                app:cornerRadius="12dp" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_service_card"
+                android:backgroundTint="#F8FAFC"
+                android:padding="12dp"
+                android:gravity="center"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Default demo account for Rahul Sharma"
+                    android:textColor="#94A3B8"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:fontFamily="@font/inter" />
+
+                <TextView
+                    android:id="@+id/tvDemoCredentialsText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Username / Phone: 9876543210  •  Password: rahul@12345"
+                    android:textColor="#94A3B8"
+                    android:textSize="11sp"
+                    android:layout_marginTop="3dp"
+                    android:fontFamily="@font/inter" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- SIGN UP SECTION -->

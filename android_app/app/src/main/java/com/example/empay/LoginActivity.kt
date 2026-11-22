@@ -24,7 +24,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var etLoginPhone: EditText
     private lateinit var etLoginPassword: EditText
     private lateinit var btnSubmitLogin: Button
-    private lateinit var btnQuickRahulLogin: Button
+    private lateinit var layoutDemoAccountHint: View
 
     private lateinit var etSignUpName: EditText
     private lateinit var etSignUpPhone: EditText
@@ -52,7 +52,7 @@ class LoginActivity : AppCompatActivity() {
         etLoginPhone = findViewById(R.id.etLoginPhone)
         etLoginPassword = findViewById(R.id.etLoginPassword)
         btnSubmitLogin = findViewById(R.id.btnSubmitLogin)
-        btnQuickRahulLogin = findViewById(R.id.btnQuickRahulLogin)
+        layoutDemoAccountHint = findViewById(R.id.layoutDemoAccountHint)
 
         etSignUpName = findViewById(R.id.etSignUpName)
         etSignUpPhone = findViewById(R.id.etSignUpPhone)
@@ -60,9 +60,9 @@ class LoginActivity : AppCompatActivity() {
         etSignUpEmergencyBal = findViewById(R.id.etSignUpEmergencyBal)
         btnSubmitSignUp = findViewById(R.id.btnSubmitSignUp)
 
-        // Pre-fill Rahul Sharma's credentials in login inputs
-        etLoginPhone.setText("9876543210")
-        etLoginPassword.setText("rahul@12345")
+        // Fields start empty by default — user enters their username/phone and password
+        etLoginPhone.setText("")
+        etLoginPassword.setText("")
     }
 
     private fun setupListeners() {
@@ -73,39 +73,32 @@ class LoginActivity : AppCompatActivity() {
             val phoneOrName = etLoginPhone.text.toString().trim()
             val password = etLoginPassword.text.toString().trim()
 
-            if (phoneOrName.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Please enter your username/phone and password", Toast.LENGTH_SHORT).show()
+            if (phoneOrName.isEmpty()) {
+                Toast.makeText(this, "Please enter your username or phone number", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            if (password.isEmpty()) {
+                Toast.makeText(this, "Please enter your password", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
             val account = authManager.login(phoneOrName, password)
             if (account != null) {
                 com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, account.name, account.phone)
-                Toast.makeText(this, "Welcome back, ${account.name}!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Welcome, ${account.name}!", Toast.LENGTH_SHORT).show()
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
             } else {
-                Toast.makeText(this, "Invalid credentials. Use phone '9876543210' & password 'rahul@12345'", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Invalid credentials. Please verify username/phone and password.", Toast.LENGTH_LONG).show()
             }
         }
 
-        val activeAcc = authManager.getActiveAccount()
-        if (activeAcc != null) {
-            btnQuickRahulLogin.text = "⚡ Continue as ${activeAcc.name}"
-            etLoginPhone.setText(activeAcc.phone)
-        } else {
-            btnQuickRahulLogin.text = "⚡ One-Tap: Login as Rahul Sharma"
-        }
-
-        btnQuickRahulLogin.setOnClickListener {
-            val target = authManager.getActiveAccount() ?: authManager.login("9876543210", "rahul@12345")
-            if (target != null) {
-                authManager.setActiveAccount(target)
-                com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, target.name, target.phone)
-                Toast.makeText(this, "Logged in as ${target.name}", Toast.LENGTH_SHORT).show()
-                startActivity(Intent(this, MainActivity::class.java))
-                finish()
-            }
+        // Tapping the light helper note fills default demo credentials for quick testing
+        layoutDemoAccountHint.setOnClickListener {
+            etLoginPhone.setText("9876543210")
+            etLoginPassword.setText("rahul@12345")
+            Toast.makeText(this, "Rahul Sharma credentials applied", Toast.LENGTH_SHORT).show()
         }
 
         btnSubmitSignUp.setOnClickListener {
