@@ -25,7 +25,9 @@ data class TransferEmergencyResponse(
  */
 data class AddFundsRequest(
     @SerializedName("user_id") val userId: Long = 1L,
-    @SerializedName("amount") val amount: Double
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("phone") val phone: String? = null,
+    @SerializedName("username") val username: String? = null
 )
 
 data class AddFundsResponse(
@@ -35,3 +37,14 @@ data class AddFundsResponse(
     @SerializedName("emergency_balance") val emergencyBalance: Double? = null
 )
 
+data class UpdateUserNameRequest(
+    @SerializedName("user_id") val userId: Long,
+    @SerializedName("phone") val phone: String,
+    @SerializedName("name") val name: String
+)
+
+data class UpdateUserNameResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("message") val message: String,
+    @SerializedName("user") val user: BankUserResponse? = null
+)

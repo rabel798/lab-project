@@ -70,7 +70,7 @@ class BluetoothActivity : AppCompatActivity() {
     private val btDiscoveryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val action = intent?.action ?: return
-            if (BluetoothDevice.ACTION_FOUND == action) {
+            if (BluetoothDevice.ACTION_FOUND == action || BluetoothDevice.ACTION_NAME_CHANGED == action) {
                 val device: BluetoothDevice? =
                     intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                 device?.let { handleDiscoveredDevice(it) }
@@ -103,10 +103,28 @@ class BluetoothActivity : AppCompatActivity() {
         val currentUser = sessionManager.getUser()
         BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
 
+        // Request Bluetooth Discoverability so nearby devices running EmPay can discover this device
+        try {
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if (adapter != null && adapter.isEnabled && adapter.scanMode != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
+                val discoverableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+                }
+                startActivity(discoverableIntent)
+            }
+        } catch (_: Exception) {}
+
         loadBalances()
         lifecycleScope.launch {
             paymentRepository.refreshAuthoritativeBalances()
             loadBalances()
+        }
+
+        // Pull latest registered users dynamically from bank server so any new user (Krrish, Rabel, etc.) appears immediately
+        AuthManager.getInstance(this).syncAllRegisteredUsersFromBackend {
+            populateKnownUsers()
+            scanPairedAndNearbyDevices()
+            renderList()
         }
 
         populateKnownUsers()
@@ -277,7 +295,10 @@ class BluetoothActivity : AppCompatActivity() {
     private fun startActiveDiscovery() {
         if (!BluetoothHelper.hasScanPermission(this)) return
         try {
-            val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
+            val filter = IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_FOUND)
+                addAction(BluetoothDevice.ACTION_NAME_CHANGED)
+            }
             if (!isReceiverRegistered) {
                 registerReceiver(btDiscoveryReceiver, filter)
                 isReceiverRegistered = true
@@ -314,14 +335,18 @@ class BluetoothActivity : AppCompatActivity() {
 
         var updated = false
         if (peer.isMerchant) {
-            if (merchantsList.none { it.name.equals(peer.name, true) }) {
+            val mIdx = merchantsList.indexOfFirst { it.name.equals(peer.name, true) }
+            if (mIdx >= 0) {
+                merchantsList[mIdx] = merchantsList[mIdx].copy(rawDevice = device)
+                updated = true
+            } else {
                 merchantsList.add(
                     0,
                     PeerItem(
                         id = 3000L + merchantsList.size,
                         name = peer.name,
                         categoryOrPhone = "Emergency Merchant",
-                        distanceMeters = 1.0,
+                        distanceMeters = 0.5,
                         isMerchant = true,
                         rawDevice = device
                     )
@@ -329,14 +354,26 @@ class BluetoothActivity : AppCompatActivity() {
                 updated = true
             }
         } else {
-            if (usersList.none { it.categoryOrPhone == peer.phone }) {
+            val uIdx = usersList.indexOfFirst { 
+                (peer.phone.isNotEmpty() && it.categoryOrPhone == peer.phone) ||
+                it.name.equals(peer.name, true)
+            }
+            if (uIdx >= 0) {
+                usersList[uIdx] = usersList[uIdx].copy(
+                    name = peer.name,
+                    categoryOrPhone = peer.phone.ifEmpty { usersList[uIdx].categoryOrPhone },
+                    rawDevice = device,
+                    distanceMeters = 0.5
+                )
+                updated = true
+            } else {
                 usersList.add(
                     0,
                     PeerItem(
                         id = 4000L + usersList.size,
                         name = peer.name,
                         categoryOrPhone = peer.phone,
-                        distanceMeters = 1.2,
+                        distanceMeters = 0.5,
                         isMerchant = false,
                         rawDevice = device
                     )
@@ -383,11 +420,13 @@ class BluetoothActivity : AppCompatActivity() {
             tvName.text = item.name
             if (item.isMerchant) {
                 ivIcon.setImageResource(R.drawable.ic_store)
-                tvSub.text = "${item.categoryOrPhone} • ${String.format(Locale.US, "%.1fm", item.distanceMeters)}"
+                val deviceStatus = if (item.rawDevice != null) " • Bluetooth Paired" else ""
+                tvSub.text = "${item.categoryOrPhone} • ${String.format(Locale.US, "%.1fm", item.distanceMeters)}$deviceStatus"
             } else {
                 ivIcon.setImageResource(R.drawable.ic_profile)
                 val phoneDisp = if (item.categoryOrPhone.startsWith("+")) item.categoryOrPhone else "+91 ${item.categoryOrPhone}"
-                tvSub.text = "$phoneDisp • ${String.format(Locale.US, "%.1fm", item.distanceMeters)}"
+                val deviceStatus = if (item.rawDevice != null) " • Bluetooth Nearby" else ""
+                tvSub.text = "$phoneDisp • ${String.format(Locale.US, "%.1fm", item.distanceMeters)}$deviceStatus"
             }
 
             val payAction = View.OnClickListener {
@@ -395,6 +434,9 @@ class BluetoothActivity : AppCompatActivity() {
                     putExtra("PAYEE_NAME", item.name)
                     if (!item.isMerchant) {
                         putExtra("PHONE", item.categoryOrPhone)
+                    }
+                    if (item.rawDevice != null) {
+                        putExtra("DEVICE_ADDRESS", item.rawDevice.address)
                     }
                     putExtra("CHANNEL", "Bluetooth")
                     putExtra("IS_OFFLINE", true)

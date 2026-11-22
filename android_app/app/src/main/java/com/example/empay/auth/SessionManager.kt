@@ -39,12 +39,12 @@ class SessionManager private constructor(context: Context) {
     }
 
     private fun loadSession(): UserSession {
-        val id = prefs.getLong(KEY_USER_ID, 1L)
-        val name = prefs.getString(KEY_NAME, "Rahul Sharma") ?: "Rahul Sharma"
-        val phone = prefs.getString(KEY_PHONE, "9876543210") ?: "9876543210"
-        val accountNumber = prefs.getString(KEY_ACCOUNT_NUMBER, "ACC-9876543210-01") ?: "ACC-9876543210-01"
-        val balance = prefs.getFloat(KEY_BALANCE, 500.0f).toDouble()
-        val emergencyBalance = prefs.getFloat(KEY_EMERGENCY_BALANCE, 10.0f).toDouble()
+        val id = prefs.getLong(KEY_USER_ID, -1L)
+        val name = prefs.getString(KEY_NAME, "") ?: ""
+        val phone = prefs.getString(KEY_PHONE, "") ?: ""
+        val accountNumber = prefs.getString(KEY_ACCOUNT_NUMBER, "") ?: ""
+        val balance = prefs.getFloat(KEY_BALANCE, 0.0f).toDouble()
+        val emergencyBalance = prefs.getFloat(KEY_EMERGENCY_BALANCE, 0.0f).toDouble()
         val isOnline = prefs.getBoolean(KEY_IS_ONLINE, true)
 
         return UserSession(
@@ -89,9 +89,29 @@ class SessionManager private constructor(context: Context) {
         updateUser(updated)
     }
 
+    fun clearSession() {
+        prefs.edit().clear().apply()
+        _sessionState.value = UserSession(
+            id = -1L,
+            name = "",
+            phone = "",
+            accountNumber = "",
+            balance = 0.0,
+            emergencyBalance = 0.0,
+            isOnline = true
+        )
+    }
+
     fun resetToDefaultDemoUser() {
-        val defaultUser = UserSession()
+        val defaultUser = UserSession(
+            id = 1L,
+            name = "rabel",
+            phone = "9876543210",
+            accountNumber = "ACC-9876543210-01",
+            balance = 1250.0,
+            emergencyBalance = 200.0,
+            isOnline = true
+        )
         updateUser(defaultUser)
     }
 }
-

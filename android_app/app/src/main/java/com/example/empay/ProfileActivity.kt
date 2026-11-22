@@ -194,19 +194,27 @@ class ProfileActivity : AppCompatActivity() {
 
     private fun editProfilePrompt() {
         val user = sessionManager.getUser()
+        val authManager = AuthManager.getInstance(this)
+        val currentAccount = authManager.getActiveAccount()
+        val prevNamesDisp = if (!currentAccount?.previousNames.isNullOrEmpty()) {
+            "\n\nPrevious names recorded in audit:\n${currentAccount?.previousNames}"
+        } else ""
+
         val inputName = EditText(this).apply {
             hint = "Enter Full Name"
             setText(user.name)
         }
         AlertDialog.Builder(this)
-            .setTitle("Update Profile")
+            .setTitle("Update Profile Name")
+            .setMessage("Editing your name will immediately broadcast your new identity over Bluetooth to all nearby devices and record history in the database.$prevNamesDisp")
             .setView(inputName)
-            .setPositiveButton("Save") { _, _ ->
+            .setPositiveButton("Save & Broadcast") { _, _ ->
                 val newName = inputName.text.toString().trim()
                 if (newName.isNotEmpty()) {
-                    sessionManager.updateUser(user.copy(name = newName))
-                    loadUserData()
-                    Toast.makeText(this, "Profile updated successfully!", Toast.LENGTH_SHORT).show()
+                    authManager.updateUserName(user.id, newName) {
+                        loadUserData()
+                        Toast.makeText(this, "Profile updated to '$newName' & broadcasted via Bluetooth!", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -233,16 +241,31 @@ class ProfileActivity : AppCompatActivity() {
                     lifecycleScope.launch(Dispatchers.IO) {
                         try {
                             val api = BankApiClient.getApiService(this@ProfileActivity)
-                            val resp = api.addFunds(AddFundsRequest(userId = user.id, amount = amt))
+                            val resp = api.addFunds(
+                                AddFundsRequest(
+                                    userId = user.id,
+                                    amount = amt,
+                                    phone = user.phone,
+                                    username = user.name
+                                )
+                            )
                             withContext(Dispatchers.Main) {
                                 if (resp.isSuccessful && resp.body()?.success == true) {
                                     val newBal = resp.body()!!.balance
                                     sessionManager.updateBalances(newBal, user.emergencyBalance)
+                                    val acc = AuthManager.getInstance(this@ProfileActivity).getActiveAccount()
+                                    if (acc != null) {
+                                        appDatabase.userDao.insertOrUpdateUser(acc.copy(balance = newBal), isRemembered = true)
+                                    }
                                     loadUserData()
-                                    Toast.makeText(this@ProfileActivity, "✅ Added ₹$amt to Bank Account!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@ProfileActivity, "✅ Added ₹$amt to Bank Account! (New Balance: ₹$newBal)", Toast.LENGTH_SHORT).show()
                                 } else {
                                     val localBal = user.balance + amt
                                     sessionManager.updateBalances(localBal, user.emergencyBalance)
+                                    val acc = AuthManager.getInstance(this@ProfileActivity).getActiveAccount()
+                                    if (acc != null) {
+                                        appDatabase.userDao.insertOrUpdateUser(acc.copy(balance = localBal), isRemembered = true)
+                                    }
                                     loadUserData()
                                     Toast.makeText(this@ProfileActivity, "Added ₹$amt to Available Balance!", Toast.LENGTH_SHORT).show()
                                 }
@@ -251,6 +274,10 @@ class ProfileActivity : AppCompatActivity() {
                             withContext(Dispatchers.Main) {
                                 val localBal = user.balance + amt
                                 sessionManager.updateBalances(localBal, user.emergencyBalance)
+                                val acc = AuthManager.getInstance(this@ProfileActivity).getActiveAccount()
+                                if (acc != null) {
+                                    appDatabase.userDao.insertOrUpdateUser(acc.copy(balance = localBal), isRemembered = true)
+                                }
                                 loadUserData()
                                 Toast.makeText(this@ProfileActivity, "Added ₹$amt (Local Update: ${e.message})", Toast.LENGTH_SHORT).show()
                             }

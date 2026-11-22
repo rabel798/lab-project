@@ -103,11 +103,19 @@ object BluetoothHelper {
             )
         }
 
-        // 3. Check if device matches any registered user account created in the app
-        val registeredAccounts = AuthManager.getInstance(context).getRegisteredAccounts()
+        // 3. Check if device matches any registered user account created in the app or database
+        val registeredAccounts = AuthManager.getInstance(context).getRegisteredAccounts().toMutableList()
+        val dbUsers = com.example.empay.db.AppDatabase.getInstance(context).userDao.getAllUsers()
+        dbUsers.forEach { u ->
+            if (registeredAccounts.none { it.id == u.id || it.phone == u.phone }) {
+                registeredAccounts.add(u)
+            }
+        }
+
         val accountMatch = registeredAccounts.find { acc ->
             acc.name.equals(rawName, ignoreCase = true) ||
             rawName.contains(acc.name, ignoreCase = true) ||
+            (acc.previousNames.isNotEmpty() && acc.previousNames.contains(rawName, ignoreCase = true)) ||
             (acc.phone.isNotEmpty() && rawName.contains(acc.phone))
         }
         if (accountMatch != null) {

@@ -1,13 +1,20 @@
 package com.example.empay
 
 import android.app.Dialog
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import android.widget.AutoCompleteTextView
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Filter
+import android.widget.Filterable
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -39,7 +46,7 @@ class PayActivity : AppCompatActivity() {
     private lateinit var appDatabase: AppDatabase
     private lateinit var paymentRepository: PaymentRepository
 
-    private lateinit var etPayRecipient: EditText
+    private lateinit var etPayRecipient: AutoCompleteTextView
     private lateinit var etPayAmountInput: EditText
     private lateinit var etPayNote: EditText
     private lateinit var tvPayHeroTitle: TextView
@@ -54,6 +61,17 @@ class PayActivity : AppCompatActivity() {
 
     private var isOnlineMode = true
     private var selectedChannel = "UPI"
+    private var targetPhone: String = ""
+    private var targetDeviceAddress: String = ""
+
+    data class RecipientSuggestion(
+        val name: String,
+        val phone: String,
+        val isMerchant: Boolean,
+        val subtitle: String
+    ) {
+        override fun toString(): String = name
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,6 +83,7 @@ class PayActivity : AppCompatActivity() {
 
         initViews()
         setupListeners()
+        setupRecipientAutoComplete()
         loadStateAndBalances()
     }
 
@@ -75,6 +94,7 @@ class PayActivity : AppCompatActivity() {
             paymentRepository.refreshAuthoritativeBalances()
             loadStateAndBalances()
         }
+        com.example.empay.auth.AuthManager.getInstance(this).syncAllRegisteredUsersFromBackend()
     }
 
     private fun initViews() {
@@ -98,6 +118,8 @@ class PayActivity : AppCompatActivity() {
         val phone = intent.getStringExtra("PHONE") ?: ""
         val defaultAmt = intent.getStringExtra("DEFAULT_AMOUNT") ?: ""
         val channelParam = intent.getStringExtra("CHANNEL") ?: ""
+        targetDeviceAddress = intent.getStringExtra("DEVICE_ADDRESS") ?: ""
+        targetPhone = phone
 
         if (targetPayee.isNotEmpty()) {
             etPayRecipient.setText(targetPayee)
@@ -125,6 +147,111 @@ class PayActivity : AppCompatActivity() {
         }
 
         selectedChannel = if (isOnlineMode) "UPI" else "Bluetooth"
+    }
+
+    private fun setupRecipientAutoComplete() {
+        val adapter = object : android.widget.ArrayAdapter<RecipientSuggestion>(
+            this,
+            R.layout.item_recipient_suggestion,
+            R.id.tvSuggestName
+        ) {
+            private var suggestions = listOf<RecipientSuggestion>()
+
+            override fun getCount(): Int = suggestions.size
+            override fun getItem(position: Int): RecipientSuggestion? = suggestions.getOrNull(position)
+
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = convertView ?: LayoutInflater.from(context).inflate(
+                    R.layout.item_recipient_suggestion, parent, false
+                )
+                val item = getItem(position) ?: return view
+
+                val ivIcon = view.findViewById<ImageView>(R.id.ivSuggestIcon)
+                val tvName = view.findViewById<TextView>(R.id.tvSuggestName)
+                val tvSubtitle = view.findViewById<TextView>(R.id.tvSuggestSubtitle)
+                val tvBadge = view.findViewById<TextView>(R.id.tvSuggestBadge)
+
+                tvName.text = item.name
+                tvSubtitle.text = item.subtitle
+                if (item.isMerchant) {
+                    ivIcon.setImageResource(R.drawable.ic_store)
+                    tvBadge.text = "✓ Verified Merchant"
+                    tvBadge.setTextColor(Color.parseColor("#15803D"))
+                } else {
+                    ivIcon.setImageResource(R.drawable.ic_profile)
+                    tvBadge.text = "✓ Registered User"
+                    tvBadge.setTextColor(Color.parseColor("#0284C7"))
+                }
+                return view
+            }
+
+            override fun getFilter(): Filter {
+                return object : Filter() {
+                    override fun performFiltering(constraint: CharSequence?): FilterResults {
+                        val query = constraint?.toString()?.trim() ?: ""
+                        val results = FilterResults()
+                        val currentPhone = sessionManager.getUser().phone
+                        val currentName = sessionManager.getUser().name
+
+                        val matched = mutableListOf<RecipientSuggestion>()
+
+                        // 1. Query local registered users from SQLite
+                        val users = appDatabase.userDao.searchUsers(query)
+                        users.forEach { u ->
+                            if (u.phone != currentPhone && !u.name.equals(currentName, true)) {
+                                matched.add(
+                                    RecipientSuggestion(
+                                        name = u.name,
+                                        phone = u.phone,
+                                        isMerchant = false,
+                                        subtitle = "+91 ${u.phone} • Genuine Registered User"
+                                    )
+                                )
+                            }
+                        }
+
+                        // 2. Verified Disaster Relief Merchants
+                        val merchants = listOf(
+                            Triple("Apex City Care Pharmacy", "9811122233", "Healthcare Merchant"),
+                            Triple("Daily Fresh Supermarket", "9822233344", "Groceries Merchant"),
+                            Triple("LifeLine Emergency Medicos", "9833344455", "Emergency Healthcare"),
+                            Triple("National Book & Stationery Depot", "9844455566", "Retail Merchant"),
+                            Triple("City QuickFix Electrical Services", "9855566677", "Emergency Services")
+                        )
+                        merchants.forEach { m ->
+                            if (query.isEmpty() || m.first.contains(query, true) || m.second.contains(query)) {
+                                matched.add(
+                                    RecipientSuggestion(
+                                        name = m.first,
+                                        phone = m.second,
+                                        isMerchant = true,
+                                        subtitle = "${m.second} • ${m.third}"
+                                    )
+                                )
+                            }
+                        }
+
+                        results.values = matched
+                        results.count = matched.size
+                        return results
+                    }
+
+                    @Suppress("UNCHECKED_CAST")
+                    override fun publishResults(constraint: CharSequence?, results: FilterResults?) {
+                        suggestions = (results?.values as? List<RecipientSuggestion>) ?: emptyList()
+                        notifyDataSetChanged()
+                    }
+                }
+            }
+        }
+
+        etPayRecipient.setAdapter(adapter)
+        etPayRecipient.setOnItemClickListener { parent, _, position, _ ->
+            val selected = parent.getItemAtPosition(position) as? RecipientSuggestion ?: return@setOnItemClickListener
+            etPayRecipient.setText(selected.name)
+            targetPhone = selected.phone
+            tvPayHeroTitle.text = selected.name
+        }
     }
 
     private fun setupListeners() {
@@ -291,6 +418,7 @@ class PayActivity : AppCompatActivity() {
         val txId = "TXN-" + UUID.randomUUID().toString().take(12).uppercase()
         val nonce = UUID.randomUUID().toString().take(8)
         val timestamp = System.currentTimeMillis()
+        val receiverIdent = if (targetPhone.isNotEmpty()) targetPhone else payee
 
         if (isOnlineMode) {
             // Online UPI execution
@@ -307,7 +435,7 @@ class PayActivity : AppCompatActivity() {
                                 note = "UPI Online Payment",
                                 direction = TransactionEntity.DIRECTION_SENT,
                                 senderId = currentUser.id.toString(),
-                                receiverId = payee
+                                receiverId = receiverIdent
                             )
                         ),
                         userId = currentUser.id
@@ -329,7 +457,7 @@ class PayActivity : AppCompatActivity() {
                     txId = txId,
                     senderId = currentUser.id.toString(),
                     senderName = currentUser.name,
-                    receiverId = payee,
+                    receiverId = receiverIdent,
                     receiverName = payee,
                     amount = amount,
                     timestamp = timestamp,
@@ -352,11 +480,30 @@ class PayActivity : AppCompatActivity() {
                 val newWalletBal = appDatabase.walletDao.getWallet()?.balance ?: 0.0
                 sessionManager.updateBalances(sessionManager.getUser().balance, newWalletBal)
 
+                // If paired or nearby Bluetooth device address is available, attempt real RFCOMM packet exchange
+                if (targetDeviceAddress.isNotEmpty()) {
+                    try {
+                        val adapter = BluetoothAdapter.getDefaultAdapter()
+                        if (adapter != null && BluetoothAdapter.checkBluetoothAddress(targetDeviceAddress)) {
+                            val remoteDev: BluetoothDevice = adapter.getRemoteDevice(targetDeviceAddress)
+                            paymentRepository.executeBluetoothPayment(
+                                device = remoteDev,
+                                receiverId = receiverIdent,
+                                receiverName = payee,
+                                amount = amount,
+                                onStatusLog = {},
+                                onSuccess = { _, _ -> },
+                                onError = {}
+                            )
+                        }
+                    } catch (_: Exception) {}
+                }
+
                 val signature = try {
                     val canonicalBytes = CryptoManager.getCanonicalBytes(
                         txId = txId,
                         senderId = currentUser.id.toString(),
-                        receiverId = payee,
+                        receiverId = receiverIdent,
                         amount = amount,
                         timestamp = timestamp,
                         nonce = nonce
@@ -382,7 +529,7 @@ class PayActivity : AppCompatActivity() {
                                     note = "Bluetooth Payment (Online Instant Settlement)",
                                     direction = TransactionEntity.DIRECTION_SENT,
                                     senderId = currentUser.id.toString(),
-                                    receiverId = payee
+                                    receiverId = receiverIdent
                                 )
                             ),
                             userId = currentUser.id
@@ -404,7 +551,7 @@ class PayActivity : AppCompatActivity() {
                     txId = txId,
                     senderId = currentUser.id.toString(),
                     senderName = currentUser.name,
-                    receiverId = payee,
+                    receiverId = receiverIdent,
                     receiverName = payee,
                     amount = amount,
                     timestamp = timestamp,

@@ -10,6 +10,6 @@ data class BankUserResponse(
     @SerializedName("name") val name: String,
     @SerializedName("phone") val phone: String,
     @SerializedName("balance") val balance: Double,
-    @SerializedName("emergency_balance") val emergencyBalance: Double
+    @SerializedName("emergency_balance") val emergencyBalance: Double,
+    @SerializedName("previous_names") val previousNames: String? = null
 )
-

@@ -121,13 +121,18 @@
                         android:layout_height="20dp"
                         android:src="@drawable/ic_profile" />
 
-                    <EditText
+                    <AutoCompleteTextView
                         android:id="@+id/etPayRecipient"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:layout_marginStart="10dp"
                         android:background="@null"
-                        android:hint="9876543210 or merchant@upi"
+                        android:hint="Type name or phone number..."
+                        android:completionThreshold="1"
+                        android:dropDownWidth="match_parent"
+                        android:dropDownVerticalOffset="6dp"
+                        android:imeOptions="actionNext"
+                        android:inputType="textPersonName|textCapWords"
                         android:textColor="#111827"
                         android:textColorHint="#9CA3AF"
                         android:textSize="15sp" />

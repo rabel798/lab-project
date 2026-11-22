@@ -71,7 +71,8 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 account_number TEXT,
                 balance REAL DEFAULT 1000.0,
                 emergency_balance REAL DEFAULT 100.0,
-                is_remembered INTEGER DEFAULT 1,
+                is_remembered INTEGER DEFAULT 0,
+                previous_names TEXT DEFAULT '',
                 created_at INTEGER
             );
         """.trimIndent()
@@ -83,10 +84,10 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
         val initialWallet = ContentValues().apply {
             put("id", 1L)
             put("user_id", "USER_1001")
-            put("user_name", "rabel")
-            put("balance", 10.0)
-            put("offline_max_limit", 10.0)
-            put("emergency_threshold", 5.0)
+            put("user_name", "")
+            put("balance", 100.0)
+            put("offline_max_limit", 5000.0)
+            put("emergency_threshold", 50.0)
             put("bank_public_key", "")
             put("last_sync_timestamp", System.currentTimeMillis())
         }
@@ -105,10 +106,14 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 account_number TEXT,
                 balance REAL DEFAULT 1000.0,
                 emergency_balance REAL DEFAULT 100.0,
-                is_remembered INTEGER DEFAULT 1,
+                is_remembered INTEGER DEFAULT 0,
+                previous_names TEXT DEFAULT '',
                 created_at INTEGER
             );
         """.trimIndent())
+        try {
+            db.execSQL("ALTER TABLE $TABLE_USERS ADD COLUMN previous_names TEXT DEFAULT ''")
+        } catch (_: Exception) {}
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -131,6 +136,7 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 put("balance", user.balance)
                 put("emergency_balance", user.emergencyBalance)
                 put("is_remembered", if (isRemembered) 1 else 0)
+                put("previous_names", user.previousNames)
                 put("created_at", System.currentTimeMillis())
             }
             return db.insertWithOnConflict(TABLE_USERS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
@@ -156,9 +162,42 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
             }
         }
 
+        override fun getUserById(id: Long): com.example.empay.auth.UserAccount? {
+            val db = readableDatabase
+            val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS WHERE id = ? LIMIT 1", arrayOf(id.toString()))
+            return cursor.use {
+                if (it.moveToFirst()) cursorToUser(it) else null
+            }
+        }
+
         override fun getAllUsers(): List<com.example.empay.auth.UserAccount> {
             val db = readableDatabase
-            val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS ORDER BY id ASC", null)
+            val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS ORDER BY name ASC", null)
+            val list = mutableListOf<com.example.empay.auth.UserAccount>()
+            cursor.use {
+                while (it.moveToNext()) {
+                    list.add(cursorToUser(it))
+                }
+            }
+            return list
+        }
+
+        override fun searchUsers(query: String): List<com.example.empay.auth.UserAccount> {
+            val trimmed = query.trim()
+            val db = readableDatabase
+            val cursor = if (trimmed.isEmpty()) {
+                db.rawQuery("SELECT * FROM $TABLE_USERS ORDER BY name ASC", null)
+            } else {
+                val digits = trimmed.filter { it.isDigit() }
+                db.rawQuery(
+                    """
+                    SELECT * FROM $TABLE_USERS 
+                    WHERE name LIKE ? OR username LIKE ? OR phone LIKE ? OR previous_names LIKE ?
+                    ORDER BY name ASC
+                    """.trimIndent(),
+                    arrayOf("%$trimmed%", "%$trimmed%", "%$digits%", "%$trimmed%")
+                )
+            }
             val list = mutableListOf<com.example.empay.auth.UserAccount>()
             cursor.use {
                 while (it.moveToNext()) {
@@ -189,7 +228,20 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
             db.execSQL("UPDATE $TABLE_USERS SET is_remembered = 0")
         }
 
+        override fun updateUserName(userId: Long, newName: String, previousNames: String): Boolean {
+            val db = writableDatabase
+            val values = ContentValues().apply {
+                put("name", newName)
+                put("username", newName)
+                put("previous_names", previousNames)
+            }
+            val rows = db.update(TABLE_USERS, values, "id = ?", arrayOf(userId.toString()))
+            return rows > 0
+        }
+
         private fun cursorToUser(c: Cursor): com.example.empay.auth.UserAccount {
+            val prevCol = c.getColumnIndex("previous_names")
+            val prevNames = if (prevCol != -1 && !c.isNull(prevCol)) c.getString(prevCol) else ""
             return com.example.empay.auth.UserAccount(
                 id = c.getLong(c.getColumnIndexOrThrow("id")),
                 name = c.getString(c.getColumnIndexOrThrow("name")),
@@ -197,7 +249,8 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 password = c.getString(c.getColumnIndexOrThrow("password")),
                 accountNumber = c.getString(c.getColumnIndexOrThrow("account_number")),
                 balance = c.getDouble(c.getColumnIndexOrThrow("balance")),
-                emergencyBalance = c.getDouble(c.getColumnIndexOrThrow("emergency_balance"))
+                emergencyBalance = c.getDouble(c.getColumnIndexOrThrow("emergency_balance")),
+                previousNames = prevNames
             )
         }
     }

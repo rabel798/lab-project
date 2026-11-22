@@ -42,6 +42,10 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN password TEXT DEFAULT '123456'")
     except Exception:
         pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN previous_names TEXT DEFAULT ''")
+    except Exception:
+        pass
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS merchants (
@@ -75,18 +79,13 @@ def init_db():
         )
     """)
 
-    # Ensure primary user Rahul Sharma exists at id 1 with official hackathon balances (500 online, 100 offline)
+    # Ensure evaluation account rabel exists at id 1 if table is empty
     cursor.execute("SELECT * FROM users WHERE id = 1")
     user1 = cursor.fetchone()
-    if user1:
+    if not user1:
         cursor.execute("""
-            UPDATE users SET name = 'Rahul Sharma', phone = '9876543210', balance = 500.0, emergency_balance = 100.0
-            WHERE id = 1
-        """)
-    else:
-        cursor.execute("""
-            INSERT INTO users (id, name, phone, balance, emergency_balance)
-            VALUES (1, 'Rahul Sharma', '9876543210', 500.0, 100.0)
+            INSERT INTO users (id, name, username, phone, password, balance, emergency_balance, previous_names)
+            VALUES (1, 'rabel', 'rabel', '9876543210', 'rabel', 1250.0, 200.0, '')
         """)
 
     # Clean up legacy mock/superhero users
@@ -260,29 +259,41 @@ DEMO_PHONE_MAP = {
 
 def resolve_user_id(conn, user_id):
     """
-    Resolves an integer user ID or demo index to a valid database user ID.
-    If an auto-incremented database has different primary keys,
-    falls back to phone number lookup via DEMO_PHONE_MAP.
+    Resolves an ID, phone number, username, or name to a valid database user ID.
     """
     if user_id is None:
         return 1
-    try:
-        uid = int(user_id)
-    except (ValueError, TypeError):
-        # Maybe it's a phone string
-        p_row = conn.execute("SELECT id FROM users WHERE phone = ?", (str(user_id).strip(),)).fetchone()
-        return p_row["id"] if p_row else None
+    
+    val_str = str(user_id).strip()
+    if not val_str:
+        return 1
 
-    # Check exact ID first
-    row = conn.execute("SELECT id FROM users WHERE id = ?", (uid,)).fetchone()
-    if row:
-        return row["id"]
-    # Fallback to phone mapping for demo users
-    if uid in DEMO_PHONE_MAP:
-        p_row = conn.execute("SELECT id FROM users WHERE phone = ?", (DEMO_PHONE_MAP[uid],)).fetchone()
-        if p_row:
-            return p_row["id"]
-    return uid
+    # 1. Check exact integer ID
+    try:
+        uid = int(val_str)
+        row = conn.execute("SELECT id FROM users WHERE id = ?", (uid,)).fetchone()
+        if row:
+            return row["id"]
+        # Fallback to demo phone map if old index
+        if uid in DEMO_PHONE_MAP:
+            p_row = conn.execute("SELECT id FROM users WHERE phone = ?", (DEMO_PHONE_MAP[uid],)).fetchone()
+            if p_row:
+                return p_row["id"]
+    except (ValueError, TypeError):
+        pass
+
+    # 2. Check by phone number
+    clean_digits = "".join(filter(str.isdigit, val_str))[-10:] if any(c.isdigit() for c in val_str) else val_str
+    p_row = conn.execute("SELECT id FROM users WHERE phone = ? OR phone LIKE ?", (val_str, f"%{clean_digits}%")).fetchone()
+    if p_row:
+        return p_row["id"]
+
+    # 3. Check by username or name
+    u_row = conn.execute("SELECT id FROM users WHERE username = ? COLLATE NOCASE OR name = ? COLLATE NOCASE", (val_str, val_str)).fetchone()
+    if u_row:
+        return u_row["id"]
+
+    return None
 
 
 @app.route("/api/user", methods=["GET"])
@@ -310,7 +321,8 @@ def api_get_user():
             "name": user["name"],
             "phone": user["phone"],
             "balance": user["balance"],
-            "emergency_balance": user["emergency_balance"]
+            "emergency_balance": user["emergency_balance"],
+            "previous_names": user["previous_names"] if "previous_names" in user.keys() else ""
         })
     return jsonify({"error": "User not found"}), 404
 
@@ -318,9 +330,24 @@ def api_get_user():
 @app.route("/api/users", methods=["GET"])
 def api_get_all_users():
     conn = get_db()
-    users = conn.execute("SELECT id, name, phone, balance, emergency_balance FROM users ORDER BY id ASC").fetchall()
+    users = conn.execute("SELECT id, name, phone, balance, emergency_balance, previous_names FROM users ORDER BY name ASC").fetchall()
     conn.close()
     return jsonify([dict(u) for u in users])
+
+
+@app.route("/api/users/search", methods=["GET"])
+def api_users_search():
+    q = request.args.get("q", "").strip()
+    conn = get_db()
+    if q:
+        rows = conn.execute(
+            "SELECT id, name, phone, balance, emergency_balance, previous_names FROM users WHERE name LIKE ? OR phone LIKE ? OR username LIKE ? ORDER BY name ASC",
+            (f"%{q}%", f"%{q}%", f"%{q}%")
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT id, name, phone, balance, emergency_balance, previous_names FROM users ORDER BY name ASC").fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
 
 
 @app.route("/api/bank/reset-demo", methods=["POST"])
@@ -468,28 +495,96 @@ def api_login_user():
 @app.route("/api/user/add-funds", methods=["POST"])
 def api_add_funds():
     data = request.get_json(silent=True) or request.form
-    amount = float(data.get("amount", 0))
+    try:
+        amount = float(data.get("amount", 0))
+    except (ValueError, TypeError):
+        amount = 0.0
     target = data.get("target", "balance")  # "balance" or "emergency_balance"
-    raw_user_id = data.get("user_id", 1)
+    raw_user_id = data.get("user_id")
+    phone = (data.get("phone") or "").strip()
+    username = (data.get("username") or "").strip()
 
     if amount <= 0:
         return jsonify({"success": False, "message": "Invalid amount"}), 400
 
     conn = get_db()
-    user_id = resolve_user_id(conn, raw_user_id) or 1
-    if target == "emergency_balance":
-        conn.execute("UPDATE users SET emergency_balance = emergency_balance + ? WHERE id = ?", (amount, user_id))
+    user_id = resolve_user_id(conn, raw_user_id)
+    if not user_id and phone:
+        user_id = resolve_user_id(conn, phone)
+    if not user_id and username:
+        user_id = resolve_user_id(conn, username)
+
+    if not user_id:
+        # Auto-create if new user profile adds funds
+        ident_phone = phone if phone else "9876543210"
+        ident_name = username if username else (f"User_{raw_user_id}" if raw_user_id else "User")
+        conn.execute(
+            "INSERT INTO users (name, username, phone, balance, emergency_balance, previous_names) VALUES (?, ?, ?, ?, ?, '')",
+            (ident_name, ident_name, ident_phone, amount if target != "emergency_balance" else 1000.0, amount if target == "emergency_balance" else 100.0)
+        )
+        conn.commit()
+        created = conn.execute("SELECT * FROM users WHERE phone = ?", (ident_phone,)).fetchone()
+        user_id = created["id"]
     else:
-        conn.execute("UPDATE users SET balance = balance + ? WHERE id = ?", (amount, user_id))
-    conn.commit()
+        if target == "emergency_balance":
+            conn.execute("UPDATE users SET emergency_balance = emergency_balance + ? WHERE id = ?", (amount, user_id))
+        else:
+            conn.execute("UPDATE users SET balance = balance + ? WHERE id = ?", (amount, user_id))
+        conn.commit()
 
     user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
     return jsonify({
         "success": True,
         "message": f"Successfully added ₹{amount:.2f}",
-        "balance": user["balance"] if user else 0.0,
-        "emergency_balance": user["emergency_balance"] if user else 0.0
+        "balance": user["balance"] if user else 500.0,
+        "emergency_balance": user["emergency_balance"] if user else 100.0
+    })
+
+
+@app.route("/api/user/update-name", methods=["POST"])
+def api_update_user_name():
+    data = request.get_json(silent=True) or request.form
+    user_id = data.get("user_id")
+    phone = (data.get("phone") or "").strip()
+    new_name = (data.get("name") or "").strip()
+
+    if not new_name:
+        return jsonify({"success": False, "message": "Name cannot be empty"}), 400
+
+    conn = get_db()
+    resolved_id = resolve_user_id(conn, user_id)
+    if not resolved_id and phone:
+        resolved_id = resolve_user_id(conn, phone)
+
+    if not resolved_id:
+        conn.close()
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (resolved_id,)).fetchone()
+    old_name = user["name"] if user else ""
+    prev_str = user["previous_names"] if user and "previous_names" in user.keys() and user["previous_names"] else ""
+    prev_list = [p.strip() for p in prev_str.split(",") if p.strip()]
+    if old_name and old_name != new_name and old_name not in prev_list:
+        prev_list.append(old_name)
+    new_prev = ", ".join(prev_list)
+
+    conn.execute("UPDATE users SET name = ?, username = ?, previous_names = ? WHERE id = ?", (new_name, new_name, new_prev, resolved_id))
+    conn.commit()
+    updated = conn.execute("SELECT * FROM users WHERE id = ?", (resolved_id,)).fetchone()
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": f"Name updated to {new_name}",
+        "user": {
+            "id": updated["id"],
+            "name": updated["name"],
+            "phone": updated["phone"],
+            "balance": updated["balance"],
+            "emergency_balance": updated["emergency_balance"],
+            "previous_names": updated["previous_names"] if "previous_names" in updated.keys() else new_prev
+        }
     })
 
 
@@ -820,6 +915,15 @@ def api_transactions_sync():
                             else:
                                 r_emg = round(float(r_user["emergency_balance"]) + amount, 2)
                                 conn.execute("UPDATE users SET emergency_balance = ? WHERE id = ?", (r_emg, receiver_user_id))
+                    elif payee and payee.strip() not in ("Unknown", ""):
+                        # Auto-credit payee even if not registered on server yet
+                        p_digits = "".join(filter(str.isdigit, payee))[-10:] if any(c.isdigit() for c in payee) else ""
+                        p_phone = p_digits if len(p_digits) == 10 else f"98765{random.randint(10000, 99999)}"
+                        conn.execute(
+                            "INSERT INTO users (name, username, phone, balance, emergency_balance, previous_names) VALUES (?, ?, ?, ?, ?, '')",
+                            (payee.strip(), payee.strip(), p_phone, 1000.0, 100.0 + amount)
+                        )
+                        conn.commit()
 
     # Also resolve any legacy pending transactions pre-existing in the DB
     pending_rows = conn.execute("SELECT * FROM transactions WHERE status = 'pending'").fetchall()
@@ -837,8 +941,8 @@ def api_transactions_sync():
         "status": "success",
         "message": f"Successfully synchronized {reconciled_count} transaction(s).",
         "reconciled_count": reconciled_count,
-        "balance": updated_user["balance"] if updated_user else 500.0,
-        "emergency_balance": updated_user["emergency_balance"] if updated_user else 10.0,
+        "balance": updated_user["balance"] if updated_user else 1000.0,
+        "emergency_balance": updated_user["emergency_balance"] if updated_user else 100.0,
         "transactions": [dict(t) for t in all_txs]
     })
 

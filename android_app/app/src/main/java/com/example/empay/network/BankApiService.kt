@@ -5,6 +5,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * Retrofit HTTP contract for the Central Laptop Bank (app.py).
@@ -16,6 +17,9 @@ interface BankApiService {
 
     @GET("/api/users")
     suspend fun getAllUsers(): Response<List<BankUserResponse>>
+
+    @GET("/api/users/search")
+    suspend fun searchUsers(@Query("q") query: String): Response<List<BankUserResponse>>
 
     @GET("/api/users/{id}")
     suspend fun getUserById(@Path("id") id: Long): Response<BankUserResponse>
@@ -32,6 +36,11 @@ interface BankApiService {
     suspend fun addFunds(
         @Body request: AddFundsRequest
     ): Response<AddFundsResponse>
+
+    @POST("/api/user/update-name")
+    suspend fun updateUserName(
+        @Body request: UpdateUserNameRequest
+    ): Response<UpdateUserNameResponse>
 
     @POST("/api/user/register")
     suspend fun registerUser(

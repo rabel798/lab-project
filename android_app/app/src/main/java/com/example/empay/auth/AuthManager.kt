@@ -22,8 +22,9 @@ data class UserAccount(
     val phone: String,
     val password: String,
     val accountNumber: String,
-    var balance: Double = 500.0,
-    var emergencyBalance: Double = 100.0
+    var balance: Double = 1000.0,
+    var emergencyBalance: Double = 100.0,
+    var previousNames: String = ""
 )
 
 data class RecipientVerificationResult(
@@ -165,7 +166,7 @@ class AuthManager private constructor(private val context: Context) {
 
         if (updated || sqliteUsers.isEmpty()) {
             saveAccountsList(accounts)
-            accounts.forEach { db.userDao.insertOrUpdateUser(it, isRemembered = (it.name == "rabel")) }
+            accounts.forEach { db.userDao.insertOrUpdateUser(it, isRemembered = false) }
         }
     }
 
@@ -369,7 +370,7 @@ class AuthManager private constructor(private val context: Context) {
 
         val id = prefs.getLong(KEY_LOGGED_IN_ID, -1L)
         if (id != -1L) {
-            val found = getRegisteredAccounts().find { it.id == id }
+            val found = db.userDao.getUserById(id) ?: getRegisteredAccounts().find { it.id == id }
             if (found != null) return found
         }
         return null
@@ -383,6 +384,111 @@ class AuthManager private constructor(private val context: Context) {
         val db = AppDatabase.getInstance(context)
         db.userDao.clearAllRemembered()
         prefs.edit().remove(KEY_LOGGED_IN_ID).apply()
+        SessionManager.getInstance(context).clearSession()
+    }
+
+    fun updateUserName(userId: Long, newName: String, onDone: (Boolean) -> Unit = {}) {
+        val trimmedNew = newName.trim()
+        if (trimmedNew.isEmpty()) {
+            onDone(false)
+            return
+        }
+
+        val db = AppDatabase.getInstance(context)
+        val user = db.userDao.getUserById(userId) ?: getRegisteredAccounts().find { it.id == userId }
+        if (user == null) {
+            onDone(false)
+            return
+        }
+
+        val oldName = user.name
+        val prevList = user.previousNames.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        if (oldName.isNotEmpty() && oldName != trimmedNew && !prevList.contains(oldName)) {
+            prevList.add(oldName)
+        }
+        val newPrevStr = prevList.joinToString(", ")
+
+        // 1. Update SQLite database
+        db.userDao.updateUserName(userId, trimmedNew, newPrevStr)
+
+        // 2. Update SharedPreferences accounts list
+        val accounts = getRegisteredAccounts().toMutableList()
+        val idx = accounts.indexOfFirst { it.id == userId }
+        if (idx >= 0) {
+            accounts[idx] = accounts[idx].copy(name = trimmedNew, previousNames = newPrevStr)
+            saveAccountsList(accounts)
+        }
+
+        // 3. Update active session
+        val currentSession = SessionManager.getInstance(context).getUser()
+        if (currentSession.id == userId) {
+            SessionManager.getInstance(context).updateUser(currentSession.copy(name = trimmedNew))
+        }
+
+        // 4. IMMEDIATELY update Bluetooth broadcast identity over the air!
+        com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(context, trimmedNew, user.phone)
+
+        // 5. Asynchronously notify bank server API
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (NetworkManager.isOnline(context)) {
+                    val api = BankApiClient.getApiService(context)
+                    api.updateUserName(
+                        com.example.empay.network.UpdateUserNameRequest(
+                            userId = userId,
+                            phone = user.phone,
+                            name = trimmedNew
+                        )
+                    )
+                }
+            } catch (_: Exception) {}
+        }
+
+        onDone(true)
+    }
+
+    fun syncAllRegisteredUsersFromBackend(onComplete: (List<UserAccount>) -> Unit = {}) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (NetworkManager.isOnline(context)) {
+                    val api = BankApiClient.getApiService(context)
+                    val res = api.getAllUsers()
+                    if (res.isSuccessful && res.body() != null) {
+                        val serverUsers = res.body()!!
+                        val db = AppDatabase.getInstance(context)
+                        val accounts = getRegisteredAccounts().toMutableList()
+                        serverUsers.forEach { su ->
+                            val existing = accounts.find { it.id == su.id || it.phone == su.phone }
+                            val ua = UserAccount(
+                                id = su.id,
+                                name = su.name,
+                                phone = su.phone,
+                                password = existing?.password ?: "123456",
+                                accountNumber = "ACC-${su.phone}-01",
+                                balance = su.balance,
+                                emergencyBalance = su.emergencyBalance,
+                                previousNames = su.previousNames ?: ""
+                            )
+                            db.userDao.insertOrUpdateUser(ua, isRemembered = false)
+                            val idx = accounts.indexOfFirst { it.id == ua.id || it.phone == ua.phone }
+                            if (idx >= 0) {
+                                accounts[idx] = ua
+                            } else {
+                                accounts.add(ua)
+                            }
+                        }
+                        saveAccountsList(accounts)
+                        kotlinx.coroutines.withContext(Dispatchers.Main) {
+                            onComplete(accounts)
+                        }
+                        return@launch
+                    }
+                }
+            } catch (_: Exception) {}
+            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                onComplete(getRegisteredAccounts())
+            }
+        }
     }
 
     /**
