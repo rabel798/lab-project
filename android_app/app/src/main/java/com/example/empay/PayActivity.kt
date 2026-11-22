@@ -68,6 +68,15 @@ class PayActivity : AppCompatActivity() {
         loadStateAndBalances()
     }
 
+    override fun onResume() {
+        super.onResume()
+        loadStateAndBalances()
+        lifecycleScope.launch {
+            paymentRepository.refreshAuthoritativeBalances()
+            loadStateAndBalances()
+        }
+    }
+
     private fun initViews() {
         findViewById<ImageButton>(R.id.btnPayBack).setOnClickListener { finish() }
 
@@ -286,8 +295,34 @@ class PayActivity : AppCompatActivity() {
         if (isOnlineMode) {
             // Online UPI execution
             lifecycleScope.launch(Dispatchers.IO) {
-                val newBal = currentUser.balance - amount
-                sessionManager.updateBalances(newBal, currentUser.emergencyBalance)
+                var newOnlineBal = currentUser.balance - amount
+                try {
+                    val api = BankApiClient.getApiService(applicationContext)
+                    val syncReq = SyncTransactionsRequest(
+                        transactions = listOf(
+                            SyncTransactionItem(
+                                txId = txId,
+                                payee = payee,
+                                amount = amount,
+                                note = "UPI Online Payment",
+                                direction = TransactionEntity.DIRECTION_SENT,
+                                senderId = currentUser.id.toString(),
+                                receiverId = payee
+                            )
+                        ),
+                        userId = currentUser.id
+                    )
+                    val resp = api.syncTransactions(syncReq)
+                    if (resp.isSuccessful && resp.body()?.status == "success") {
+                        val body = resp.body()!!
+                        newOnlineBal = body.balance
+                        sessionManager.updateBalances(body.balance, body.emergencyBalance)
+                    } else {
+                        sessionManager.updateBalances(newOnlineBal, currentUser.emergencyBalance)
+                    }
+                } catch (_: Exception) {
+                    sessionManager.updateBalances(newOnlineBal, currentUser.emergencyBalance)
+                }
 
                 // Insert into local DB
                 val txEntity = TransactionEntity(

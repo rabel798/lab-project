@@ -747,20 +747,28 @@ def api_transactions_sync():
                     if s_user:
                         s_emg = float(s_user["emergency_balance"])
                         s_bal = float(s_user["balance"])
-                        if s_emg >= amount:
-                            s_emg = round(s_emg - amount, 2)
+                        is_online_upi = "UPI" in note.upper() or "ONLINE" in note.upper()
+                        if is_online_upi:
+                            s_bal = max(0.0, round(s_bal - amount, 2))
                         else:
-                            rem = amount - s_emg
-                            s_emg = 0.0
-                            s_bal = max(0.0, round(s_bal - rem, 2))
+                            if s_emg >= amount:
+                                s_emg = round(s_emg - amount, 2)
+                            else:
+                                rem = amount - s_emg
+                                s_emg = 0.0
+                                s_bal = max(0.0, round(s_bal - rem, 2))
                         conn.execute("UPDATE users SET balance = ?, emergency_balance = ? WHERE id = ?", (s_bal, s_emg, sender_id))
 
-                    # Credit receiver's emergency balance if receiver is a registered user
+                    # Credit receiver if receiver is a registered user
                     if receiver_user_id:
                         r_user = conn.execute("SELECT * FROM users WHERE id = ?", (receiver_user_id,)).fetchone()
                         if r_user:
-                            r_emg = round(float(r_user["emergency_balance"]) + amount, 2)
-                            conn.execute("UPDATE users SET emergency_balance = ? WHERE id = ?", (r_emg, receiver_user_id))
+                            if "UPI" in note.upper() or "ONLINE" in note.upper():
+                                r_bal = round(float(r_user["balance"]) + amount, 2)
+                                conn.execute("UPDATE users SET balance = ? WHERE id = ?", (r_bal, receiver_user_id))
+                            else:
+                                r_emg = round(float(r_user["emergency_balance"]) + amount, 2)
+                                conn.execute("UPDATE users SET emergency_balance = ? WHERE id = ?", (r_emg, receiver_user_id))
 
     # Also resolve any legacy pending transactions pre-existing in the DB
     pending_rows = conn.execute("SELECT * FROM transactions WHERE status = 'pending'").fetchall()

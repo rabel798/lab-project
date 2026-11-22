@@ -60,6 +60,59 @@ class PaymentRepository private constructor(private val context: Context) {
 
     fun getCurrentUser(): UserSession = sessionManager.getUser()
 
+    /**
+     * Rapidly fetches authoritative balances from Central Bank server when online,
+     * while preserving local SQLite offline deductions for pending unsynced payments.
+     */
+    suspend fun refreshAuthoritativeBalances(): UserSession = withContext(Dispatchers.IO) {
+        val user = sessionManager.getUser()
+        val localWallet = appDatabase.walletDao.getWallet()
+        val localEmergency = localWallet?.balance ?: user.emergencyBalance
+
+        if (!NetworkManager.isOnline(context)) {
+            val updated = user.copy(emergencyBalance = localEmergency)
+            sessionManager.updateUser(updated)
+            return@withContext updated
+        }
+
+        try {
+            val api = getApiService()
+            val resp = try {
+                val phoneRes = api.getUserByPhone(user.phone)
+                if (phoneRes.isSuccessful && phoneRes.body() != null) phoneRes else api.getUserById(user.id)
+            } catch (_: Exception) {
+                api.getUserById(user.id)
+            }
+
+            if (resp.isSuccessful && resp.body() != null) {
+                val remote = resp.body()!!
+                val pending = appDatabase.transactionDao.getPendingSyncTransactions()
+                val effectiveEmergency = if (pending.isNotEmpty()) {
+                    localEmergency
+                } else {
+                    appDatabase.walletDao.updateBalance(remote.emergencyBalance)
+                    remote.emergencyBalance
+                }
+
+                val updated = user.copy(
+                    id = remote.id,
+                    name = remote.name,
+                    phone = remote.phone,
+                    balance = remote.balance,
+                    emergencyBalance = effectiveEmergency
+                )
+                sessionManager.updateUser(updated)
+                return@withContext updated
+            }
+        } catch (e: Exception) {
+            // Retain local balances on network hiccup
+        }
+
+        val updated = user.copy(emergencyBalance = localEmergency)
+        sessionManager.updateUser(updated)
+        return@withContext updated
+    }
+
     suspend fun switchActiveUser(user: UserSession): UserSession = withContext(Dispatchers.IO) {
         sessionManager.updateUser(user)
         appDatabase.walletDao.updateBalance(user.emergencyBalance)

@@ -181,6 +181,9 @@ class MainActivity : AppCompatActivity() {
         if (localWallet != null) {
             sessionManager.updateBalances(sessionManager.getUser().balance, localWallet.balance)
         }
+        lifecycleScope.launch {
+            paymentRepository.refreshAuthoritativeBalances()
+        }
 
         appendLog("INIT", "EmPay Protocol Core initialized (Min SDK 26, Target SDK 36)")
         appendLog("DATABASE", "Local SQLite ledger ready (empay_offline.db). Offline balance: ₹${localWallet?.balance ?: 10.0}")
@@ -560,8 +563,12 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     updateNetworkBadge(true)
                     appendLog("NETWORK", "🟢 Connectivity restored: Central Bank connection available.")
-                    appendLog("AUTO-SYNC", "Network restored. Triggering automatic ledger sync...")
-                    SyncManager.triggerImmediateSync(this@MainActivity)
+                    appendLog("AUTO-SYNC", "Network restored. Triggering automatic ledger sync & balance refresh...")
+                    lifecycleScope.launch {
+                        SyncManager.syncNow(this@MainActivity)
+                        paymentRepository.refreshAuthoritativeBalances()
+                        refreshLocalLedgerUI()
+                    }
                 }
             }
 
@@ -1284,6 +1291,9 @@ class MainActivity : AppCompatActivity() {
         }
         updateNetworkBadge(NetworkManager.isOnline(this))
         refreshLocalLedgerUI()
+        lifecycleScope.launch {
+            paymentRepository.refreshAuthoritativeBalances()
+        }
         if (NetworkManager.isOnline(this)) {
             lifecycleScope.launch(Dispatchers.IO) {
                 val pending = appDatabase.transactionDao.getPendingSyncTransactions()
@@ -1292,6 +1302,7 @@ class MainActivity : AppCompatActivity() {
                         appendLog("AUTO-SYNC", "App in foreground with ${pending.size} pending offline receipts. Auto-syncing with Central Bank...")
                     }
                     SyncManager.syncNow(this@MainActivity)
+                    paymentRepository.refreshAuthoritativeBalances()
                     withContext(Dispatchers.Main) {
                         refreshLocalLedgerUI()
                     }

@@ -94,9 +94,24 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 null,
                 null
             )
-            return cursor.use {
+            val found = cursor.use {
                 if (it.moveToFirst()) cursorToWallet(it) else null
             }
+            if (found != null) return found
+
+            // Auto-create wallet row id=1 if empty
+            val initial = WalletEntity(
+                id = 1L,
+                userId = "1",
+                userName = "Rahul Sharma",
+                balance = 100.0,
+                offlineMaxLimit = 5000.0,
+                emergencyThreshold = 50.0,
+                bankPublicKey = "",
+                lastSyncTimestamp = System.currentTimeMillis()
+            )
+            saveWallet(initial)
+            return initial
         }
 
         override fun saveWallet(wallet: WalletEntity) {
@@ -118,8 +133,18 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
             val db = writableDatabase
             val values = ContentValues().apply {
                 put("balance", newBalance)
+                put("last_sync_timestamp", System.currentTimeMillis())
             }
-            db.update(TABLE_WALLET, values, "id = ?", arrayOf("1"))
+            val rows = db.update(TABLE_WALLET, values, "id = ?", arrayOf("1"))
+            if (rows == 0) {
+                values.put("id", 1L)
+                values.put("user_id", "1")
+                values.put("user_name", "Rahul Sharma")
+                values.put("offline_max_limit", 5000.0)
+                values.put("emergency_threshold", 50.0)
+                values.put("bank_public_key", "")
+                db.insertWithOnConflict(TABLE_WALLET, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+            }
         }
 
         @Synchronized
@@ -128,12 +153,23 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
             db.beginTransaction()
             return try {
                 val current = getWallet()
-                if (current != null && current.balance >= amount) {
-                    val newBalance = current.balance - amount
+                val currentBal = current?.balance ?: 0.0
+                if (currentBal >= amount) {
+                    val newBalance = Math.round((currentBal - amount) * 100.0) / 100.0
                     val values = ContentValues().apply {
                         put("balance", newBalance)
+                        put("last_sync_timestamp", System.currentTimeMillis())
                     }
-                    db.update(TABLE_WALLET, values, "id = ?", arrayOf("1"))
+                    val rows = db.update(TABLE_WALLET, values, "id = ?", arrayOf("1"))
+                    if (rows == 0) {
+                        values.put("id", 1L)
+                        values.put("user_id", current?.userId ?: "1")
+                        values.put("user_name", current?.userName ?: "User")
+                        values.put("offline_max_limit", 5000.0)
+                        values.put("emergency_threshold", 50.0)
+                        values.put("bank_public_key", "")
+                        db.insertWithOnConflict(TABLE_WALLET, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+                    }
                     db.setTransactionSuccessful()
                     true
                 } else {
@@ -151,12 +187,21 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
             try {
                 val current = getWallet()
                 val currentBalance = current?.balance ?: 0.0
-                val newBalance = currentBalance + amount
+                val newBalance = Math.round((currentBalance + amount) * 100.0) / 100.0
                 val values = ContentValues().apply {
                     put("balance", newBalance)
                     put("last_sync_timestamp", System.currentTimeMillis())
                 }
-                db.update(TABLE_WALLET, values, "id = ?", arrayOf("1"))
+                val rows = db.update(TABLE_WALLET, values, "id = ?", arrayOf("1"))
+                if (rows == 0) {
+                    values.put("id", 1L)
+                    values.put("user_id", current?.userId ?: "1")
+                    values.put("user_name", current?.userName ?: "User")
+                    values.put("offline_max_limit", 5000.0)
+                    values.put("emergency_threshold", 50.0)
+                    values.put("bank_public_key", "")
+                    db.insertWithOnConflict(TABLE_WALLET, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+                }
                 db.setTransactionSuccessful()
             } finally {
                 db.endTransaction()

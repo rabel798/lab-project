@@ -58,6 +58,10 @@ class ProfileActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadUserData()
+        lifecycleScope.launch {
+            paymentRepository.refreshAuthoritativeBalances()
+            loadUserData()
+        }
     }
 
     private fun initViews() {

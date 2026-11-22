@@ -16,10 +16,12 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.empay.auth.SessionManager
 import com.example.empay.bluetooth.BluetoothPaymentEngine
 import com.example.empay.db.AppDatabase
 import com.example.empay.repository.PaymentRepository
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class BluetoothActivity : AppCompatActivity() {
@@ -78,6 +80,15 @@ class BluetoothActivity : AppCompatActivity() {
         loadBalances()
         scanPairedAndNearbyDevices()
         renderList()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        loadBalances()
+        lifecycleScope.launch {
+            paymentRepository.refreshAuthoritativeBalances()
+            loadBalances()
+        }
     }
 
     private fun initViews() {
