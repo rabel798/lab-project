@@ -12,7 +12,8 @@ data class SyncTransactionItem(
     @SerializedName("note") val note: String = "Bluetooth Mesh Offline Payment",
     @SerializedName("direction") val direction: String = "SENT",
     @SerializedName("sender_id") val senderId: String = "1",
-    @SerializedName("receiver_id") val receiverId: String? = null
+    @SerializedName("receiver_id") val receiverId: String? = null,
+    @SerializedName("channel") val channel: String = "Bluetooth"
 )
 
 /**

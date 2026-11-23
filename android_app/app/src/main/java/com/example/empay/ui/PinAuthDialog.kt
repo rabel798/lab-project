@@ -20,6 +20,9 @@ class PinAuthDialog(
     private val context: Context,
     private val actionTitle: String = "Offline Authorization",
     private val actionSubtitle: String = "Enter 4-digit PIN to authorize action",
+    private val amount: Double? = null,
+    private val payee: String? = null,
+    private val channel: String? = null,
     private val onSuccess: () -> Unit,
     private val onFailed: ((String) -> Unit)? = null
 ) {
@@ -62,6 +65,25 @@ class PinAuthDialog(
 
         tvTitle.text = actionTitle
         tvSubtitle.text = actionSubtitle
+
+        val layoutSummaryCard = view.findViewById<View>(R.id.layoutPinSummaryCard)
+        val tvPinAmount = view.findViewById<TextView>(R.id.tvPinAmount)
+        val tvPinPayee = view.findViewById<TextView>(R.id.tvPinPayee)
+        val tvPinChannel = view.findViewById<TextView>(R.id.tvPinChannel)
+
+        if (amount != null) {
+            layoutSummaryCard?.visibility = View.VISIBLE
+            tvPinAmount?.text = String.format(java.util.Locale.US, "₹ %.2f", amount)
+            tvPinPayee?.text = payee ?: "To: Recipient"
+            tvPinChannel?.text = channel ?: "Via Bluetooth Mesh"
+        } else if (payee != null) {
+            layoutSummaryCard?.visibility = View.VISIBLE
+            tvPinAmount?.text = ""
+            tvPinPayee?.text = payee
+            tvPinChannel?.text = channel ?: ""
+        } else {
+            layoutSummaryCard?.visibility = View.GONE
+        }
     }
 
     private fun setupKeypad(view: View) {

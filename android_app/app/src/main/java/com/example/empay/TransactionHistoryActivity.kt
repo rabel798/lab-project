@@ -217,7 +217,17 @@ class TransactionHistoryActivity : AppCompatActivity() {
             tvAmount.text = String.format(Locale.US, if (isOut) "- ₹%.2f" else "+ ₹%.2f", tx.amount)
 
             val dateStr = timeFormat.format(Date(tx.timestamp))
-            tvId.text = "Bluetooth • $dateStr"
+            val isOnlineTx = tx.isOnline
+            val channelLabel = if (isOnlineTx) "UPI" else "Bluetooth"
+            tvId.text = "$channelLabel • $dateStr"
+
+            if (isOnlineTx) {
+                ivIcon.setImageResource(R.drawable.ic_bank)
+                ivIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.primary)
+            } else {
+                ivIcon.setImageResource(R.drawable.ic_bluetooth)
+                ivIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.primary)
+            }
 
             when (tx.status) {
                 TransactionEntity.STATUS_SYNCED -> {

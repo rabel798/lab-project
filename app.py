@@ -880,10 +880,15 @@ def api_transactions_sync():
                     direction == "SELF"
                 )
 
+                is_online_upi = "UPI" in note.upper() or "ONLINE" in note.upper() or t.get("channel") == "UPI" or "UPI" in str(t_id).upper()
+                channel_val = "UPI" if is_online_upi else t.get("channel", "Bluetooth")
+                method_val = "UPI" if is_online_upi else "BLUETOOTH"
+                is_offline_val = 0 if is_online_upi else 1
+
                 conn.execute("""
                     INSERT INTO transactions (tx_id, sender_id, receiver_id, payee, amount, status, channel, note, is_offline, method)
-                    VALUES (?, ?, ?, ?, ?, 'completed', 'Bluetooth', ?, 1, 'BLUETOOTH')
-                """, (str(t_id), sender_id, receiver_user_id or raw_receiver, payee, amount, note))
+                    VALUES (?, ?, ?, ?, ?, 'completed', ?, ?, ?, ?)
+                """, (str(t_id), sender_id, receiver_user_id or raw_receiver, payee, amount, channel_val, note, is_offline_val, method_val))
 
                 reconciled_count += 1
                 if not is_self_transfer and amount > 0:

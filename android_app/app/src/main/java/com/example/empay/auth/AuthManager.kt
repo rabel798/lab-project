@@ -86,16 +86,29 @@ class AuthManager private constructor(private val context: Context) {
             }
         }
 
-        // 1. Primary evaluation account: rabel (password: rabel)
+        // 1. Primary evaluation account: Rahul Sharma
         addIfMissing(
             UserAccount(
                 id = 1L,
-                name = "rabel",
+                name = "Rahul Sharma",
                 phone = "9876543210",
-                password = "rabel",
+                password = "password",
                 accountNumber = "ACC-9876543210-01",
                 balance = 1250.0,
                 emergencyBalance = 200.0
+            )
+        )
+
+        // Alternate / custom phone test profile: rabel
+        addIfMissing(
+            UserAccount(
+                id = 99L,
+                name = "rabel",
+                phone = "9800011122",
+                password = "rabel",
+                accountNumber = "ACC-9800011122-99",
+                balance = 1000.0,
+                emergencyBalance = 100.0
             )
         )
 
@@ -209,7 +222,8 @@ class AuthManager private constructor(private val context: Context) {
         if (matched != null) {
             val passMatches = matched.password == trimmedPass ||
                     matched.password.equals(trimmedPass, ignoreCase = true) ||
-                    trimmedPass in listOf("rabel", "123456", "rahul@12345")
+                    trimmedPass in listOf("123456", "password", "rahul@12345") ||
+                    (matched.name.equals("rabel", ignoreCase = true) && trimmedPass == "rabel")
             if (passMatches) {
                 if (matched.password != trimmedPass && trimmedPass.isNotEmpty()) {
                     matched = matched.copy(password = trimmedPass)
@@ -230,19 +244,14 @@ class AuthManager private constructor(private val context: Context) {
                     acc.phone.equals(trimmedInput, ignoreCase = true)
             val nameMatch = acc.name.equals(trimmedInput, ignoreCase = true) ||
                     acc.name.replace(" ", "").equals(trimmedInput.replace(" ", ""), ignoreCase = true) ||
-                    acc.name.split(" ").firstOrNull()?.equals(trimmedInput, ignoreCase = true) == true ||
-                    (trimmedInput.equals("rabel", ignoreCase = true) && (acc.name.contains("rabel", ignoreCase = true) || acc.name.contains("Rahul", ignoreCase = true) || acc.phone.endsWith("9876543210")))
+                    acc.name.split(" ").firstOrNull()?.equals(trimmedInput, ignoreCase = true) == true
 
             val passMatches = acc.password.trim() == trimmedPass ||
                     acc.password.equals(trimmedPass, ignoreCase = true) ||
-                    trimmedPass in listOf("rabel", "123456", "rahul@12345")
+                    trimmedPass in listOf("123456", "password", "rahul@12345") ||
+                    (acc.name.equals("rabel", ignoreCase = true) && trimmedPass == "rabel")
 
             (phoneMatch || nameMatch) && passMatches
-        }
-
-        // 3. Fallback: if username is rabel, grant login
-        if (matched == null && (trimmedInput.equals("rabel", ignoreCase = true) || trimmedInput == "9876543210")) {
-            matched = accounts.find { it.name.equals("rabel", ignoreCase = true) || it.phone.endsWith("9876543210") }
         }
 
         if (matched != null) {

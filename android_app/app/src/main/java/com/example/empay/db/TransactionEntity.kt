@@ -11,7 +11,8 @@ data class TransactionEntity(
     val nonce: String,
     val signature: String,
     val status: String = STATUS_PENDING_SYNC,
-    val direction: String = DIRECTION_SENT
+    val direction: String = DIRECTION_SENT,
+    val channel: String = CHANNEL_BLUETOOTH
 ) {
     companion object {
         const val STATUS_PENDING_SYNC = "PENDING_SYNC"
@@ -20,6 +21,13 @@ data class TransactionEntity(
 
         const val DIRECTION_SENT = "SENT"
         const val DIRECTION_RECEIVED = "RECEIVED"
-    }
-}
 
+        const val CHANNEL_BLUETOOTH = "Bluetooth"
+        const val CHANNEL_UPI = "UPI"
+    }
+
+    val isOnline: Boolean
+        get() = channel.equals(CHANNEL_UPI, ignoreCase = true) ||
+                signature.startsWith("UPI", ignoreCase = true) ||
+                txId.contains("UPI", ignoreCase = true)
+}

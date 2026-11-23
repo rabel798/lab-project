@@ -353,25 +353,23 @@
                             android:layout_height="wrap_content"
                             android:orientation="horizontal">
 
-                            <Button
+                            <androidx.appcompat.widget.AppCompatButton
                                 android:id="@+id/btnTransferToOffline"
                                 android:layout_width="wrap_content"
                                 android:layout_height="34dp"
-                                android:background="@drawable/bg_btn_orange_accent"
-                                android:backgroundTint="@null"
+                                android:background="@drawable/bg_btn_white_translucent"
                                 android:paddingHorizontal="10dp"
                                 android:text="Transfer to Emergency"
                                 android:textColor="@color/white"
                                 android:textSize="10sp"
                                 android:textStyle="bold" />
 
-                            <Button
+                            <androidx.appcompat.widget.AppCompatButton
                                 android:id="@+id/btnAddMoney"
                                 android:layout_width="wrap_content"
                                 android:layout_height="34dp"
                                 android:layout_marginStart="8dp"
                                 android:background="@drawable/bg_btn_white_translucent"
-                                android:backgroundTint="@null"
                                 android:paddingHorizontal="12dp"
                                 android:text="Add Money"
                                 android:textColor="@color/white"

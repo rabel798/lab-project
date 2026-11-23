@@ -208,6 +208,10 @@ class MainActivity : AppCompatActivity() {
         tvEmergencyBalance = findViewById(R.id.tvEmergencyBalance)
         btnTransferToOffline = findViewById(R.id.btnTransferToOffline)
         btnAddMoney = findViewById(R.id.btnAddMoney)
+        btnTransferToOffline.setBackgroundResource(R.drawable.bg_btn_white_translucent)
+        btnTransferToOffline.backgroundTintList = null
+        btnAddMoney.setBackgroundResource(R.drawable.bg_btn_white_translucent)
+        btnAddMoney.backgroundTintList = null
 
         // Alert Banner
         layoutEmergencyAlertBanner = findViewById(R.id.layoutEmergencyAlertBanner)
@@ -770,6 +774,9 @@ class MainActivity : AppCompatActivity() {
             context = this,
             actionTitle = "Authorize Offline Transfer",
             actionSubtitle = "Enter PIN to sign ₹$amount payment with ECDSA",
+            amount = amount,
+            payee = "To: $payeeName",
+            channel = "Via Bluetooth Mesh",
             onSuccess = {
                 if (isLoopback) {
                     executeLoopbackPayment(payeeName, amount)
@@ -1104,7 +1111,17 @@ class MainActivity : AppCompatActivity() {
                         tvAmount.text = String.format(Locale.US, if (isOut) "- ₹%.2f" else "+ ₹%.2f", tx.amount)
 
                         val dateStr = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(tx.timestamp))
-                        tvId.text = "Bluetooth • $dateStr"
+                        val isOnlineTx = tx.isOnline
+                        val channelLabel = if (isOnlineTx) "UPI" else "Bluetooth"
+                        tvId.text = "$channelLabel • $dateStr"
+
+                        if (isOnlineTx) {
+                            ivIcon.setImageResource(R.drawable.ic_bank)
+                            ivIcon.imageTintList = ContextCompat.getColorStateList(this@MainActivity, R.color.primary)
+                        } else {
+                            ivIcon.setImageResource(R.drawable.ic_bluetooth)
+                            ivIcon.imageTintList = ContextCompat.getColorStateList(this@MainActivity, R.color.primary)
+                        }
 
                         if (tx.status == TransactionEntity.STATUS_PENDING_SYNC) {
                             tvStatus.text = "Queued Sync"

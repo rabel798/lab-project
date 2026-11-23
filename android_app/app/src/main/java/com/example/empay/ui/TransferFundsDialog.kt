@@ -100,6 +100,9 @@ class TransferFundsDialog(
                 context = context,
                 actionTitle = "Authorize Fund Reservation",
                 actionSubtitle = String.format(Locale.US, "Enter PIN to transfer ₹%.2f to Emergency Wallet", amount),
+                amount = amount,
+                payee = "To: Emergency Wallet",
+                channel = "Online Bank -> Emergency Vault",
                 onSuccess = {
                     onAuthorized(amount)
                 },

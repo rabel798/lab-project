@@ -86,6 +86,7 @@ class LoginActivity : AppCompatActivity() {
         // Lock button colors so they remain intact without changing when clicked
         btnSubmitLogin.backgroundTintList = ContextCompat.getColorStateList(this, R.color.btn_primary_solid)
         btnSubmitSignUp.backgroundTintList = ContextCompat.getColorStateList(this, R.color.btn_primary_solid)
+        switchTab(isSignIn = true)
     }
 
     private fun setupListeners() {
@@ -93,62 +94,76 @@ class LoginActivity : AppCompatActivity() {
         btnTabSignUp.setOnClickListener { switchTab(isSignIn = false) }
 
         btnSubmitLogin.setOnClickListener {
-            val phoneOrName = etLoginPhone.text.toString().trim()
-            val password = etLoginPassword.text.toString().trim()
-            val rememberMe = cbRememberMe.isChecked
+            try {
+                val phoneOrName = etLoginPhone.text.toString().trim()
+                val password = etLoginPassword.text.toString().trim()
+                val rememberMe = cbRememberMe.isChecked
 
-            if (phoneOrName.isEmpty()) {
-                Toast.makeText(this, "Please enter your username or phone number", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+                if (phoneOrName.isEmpty()) {
+                    Toast.makeText(this, "Please enter your username or phone number", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
 
-            if (password.isEmpty()) {
-                Toast.makeText(this, "Please enter your password", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+                if (password.isEmpty()) {
+                    Toast.makeText(this, "Please enter your password", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
 
-            val account = authManager.login(phoneOrName, password, rememberMe)
-            if (account != null) {
-                com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, account.name, account.phone)
-                Toast.makeText(this, "Welcome, ${account.name}!", Toast.LENGTH_SHORT).show()
-                startActivity(Intent(this, MainActivity::class.java))
-                finish()
-            } else {
-                Toast.makeText(this, "Invalid credentials. Please verify username/phone and password.", Toast.LENGTH_LONG).show()
+                val account = authManager.login(phoneOrName, password, rememberMe)
+                if (account != null) {
+                    try {
+                        com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, account.name, account.phone)
+                    } catch (_: Exception) {}
+                    Toast.makeText(this, "Welcome, ${account.name}!", Toast.LENGTH_SHORT).show()
+                    startActivity(Intent(this, MainActivity::class.java))
+                    finish()
+                } else {
+                    Toast.makeText(this, "Invalid credentials. Please verify username/phone and password.", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Throwable) {
+                android.util.Log.e("LoginActivity", "Login error: ${e.message}", e)
+                Toast.makeText(this, "Sign in failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
 
         // Tapping the light helper note fills default credentials for quick testing
         layoutDemoAccountHint.setOnClickListener {
-            etLoginPhone.setText("rabel")
-            etLoginPassword.setText("rabel")
-            Toast.makeText(this, "rabel credentials applied", Toast.LENGTH_SHORT).show()
+            etLoginPhone.setText("9876543210")
+            etLoginPassword.setText("123456")
+            Toast.makeText(this, "Rahul Sharma credentials applied", Toast.LENGTH_SHORT).show()
         }
 
         btnSubmitSignUp.setOnClickListener {
-            val name = etSignUpName.text.toString().trim()
-            val phone = etSignUpPhone.text.toString().trim()
-            val password = etSignUpPassword.text.toString().trim()
-            val balStr = etSignUpEmergencyBal.text.toString().trim()
-            val emergencyBal = balStr.toDoubleOrNull() ?: 100.0
+            try {
+                val name = etSignUpName.text.toString().trim()
+                val phone = etSignUpPhone.text.toString().trim()
+                val password = etSignUpPassword.text.toString().trim()
+                val balStr = etSignUpEmergencyBal.text.toString().trim()
+                val emergencyBal = balStr.toDoubleOrNull() ?: 100.0
 
-            if (name.isEmpty() || phone.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Please fill in all fields to create an account", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+                if (name.isEmpty() || phone.isEmpty() || password.isEmpty()) {
+                    Toast.makeText(this, "Please fill in all fields to create an account", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                // Permanently registers account in SQLite & bank server, keeping user logged in
+                val newAccount = authManager.signUp(name, phone, password, emergencyBal, rememberMe = true)
+                try {
+                    com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, newAccount.name, newAccount.phone)
+                } catch (_: Exception) {}
+                Toast.makeText(this, "Profile created for ${newAccount.name}!", Toast.LENGTH_LONG).show()
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+            } catch (e: Throwable) {
+                android.util.Log.e("LoginActivity", "Sign up error: ${e.message}", e)
+                Toast.makeText(this, "Registration failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
-
-            // Permanently registers account in SQLite & bank server, keeping user logged in
-            val newAccount = authManager.signUp(name, phone, password, emergencyBal, rememberMe = true)
-            com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, newAccount.name, newAccount.phone)
-            Toast.makeText(this, "Profile created for ${newAccount.name}!", Toast.LENGTH_LONG).show()
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
         }
     }
 
     private fun switchTab(isSignIn: Boolean) {
-        val activeBg = ContextCompat.getColorStateList(this, R.color.btn_primary_solid)
-        val inactiveBg = ContextCompat.getColorStateList(this, android.R.color.transparent)
+        val activeBg = android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this, R.color.primary))
+        val inactiveBg = android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this, R.color.white))
         val activeText = ContextCompat.getColor(this, R.color.white)
         val inactiveText = ContextCompat.getColor(this, R.color.text_muted)
 

@@ -36,14 +36,18 @@ class SyncWorker(
 
         val totalAmount = pendingTxs.sumOf { it.amount }
         val syncItems = pendingTxs.map { tx ->
+            val isOnlineTx = tx.isOnline
+            val ch = if (isOnlineTx) "UPI" else "Bluetooth"
+            val defaultNote = if (isOnlineTx) "UPI Online Payment" else "Bluetooth Offline Payment (Direction: ${tx.direction})"
             SyncTransactionItem(
                 txId = tx.txId,
                 payee = tx.receiverName,
                 amount = tx.amount,
-                note = "Bluetooth Offline Payment (Direction: ${tx.direction})",
+                note = defaultNote,
                 direction = tx.direction,
                 senderId = tx.senderId,
-                receiverId = tx.receiverId
+                receiverId = tx.receiverId,
+                channel = ch
             )
         }
 

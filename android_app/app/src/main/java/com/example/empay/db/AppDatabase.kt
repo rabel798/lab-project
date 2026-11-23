@@ -15,7 +15,7 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
 
     companion object {
         private const val DATABASE_NAME = "empay_offline.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2
 
         private const val TABLE_WALLET = "wallet"
         private const val TABLE_TRANSACTIONS = "transactions"
@@ -57,7 +57,8 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 nonce TEXT NOT NULL UNIQUE,
                 signature TEXT NOT NULL,
                 status TEXT NOT NULL,
-                direction TEXT NOT NULL
+                direction TEXT NOT NULL,
+                channel TEXT DEFAULT 'Bluetooth'
             );
         """.trimIndent()
 
@@ -111,16 +112,46 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 created_at INTEGER
             );
         """.trimIndent())
+        val userCols = listOf(
+            "username TEXT",
+            "password TEXT DEFAULT '123456'",
+            "account_number TEXT DEFAULT ''",
+            "balance REAL DEFAULT 1000.0",
+            "emergency_balance REAL DEFAULT 100.0",
+            "is_remembered INTEGER DEFAULT 0",
+            "previous_names TEXT DEFAULT ''",
+            "created_at INTEGER"
+        )
+        for (col in userCols) {
+            try {
+                db.execSQL("ALTER TABLE $TABLE_USERS ADD COLUMN $col")
+            } catch (_: Exception) {}
+        }
         try {
-            db.execSQL("ALTER TABLE $TABLE_USERS ADD COLUMN previous_names TEXT DEFAULT ''")
+            db.execSQL("ALTER TABLE $TABLE_TRANSACTIONS ADD COLUMN channel TEXT DEFAULT 'Bluetooth'")
+        } catch (_: Exception) {}
+        try {
+            db.execSQL("UPDATE $TABLE_TRANSACTIONS SET channel = 'UPI' WHERE signature LIKE 'UPI%' OR tx_id LIKE '%UPI%'")
         } catch (_: Exception) {}
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_WALLET")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_TRANSACTIONS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
-        onCreate(db)
+        // Safe schema upgrade without wiping user accounts or wallet
+        val userCols = listOf(
+            "username TEXT",
+            "password TEXT DEFAULT '123456'",
+            "account_number TEXT DEFAULT ''",
+            "balance REAL DEFAULT 1000.0",
+            "emergency_balance REAL DEFAULT 100.0",
+            "is_remembered INTEGER DEFAULT 0",
+            "previous_names TEXT DEFAULT ''",
+            "created_at INTEGER"
+        )
+        for (col in userCols) {
+            try {
+                db.execSQL("ALTER TABLE $TABLE_USERS ADD COLUMN $col")
+            } catch (_: Exception) {}
+        }
     }
 
     val userDao: UserDao = object : UserDao {
@@ -240,16 +271,36 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
         }
 
         private fun cursorToUser(c: Cursor): com.example.empay.auth.UserAccount {
-            val prevCol = c.getColumnIndex("previous_names")
-            val prevNames = if (prevCol != -1 && !c.isNull(prevCol)) c.getString(prevCol) else ""
+            fun getStringSafe(col: String, default: String = ""): String {
+                val idx = c.getColumnIndex(col)
+                return if (idx != -1 && !c.isNull(idx)) c.getString(idx) else default
+            }
+            fun getDoubleSafe(col: String, default: Double = 0.0): Double {
+                val idx = c.getColumnIndex(col)
+                return if (idx != -1 && !c.isNull(idx)) c.getDouble(idx) else default
+            }
+            fun getLongSafe(col: String, default: Long = 0L): Long {
+                val idx = c.getColumnIndex(col)
+                return if (idx != -1 && !c.isNull(idx)) c.getLong(idx) else default
+            }
+
+            val id = getLongSafe("id", 1L)
+            val name = getStringSafe("name", "User")
+            val phone = getStringSafe("phone", "")
+            val pass = getStringSafe("password", "123456")
+            val accNum = getStringSafe("account_number", if (phone.isNotEmpty()) "ACC-$phone-01" else "ACC-01")
+            val bal = getDoubleSafe("balance", 1000.0)
+            val emergBal = getDoubleSafe("emergency_balance", 100.0)
+            val prevNames = getStringSafe("previous_names", "")
+
             return com.example.empay.auth.UserAccount(
-                id = c.getLong(c.getColumnIndexOrThrow("id")),
-                name = c.getString(c.getColumnIndexOrThrow("name")),
-                phone = c.getString(c.getColumnIndexOrThrow("phone")),
-                password = c.getString(c.getColumnIndexOrThrow("password")),
-                accountNumber = c.getString(c.getColumnIndexOrThrow("account_number")),
-                balance = c.getDouble(c.getColumnIndexOrThrow("balance")),
-                emergencyBalance = c.getDouble(c.getColumnIndexOrThrow("emergency_balance")),
+                id = id,
+                name = name,
+                phone = phone,
+                password = pass,
+                accountNumber = accNum,
+                balance = bal,
+                emergencyBalance = emergBal,
                 previousNames = prevNames
             )
         }
@@ -410,6 +461,7 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 put("signature", tx.signature)
                 put("status", tx.status)
                 put("direction", tx.direction)
+                put("channel", tx.channel)
             }
             val rowId = db.insertWithOnConflict(TABLE_TRANSACTIONS, null, values, SQLiteDatabase.CONFLICT_IGNORE)
             return rowId != -1L
@@ -507,6 +559,13 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
         }
 
         private fun cursorToTransaction(cursor: Cursor): TransactionEntity {
+            val channelCol = cursor.getColumnIndex("channel")
+            val channelVal = if (channelCol != -1 && !cursor.isNull(channelCol)) {
+                cursor.getString(channelCol)
+            } else {
+                TransactionEntity.CHANNEL_BLUETOOTH
+            }
+
             return TransactionEntity(
                 txId = cursor.getString(cursor.getColumnIndexOrThrow("tx_id")),
                 senderId = cursor.getString(cursor.getColumnIndexOrThrow("sender_id")),
@@ -518,7 +577,8 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 nonce = cursor.getString(cursor.getColumnIndexOrThrow("nonce")),
                 signature = cursor.getString(cursor.getColumnIndexOrThrow("signature")),
                 status = cursor.getString(cursor.getColumnIndexOrThrow("status")),
-                direction = cursor.getString(cursor.getColumnIndexOrThrow("direction"))
+                direction = cursor.getString(cursor.getColumnIndexOrThrow("direction")),
+                channel = channelVal
             )
         }
     }

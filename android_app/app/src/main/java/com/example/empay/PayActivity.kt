@@ -404,6 +404,9 @@ class PayActivity : AppCompatActivity() {
             context = this,
             actionTitle = if (isOnlineMode) "UPI Authorization" else "Authorize Offline Transfer",
             actionSubtitle = "Enter 4-digit PIN to sign and authorize payment",
+            amount = amount,
+            payee = "To: $payee",
+            channel = if (isOnlineMode) "Via Online UPI Network" else "Via Bluetooth Mesh",
             onSuccess = {
                 executeTransfer(amount, payee, note)
             },
@@ -415,7 +418,11 @@ class PayActivity : AppCompatActivity() {
 
     private fun executeTransfer(amount: Double, payee: String, note: String) {
         val currentUser = paymentRepository.getCurrentUser()
-        val txId = "TXN-" + UUID.randomUUID().toString().take(12).uppercase()
+        val txId = if (isOnlineMode) {
+            "UPI-" + UUID.randomUUID().toString().take(12).uppercase()
+        } else {
+            "BT-" + UUID.randomUUID().toString().take(12).uppercase()
+        }
         val nonce = UUID.randomUUID().toString().take(8)
         val timestamp = System.currentTimeMillis()
         val receiverIdent = if (targetPhone.isNotEmpty()) targetPhone else payee
@@ -464,7 +471,8 @@ class PayActivity : AppCompatActivity() {
                     nonce = nonce,
                     signature = "UPI_VERIFIED_" + UUID.randomUUID().toString().take(8),
                     status = TransactionEntity.STATUS_SYNCED,
-                    direction = TransactionEntity.DIRECTION_SENT
+                    direction = TransactionEntity.DIRECTION_SENT,
+                    channel = TransactionEntity.CHANNEL_UPI
                 )
                 appDatabase.transactionDao.insertTransaction(txEntity)
 
@@ -558,7 +566,8 @@ class PayActivity : AppCompatActivity() {
                     nonce = nonce,
                     signature = signature,
                     status = initialStatus,
-                    direction = TransactionEntity.DIRECTION_SENT
+                    direction = TransactionEntity.DIRECTION_SENT,
+                    channel = TransactionEntity.CHANNEL_BLUETOOTH
                 )
                 appDatabase.transactionDao.insertTransaction(txEntity)
 

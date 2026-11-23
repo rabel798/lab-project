@@ -230,14 +230,18 @@ class PaymentRepository private constructor(private val context: Context) {
 
             if (pendingTxs.isNotEmpty()) {
                 val syncItems = pendingTxs.map {
+                    val isOnlineTx = it.isOnline
+                    val ch = if (isOnlineTx) "UPI" else "Bluetooth"
+                    val defaultNote = if (isOnlineTx) "UPI Online Payment" else "Bluetooth Offline Payment (Direction: ${it.direction})"
                     SyncTransactionItem(
                         txId = it.txId,
                         payee = it.receiverName,
                         amount = it.amount,
-                        note = "Bluetooth Offline Payment (Direction: ${it.direction})",
+                        note = defaultNote,
                         direction = it.direction,
                         senderId = it.senderId,
-                        receiverId = it.receiverId
+                        receiverId = it.receiverId,
+                        channel = ch
                     )
                 }
 
