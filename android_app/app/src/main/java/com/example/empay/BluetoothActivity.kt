@@ -1,12 +1,15 @@
 package com.example.empay
 
+import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -18,6 +21,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.empay.auth.AuthManager
@@ -44,8 +48,10 @@ class BluetoothActivity : AppCompatActivity() {
     private lateinit var indicatorBtUsers: View
     private lateinit var layoutBtDevicesList: LinearLayout
 
-    private var activeTab = "merchants" // "merchants" or "users"
+    private var activeTab = "users" // Default to users tab so nearby registered accounts are immediately visible
     private var searchQuery = ""
+    private var hasRequestedDiscoverable = false
+    private val REQUEST_BT_PERMISSIONS = 2001
 
     data class PeerItem(
         val id: Long,
@@ -73,7 +79,8 @@ class BluetoothActivity : AppCompatActivity() {
             if (BluetoothDevice.ACTION_FOUND == action || BluetoothDevice.ACTION_NAME_CHANGED == action) {
                 val device: BluetoothDevice? =
                     intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                device?.let { handleDiscoveredDevice(it) }
+                val extraName: String? = intent.getStringExtra(BluetoothDevice.EXTRA_NAME)
+                device?.let { handleDiscoveredDevice(it, extraName) }
             }
         }
     }
@@ -92,10 +99,51 @@ class BluetoothActivity : AppCompatActivity() {
 
         initViews()
         setupListeners()
+        updateTabsUi()
         loadBalances()
         populateKnownUsers()
         scanPairedAndNearbyDevices()
         renderList()
+        checkBluetoothPermissions()
+    }
+
+    private fun checkBluetoothPermissions(): Boolean {
+        val required = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                required.add(Manifest.permission.BLUETOOTH_SCAN)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                required.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
+                required.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                required.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+
+        if (required.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, required.toTypedArray(), REQUEST_BT_PERMISSIONS)
+            return false
+        }
+        return true
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_BT_PERMISSIONS) {
+            val allGranted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+            if (allGranted) {
+                val currentUser = sessionManager.getUser()
+                BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
+                scanPairedAndNearbyDevices()
+                startActiveDiscovery()
+                renderList()
+            }
+        }
     }
 
     override fun onResume() {
@@ -103,16 +151,25 @@ class BluetoothActivity : AppCompatActivity() {
         val currentUser = sessionManager.getUser()
         BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
 
-        // Request Bluetooth Discoverability so nearby devices running EmPay can discover this device
-        try {
-            val adapter = BluetoothAdapter.getDefaultAdapter()
-            if (adapter != null && adapter.isEnabled && adapter.scanMode != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
-                val discoverableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
-                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+        val adapter = BluetoothAdapter.getDefaultAdapter()
+        if (adapter != null && !adapter.isEnabled) {
+            try {
+                startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            } catch (_: Exception) {}
+        }
+
+        // Request Bluetooth Discoverability once so nearby peer devices running EmPay can discover this device
+        if (!hasRequestedDiscoverable) {
+            hasRequestedDiscoverable = true
+            try {
+                if (adapter != null && adapter.isEnabled && adapter.scanMode != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
+                    val discoverableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                        putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+                    }
+                    startActivity(discoverableIntent)
                 }
-                startActivity(discoverableIntent)
-            }
-        } catch (_: Exception) {}
+            } catch (_: Exception) {}
+        }
 
         loadBalances()
         lifecycleScope.launch {
@@ -228,18 +285,19 @@ class BluetoothActivity : AppCompatActivity() {
 
     private fun populateKnownUsers() {
         val currentPhone = sessionManager.getUser().phone
+        val currentName = sessionManager.getUser().name
         val registeredAccounts = AuthManager.getInstance(this).getRegisteredAccounts()
 
         registeredAccounts.forEach { account ->
-            if (account.phone != currentPhone) {
-                val exists = usersList.any { it.categoryOrPhone == account.phone }
+            if (account.phone != currentPhone && !account.name.equals(currentName, true)) {
+                val exists = usersList.any { it.categoryOrPhone == account.phone || it.name.equals(account.name, true) }
                 if (!exists) {
                     usersList.add(
                         PeerItem(
                             id = usersList.size + 1L,
                             name = account.name,
                             categoryOrPhone = account.phone,
-                            distanceMeters = 1.0 + (usersList.size * 0.8),
+                            distanceMeters = 1.0 + (usersList.size * 0.5),
                             isMerchant = false
                         )
                     )
@@ -252,13 +310,17 @@ class BluetoothActivity : AppCompatActivity() {
         try {
             val paired = paymentRepository.getPairedBluetoothDevices()
             val currentPhone = sessionManager.getUser().phone
+            val currentName = sessionManager.getUser().name
 
             for (dev in paired) {
                 val peer = BluetoothHelper.parseEmPayPeer(this, dev) ?: continue
-                if (peer.phone == currentPhone) continue // Skip self
+                if (peer.phone == currentPhone || peer.name.equals(currentName, true)) continue // Skip self
 
                 if (peer.isMerchant) {
-                    if (merchantsList.none { it.name.equals(peer.name, true) }) {
+                    val mIdx = merchantsList.indexOfFirst { it.name.equals(peer.name, true) }
+                    if (mIdx >= 0) {
+                        merchantsList[mIdx] = merchantsList[mIdx].copy(rawDevice = dev)
+                    } else {
                         merchantsList.add(
                             0,
                             PeerItem(
@@ -272,7 +334,18 @@ class BluetoothActivity : AppCompatActivity() {
                         )
                     }
                 } else {
-                    if (usersList.none { it.categoryOrPhone == peer.phone }) {
+                    val uIdx = usersList.indexOfFirst { 
+                        (peer.phone.isNotEmpty() && it.categoryOrPhone == peer.phone) ||
+                        it.name.equals(peer.name, true)
+                    }
+                    if (uIdx >= 0) {
+                        usersList[uIdx] = usersList[uIdx].copy(
+                            name = peer.name,
+                            categoryOrPhone = peer.phone.ifEmpty { usersList[uIdx].categoryOrPhone },
+                            rawDevice = dev,
+                            distanceMeters = 0.5
+                        )
+                    } else {
                         usersList.add(
                             0,
                             PeerItem(
@@ -328,10 +401,11 @@ class BluetoothActivity : AppCompatActivity() {
         } catch (_: Exception) {}
     }
 
-    private fun handleDiscoveredDevice(device: BluetoothDevice) {
-        val peer = BluetoothHelper.parseEmPayPeer(this, device) ?: return
+    private fun handleDiscoveredDevice(device: BluetoothDevice, extraName: String? = null) {
+        val peer = BluetoothHelper.parseEmPayPeer(this, device, extraName) ?: return
         val currentPhone = sessionManager.getUser().phone
-        if (peer.phone == currentPhone) return
+        val currentName = sessionManager.getUser().name
+        if (peer.phone == currentPhone || peer.name.equals(currentName, true)) return
 
         var updated = false
         if (peer.isMerchant) {

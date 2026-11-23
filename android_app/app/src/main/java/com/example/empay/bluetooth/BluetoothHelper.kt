@@ -52,20 +52,22 @@ object BluetoothHelper {
      * Non-EmPay devices (headphones, cars, TVs, generic PCs) return null and are filtered out.
      */
     @SuppressLint("MissingPermission")
-    fun parseEmPayPeer(context: Context, device: BluetoothDevice): EmPayPeer? {
+    fun parseEmPayPeer(context: Context, device: BluetoothDevice, extraName: String? = null): EmPayPeer? {
         if (!hasConnectPermission(context)) return null
 
-        val rawName = try {
+        val deviceName = try {
             device.name?.trim() ?: ""
         } catch (_: Exception) {
             ""
         }
 
+        val rawName = if (!extraName.isNullOrBlank()) extraName.trim() else deviceName
         if (rawName.isEmpty()) return null
 
-        // 1. Check for EmPay broadcast protocol: "EmPay:<Name>:<Phone>"
+        // 1. Check for EmPay broadcast protocol: "EmPay:<Name>:<Phone>" or "EmPay-<Name>"
         if (rawName.startsWith(PREFIX, ignoreCase = true)) {
-            val parts = rawName.split(SEPARATOR)
+            val delimiter = if (rawName.contains(":")) ":" else if (rawName.contains("-")) "-" else "_"
+            val parts = rawName.split(delimiter)
             if (parts.size >= 3) {
                 val peerName = parts[1].trim()
                 val peerPhone = parts[2].trim()

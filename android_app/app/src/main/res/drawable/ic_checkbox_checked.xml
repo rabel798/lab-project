@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Blue rounded background box -->
+    <path
+        android:fillColor="#0052FF"
+        android:pathData="M 5,3 C 3.9,3 3,3.9 3,5 L 3,19 C 3,20.1 3.9,21 5,21 L 19,21 C 20.1,21 21,20.1 21,19 L 21,5 C 21,3.9 20.1,3 19,3 Z" />
+    <!-- Crisp bold white checkmark tick -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M 6.5,12.5 L 10.5,16.5 L 17.5,7.5" />
+</vector>

@@ -157,10 +157,13 @@
                 android:layout_height="wrap_content"
                 android:text="Remember Me"
                 android:checked="true"
-                android:textColor="#475569"
+                android:textColor="#334155"
                 android:textSize="14sp"
                 android:fontFamily="@font/inter"
-                android:buttonTint="@color/primary"
+                android:button="@drawable/sl_custom_checkbox"
+                android:buttonTint="@null"
+                app:buttonTint="@null"
+                android:paddingStart="8dp"
                 android:layout_marginBottom="18dp" />
 
             <Button

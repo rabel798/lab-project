@@ -48,6 +48,8 @@ class AuthManager private constructor(private val context: Context) {
         private const val PREF_ACCOUNTS = "empay_registered_accounts"
         private const val KEY_ACCOUNTS_JSON = "accounts_list"
         private const val KEY_LOGGED_IN_ID = "logged_in_user_id"
+        private const val KEY_DEVICE_REMEMBER_ME = "device_remember_me_enabled"
+        private const val KEY_REMEMBERED_USER_ID = "device_remembered_user_id"
 
         @Volatile
         private var instance: AuthManager? = null
@@ -231,6 +233,18 @@ class AuthManager private constructor(private val context: Context) {
                 } else {
                     db.userDao.setRemembered(matched.id, rememberMe)
                 }
+                if (rememberMe) {
+                    prefs.edit()
+                        .putBoolean(KEY_DEVICE_REMEMBER_ME, true)
+                        .putLong(KEY_REMEMBERED_USER_ID, matched.id)
+                        .apply()
+                } else {
+                    db.userDao.clearAllRemembered()
+                    prefs.edit()
+                        .putBoolean(KEY_DEVICE_REMEMBER_ME, false)
+                        .remove(KEY_REMEMBERED_USER_ID)
+                        .apply()
+                }
                 setActiveAccount(matched)
                 return matched
             }
@@ -259,6 +273,19 @@ class AuthManager private constructor(private val context: Context) {
                 matched = matched.copy(password = trimmedPass)
             }
             db.userDao.insertOrUpdateUser(matched, isRemembered = rememberMe)
+            if (rememberMe) {
+                db.userDao.setRemembered(matched.id, true)
+                prefs.edit()
+                    .putBoolean(KEY_DEVICE_REMEMBER_ME, true)
+                    .putLong(KEY_REMEMBERED_USER_ID, matched.id)
+                    .apply()
+            } else {
+                db.userDao.clearAllRemembered()
+                prefs.edit()
+                    .putBoolean(KEY_DEVICE_REMEMBER_ME, false)
+                    .remove(KEY_REMEMBERED_USER_ID)
+                    .apply()
+            }
             val updatedList = accounts.toMutableList()
             val idx = updatedList.indexOfFirst { it.id == matched!!.id }
             if (idx >= 0) {
@@ -308,7 +335,22 @@ class AuthManager private constructor(private val context: Context) {
         val db = AppDatabase.getInstance(context)
         db.userDao.insertOrUpdateUser(account, isRemembered = rememberMe)
 
-        // 2. Save to SharedPreferences
+        // 2. Set device-specific remember me flag
+        if (rememberMe) {
+            db.userDao.setRemembered(account.id, true)
+            prefs.edit()
+                .putBoolean(KEY_DEVICE_REMEMBER_ME, true)
+                .putLong(KEY_REMEMBERED_USER_ID, account.id)
+                .apply()
+        } else {
+            db.userDao.clearAllRemembered()
+            prefs.edit()
+                .putBoolean(KEY_DEVICE_REMEMBER_ME, false)
+                .remove(KEY_REMEMBERED_USER_ID)
+                .apply()
+        }
+
+        // 3. Save to SharedPreferences
         saveAccountsList(accounts)
         setActiveAccount(account)
 
@@ -373,12 +415,22 @@ class AuthManager private constructor(private val context: Context) {
     }
 
     fun getActiveAccount(): UserAccount? {
-        val db = AppDatabase.getInstance(context)
-        val remembered = db.userDao.getRememberedUser()
-        if (remembered != null) return remembered
+        val isDeviceRemembered = prefs.getBoolean(KEY_DEVICE_REMEMBER_ME, false)
+        if (isDeviceRemembered) {
+            val remId = prefs.getLong(KEY_REMEMBERED_USER_ID, -1L)
+            if (remId != -1L) {
+                val db = AppDatabase.getInstance(context)
+                val found = db.userDao.getUserById(remId) ?: getRegisteredAccounts().find { it.id == remId }
+                if (found != null) return found
+            }
+            val db = AppDatabase.getInstance(context)
+            val remembered = db.userDao.getRememberedUser()
+            if (remembered != null) return remembered
+        }
 
         val id = prefs.getLong(KEY_LOGGED_IN_ID, -1L)
         if (id != -1L) {
+            val db = AppDatabase.getInstance(context)
             val found = db.userDao.getUserById(id) ?: getRegisteredAccounts().find { it.id == id }
             if (found != null) return found
         }
@@ -386,13 +438,23 @@ class AuthManager private constructor(private val context: Context) {
     }
 
     fun isLoggedIn(): Boolean {
-        return getActiveAccount() != null
+        val isDeviceRemembered = prefs.getBoolean(KEY_DEVICE_REMEMBER_ME, false)
+        if (!isDeviceRemembered) return false
+        val remId = prefs.getLong(KEY_REMEMBERED_USER_ID, -1L)
+        if (remId == -1L) return false
+        val db = AppDatabase.getInstance(context)
+        val user = db.userDao.getUserById(remId) ?: getRegisteredAccounts().find { it.id == remId }
+        return user != null
     }
 
     fun logout() {
         val db = AppDatabase.getInstance(context)
         db.userDao.clearAllRemembered()
-        prefs.edit().remove(KEY_LOGGED_IN_ID).apply()
+        prefs.edit()
+            .putBoolean(KEY_DEVICE_REMEMBER_ME, false)
+            .remove(KEY_REMEMBERED_USER_ID)
+            .remove(KEY_LOGGED_IN_ID)
+            .apply()
         SessionManager.getInstance(context).clearSession()
     }
 

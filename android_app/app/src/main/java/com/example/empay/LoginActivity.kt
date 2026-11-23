@@ -146,8 +146,9 @@ class LoginActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
 
-                // Permanently registers account in SQLite & bank server, keeping user logged in
-                val newAccount = authManager.signUp(name, phone, password, emergencyBal, rememberMe = true)
+                // Permanently registers account in SQLite & bank server, respecting Remember Me
+                val rememberMe = cbRememberMe.isChecked
+                val newAccount = authManager.signUp(name, phone, password, emergencyBal, rememberMe = rememberMe)
                 try {
                     com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, newAccount.name, newAccount.phone)
                 } catch (_: Exception) {}
