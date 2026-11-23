@@ -1,9 +1,17 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- Solid Blue Oval / Capsule Pill Background (Exact match to uploaded Bluetooth photo) -->
     <path
         android:fillColor="@color/primary"
-        android:pathData="M14.88,16.29L13,14.41V19.17L14.88,16.29ZM13,4.83L14.88,7.71L13,5.83V4.83ZM11,2H13V9.59L17.59,5L19,6.41L13.41,12L19,17.59L17.59,19L13,14.41V22H11V13.41L6.41,18L5,16.59L10.59,11L5,5.41L6.41,4L11,8.59V2Z"/>
+        android:pathData="M 50,4 C 70,4 85,16 85,38 L 85,62 C 85,84 70,96 50,96 C 30,96 15,84 15,62 L 15,38 C 15,16 30,4 50,4 Z" />
+
+    <!-- Crisp White Bluetooth Rune with Inner Triangle Cutouts -->
+    <path
+        android:fillColor="@color/white"
+        android:fillType="evenOdd"
+        android:pathData="M58.64,66.3L53.0,59.16V77.25L58.64,66.3ZM53.0,22.75L58.64,33.7L53.0,26.55V22.75ZM47.0,12.0H53.0V40.84L66.77,23.4L71.0,28.76L54.23,50.0L71.0,71.24L66.77,76.6L53.0,59.16V88.0H47.0V55.36L33.23,72.8L29.0,67.44L45.77,46.2L29.0,24.96L33.23,19.6L47.0,37.04V12.0Z" />
 </vector>

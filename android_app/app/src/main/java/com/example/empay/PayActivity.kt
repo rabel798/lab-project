@@ -290,7 +290,7 @@ class PayActivity : AppCompatActivity() {
             tvPayNetworkBadge.setTextColor(ContextCompat.getColor(this, R.color.emergency_dark))
             tvPayNetworkBadge.backgroundTintList = ContextCompat.getColorStateList(this, R.color.emergency_bg)
             ivMethodIcon.setImageResource(R.drawable.ic_bluetooth)
-            ivMethodIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.electric_orange)
+            ivMethodIcon.imageTintList = null
             tvMethodText.text = "Bluetooth Payment (Offline)"
             tvPayExecutionMode.text = "Bluetooth (Offline Emergency)"
             btnSubmitPayment.backgroundTintList = ContextCompat.getColorStateList(this, R.color.electric_orange)

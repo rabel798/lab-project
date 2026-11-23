@@ -82,6 +82,10 @@ class LoginActivity : AppCompatActivity() {
         etLoginPhone.setText("")
         etLoginPassword.setText("")
         cbRememberMe.isChecked = true
+
+        // Lock button colors so they remain intact without changing when clicked
+        btnSubmitLogin.backgroundTintList = ContextCompat.getColorStateList(this, R.color.btn_primary_solid)
+        btnSubmitSignUp.backgroundTintList = ContextCompat.getColorStateList(this, R.color.btn_primary_solid)
     }
 
     private fun setupListeners() {
@@ -143,7 +147,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun switchTab(isSignIn: Boolean) {
-        val activeBg = ContextCompat.getColorStateList(this, R.color.primary)
+        val activeBg = ContextCompat.getColorStateList(this, R.color.btn_primary_solid)
         val inactiveBg = ContextCompat.getColorStateList(this, android.R.color.transparent)
         val activeText = ContextCompat.getColor(this, R.color.white)
         val inactiveText = ContextCompat.getColor(this, R.color.text_muted)

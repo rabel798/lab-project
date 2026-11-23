@@ -14,6 +14,7 @@
     <color name="electric_blue">#0052FF</color>
     <color name="electric_blue_vibrant">#0066FF</color>
     <color name="electric_blue_dark">#002D9C</color>
+    <color name="electric_cyan">#00A3E0</color>
 
     <!-- Electric Orange Spectrum (Energy, Emergency, High-Contrast Highlights) -->
     <color name="electric_orange">#FF6A00</color>

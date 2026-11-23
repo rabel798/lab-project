@@ -74,7 +74,11 @@
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:backgroundTint="@color/primary"
+                android:backgroundTint="@color/btn_primary_solid"
+                app:backgroundTint="@color/btn_primary_solid"
+                app:rippleColor="@android:color/transparent"
+                android:stateListAnimator="@null"
+                app:elevation="0dp"
                 app:cornerRadius="8dp" />
 
             <Button
@@ -87,6 +91,10 @@
                 android:textStyle="bold"
                 android:textColor="#475569"
                 android:backgroundTint="@android:color/transparent"
+                app:backgroundTint="@android:color/transparent"
+                app:rippleColor="@android:color/transparent"
+                android:stateListAnimator="@null"
+                app:elevation="0dp"
                 app:cornerRadius="8dp" />
         </LinearLayout>
 
@@ -162,8 +170,12 @@
                 android:text="Sign In"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="@color/primary"
+                android:textColor="@color/btn_text_solid"
+                android:backgroundTint="@color/btn_primary_solid"
+                app:backgroundTint="@color/btn_primary_solid"
+                app:rippleColor="@android:color/transparent"
+                android:stateListAnimator="@null"
+                app:elevation="0dp"
                 app:cornerRadius="12dp"
                 android:layout_marginBottom="14dp" />
 
@@ -307,8 +319,12 @@
                 android:text="Create Account &amp; Test Bluetooth"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="@color/primary"
+                android:textColor="@color/btn_text_solid"
+                android:backgroundTint="@color/btn_primary_solid"
+                app:backgroundTint="@color/btn_primary_solid"
+                app:rippleColor="@android:color/transparent"
+                android:stateListAnimator="@null"
+                app:elevation="0dp"
                 app:cornerRadius="12dp" />
         </LinearLayout>
 
@@ -326,8 +342,7 @@
             <ImageView
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:src="@drawable/ic_bluetooth"
-                app:tint="@color/electric_orange" />
+                android:src="@drawable/ic_bluetooth" />
 
             <TextView
                 android:layout_width="0dp"

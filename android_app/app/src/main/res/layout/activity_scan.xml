@@ -228,8 +228,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:layout_gravity="center"
-                        android:src="@drawable/ic_bluetooth"
-                        app:tint="@color/white" />
+                        android:src="@drawable/ic_bluetooth" />
                 </FrameLayout>
 
                 <TextView
