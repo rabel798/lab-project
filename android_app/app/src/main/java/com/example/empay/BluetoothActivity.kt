@@ -80,7 +80,9 @@ class BluetoothActivity : AppCompatActivity() {
                 val device: BluetoothDevice? =
                     intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                 val extraName: String? = intent.getStringExtra(BluetoothDevice.EXTRA_NAME)
-                device?.let { handleDiscoveredDevice(it, extraName) }
+                val rssi: Short = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE)
+                val rssiVal: Int? = if (rssi != Short.MIN_VALUE) rssi.toInt() else null
+                device?.let { handleDiscoveredDevice(it, extraName, rssiVal) }
             }
         }
     }
@@ -177,12 +179,9 @@ class BluetoothActivity : AppCompatActivity() {
             loadBalances()
         }
 
-        // Pull latest registered users dynamically from bank server so any new peer appears immediately
-        AuthManager.getInstance(this).syncAllRegisteredUsersFromBackend {
-            populateKnownUsers()
-            scanPairedAndNearbyDevices()
-            renderList()
-        }
+        // Sync bank database in background for account lookup/verification,
+        // without dumping unverified remote users into the nearby Bluetooth list
+        AuthManager.getInstance(this).syncAllRegisteredUsersFromBackend()
 
         populateKnownUsers()
         scanPairedAndNearbyDevices()
@@ -283,21 +282,42 @@ class BluetoothActivity : AppCompatActivity() {
         tvBtEmergencyBalance.text = String.format(Locale.US, "₹ %.2f", offlineBal)
     }
 
+    /**
+     * Calculates estimated physical distance in meters from Bluetooth Received Signal Strength Indication (RSSI).
+     * Log-distance path loss model:
+     * Distance = 10 ^ ((TxPower - RSSI) / (10 * n))
+     * where TxPower = -59 dBm (measured RSSI at 1m), n = 2.2 (indoor path loss exponent)
+     */
+    private fun calculateDistanceMeters(rssi: Int?): Double {
+        if (rssi == null || rssi == 0) return 0.8
+        val txPower = -59.0
+        val pathLossExponent = 2.2
+        val ratio = (txPower - rssi) / (10.0 * pathLossExponent)
+        val rawDistance = Math.pow(10.0, ratio).coerceIn(0.2, 25.0)
+        return Math.round(rawDistance * 10.0) / 10.0
+    }
+
     private fun populateKnownUsers() {
         val currentPhone = sessionManager.getUser().phone
         val currentName = sessionManager.getUser().name
-        val registeredAccounts = AuthManager.getInstance(this).getRegisteredAccounts()
 
-        registeredAccounts.forEach { account ->
-            if (account.phone != currentPhone && !account.name.equals(currentName, true)) {
-                val exists = usersList.any { it.categoryOrPhone == account.phone || it.name.equals(account.name, true) }
-                if (!exists) {
+        // Pre-populate only the designated hardcoded demo testers
+        val hardcodedTesters = listOf(
+            Triple("Priya Sharma", "8765432109", 1.2),
+            Triple("Sukhpal Singh", "9811122233", 1.8),
+            Triple("Dr. Rohan Verma", "7654321098", 2.4),
+            Triple("Ananya Patel", "6543210987", 3.1)
+        )
+
+        hardcodedTesters.forEach { (name, phone, dist) ->
+            if (phone != currentPhone && !name.equals(currentName, true)) {
+                if (usersList.none { it.categoryOrPhone == phone || it.name.equals(name, true) }) {
                     usersList.add(
                         PeerItem(
                             id = usersList.size + 1L,
-                            name = account.name,
-                            categoryOrPhone = account.phone,
-                            distanceMeters = 1.0 + (usersList.size * 0.5),
+                            name = name,
+                            categoryOrPhone = phone,
+                            distanceMeters = dist,
                             isMerchant = false
                         )
                     )
@@ -401,17 +421,18 @@ class BluetoothActivity : AppCompatActivity() {
         } catch (_: Exception) {}
     }
 
-    private fun handleDiscoveredDevice(device: BluetoothDevice, extraName: String? = null) {
+    private fun handleDiscoveredDevice(device: BluetoothDevice, extraName: String? = null, rssi: Int? = null) {
         val peer = BluetoothHelper.parseEmPayPeer(this, device, extraName) ?: return
         val currentPhone = sessionManager.getUser().phone
         val currentName = sessionManager.getUser().name
         if (peer.phone == currentPhone || peer.name.equals(currentName, true)) return
 
+        val measuredDistance = calculateDistanceMeters(rssi)
         var updated = false
         if (peer.isMerchant) {
             val mIdx = merchantsList.indexOfFirst { it.name.equals(peer.name, true) }
             if (mIdx >= 0) {
-                merchantsList[mIdx] = merchantsList[mIdx].copy(rawDevice = device)
+                merchantsList[mIdx] = merchantsList[mIdx].copy(rawDevice = device, distanceMeters = measuredDistance)
                 updated = true
             } else {
                 merchantsList.add(
@@ -420,7 +441,7 @@ class BluetoothActivity : AppCompatActivity() {
                         id = 3000L + merchantsList.size,
                         name = peer.name,
                         categoryOrPhone = "Emergency Merchant",
-                        distanceMeters = 0.5,
+                        distanceMeters = measuredDistance,
                         isMerchant = true,
                         rawDevice = device
                     )
@@ -437,7 +458,7 @@ class BluetoothActivity : AppCompatActivity() {
                     name = peer.name,
                     categoryOrPhone = peer.phone.ifEmpty { usersList[uIdx].categoryOrPhone },
                     rawDevice = device,
-                    distanceMeters = 0.5
+                    distanceMeters = measuredDistance
                 )
                 updated = true
             } else {
@@ -447,7 +468,7 @@ class BluetoothActivity : AppCompatActivity() {
                         id = 4000L + usersList.size,
                         name = peer.name,
                         categoryOrPhone = peer.phone,
-                        distanceMeters = 0.5,
+                        distanceMeters = measuredDistance,
                         isMerchant = false,
                         rawDevice = device
                     )
@@ -495,12 +516,12 @@ class BluetoothActivity : AppCompatActivity() {
             if (item.isMerchant) {
                 ivIcon.setImageResource(R.drawable.ic_store)
                 val deviceStatus = if (item.rawDevice != null) " • Bluetooth Paired" else ""
-                tvSub.text = "${item.categoryOrPhone} • ${String.format(Locale.US, "%.1fm", item.distanceMeters)}$deviceStatus"
+                tvSub.text = "${item.categoryOrPhone} • ${String.format(Locale.US, "%.1fm away", item.distanceMeters)}$deviceStatus"
             } else {
                 ivIcon.setImageResource(R.drawable.ic_profile)
                 val phoneDisp = if (item.categoryOrPhone.startsWith("+")) item.categoryOrPhone else "+91 ${item.categoryOrPhone}"
-                val deviceStatus = if (item.rawDevice != null) " • Bluetooth Nearby" else ""
-                tvSub.text = "$phoneDisp • ${String.format(Locale.US, "%.1fm", item.distanceMeters)}$deviceStatus"
+                val deviceStatus = if (item.rawDevice != null) " • Bluetooth In Vicinity" else ""
+                tvSub.text = "$phoneDisp • ${String.format(Locale.US, "%.1fm away", item.distanceMeters)}$deviceStatus"
             }
 
             val payAction = View.OnClickListener {
