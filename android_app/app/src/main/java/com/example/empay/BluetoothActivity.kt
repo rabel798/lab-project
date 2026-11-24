@@ -11,6 +11,8 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -59,30 +61,71 @@ class BluetoothActivity : AppCompatActivity() {
         val categoryOrPhone: String,
         val distanceMeters: Double,
         val isMerchant: Boolean,
-        val rawDevice: BluetoothDevice? = null
+        val rawDevice: BluetoothDevice? = null,
+        val lastSeenTimestamp: Long = System.currentTimeMillis(),
+        val isHardcoded: Boolean = false
     )
 
     private val merchantsList = mutableListOf(
-        PeerItem(1, "Apex City Care Pharmacy", "Healthcare", 1.2, true),
-        PeerItem(2, "Daily Fresh Supermarket", "Groceries", 0.8, true),
-        PeerItem(3, "LifeLine Emergency Medicos", "Healthcare", 1.5, true),
-        PeerItem(4, "National Book & Stationery Depot", "Retail", 2.4, true),
-        PeerItem(5, "City QuickFix Electrical Services", "Emergency Services", 1.8, true)
+        PeerItem(1, "Apex City Care Pharmacy", "Healthcare", 1.2, true, isHardcoded = true),
+        PeerItem(2, "Daily Fresh Supermarket", "Groceries", 0.8, true, isHardcoded = true),
+        PeerItem(3, "LifeLine Emergency Medicos", "Healthcare", 1.5, true, isHardcoded = true),
+        PeerItem(4, "National Book & Stationery Depot", "Retail", 2.4, true, isHardcoded = true),
+        PeerItem(5, "City QuickFix Electrical Services", "Emergency Services", 1.8, true, isHardcoded = true)
     )
 
     private val usersList = mutableListOf<PeerItem>()
+
+    private var isActivityActive = false
+    private val PEER_TTL_MS = 14000L // 14s TTL: if device moves out of range or turns off BT, it disappears
+    private val pruneHandler = Handler(Looper.getMainLooper())
+    private val pruneRunnable = object : Runnable {
+        override fun run() {
+            if (isActivityActive) {
+                pruneOutOfRangePeers()
+                pruneHandler.postDelayed(this, 3000L)
+            }
+        }
+    }
+    private val restartDiscoveryHandler = Handler(Looper.getMainLooper())
 
     private var isReceiverRegistered = false
     private val btDiscoveryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val action = intent?.action ?: return
-            if (BluetoothDevice.ACTION_FOUND == action || BluetoothDevice.ACTION_NAME_CHANGED == action) {
-                val device: BluetoothDevice? =
-                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                val extraName: String? = intent.getStringExtra(BluetoothDevice.EXTRA_NAME)
-                val rssi: Short = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE)
-                val rssiVal: Int? = if (rssi != Short.MIN_VALUE) rssi.toInt() else null
-                device?.let { handleDiscoveredDevice(it, extraName, rssiVal) }
+            when (action) {
+                BluetoothDevice.ACTION_FOUND, BluetoothDevice.ACTION_NAME_CHANGED -> {
+                    val device: BluetoothDevice? =
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    val extraName: String? = intent.getStringExtra(BluetoothDevice.EXTRA_NAME)
+                    val rssi: Short = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE)
+                    val rssiVal: Int? = if (rssi != Short.MIN_VALUE) rssi.toInt() else null
+                    device?.let { handleDiscoveredDevice(it, extraName, rssiVal) }
+                }
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                    val device: BluetoothDevice? =
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    device?.let { handleDeviceDisconnected(it) }
+                }
+                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
+                    pruneOutOfRangePeers()
+                    if (isActivityActive) {
+                        restartDiscoveryHandler.removeCallbacksAndMessages(null)
+                        restartDiscoveryHandler.postDelayed({
+                            if (isActivityActive) {
+                                triggerDiscovery()
+                            }
+                        }, 2000L)
+                    }
+                }
+                BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                    val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                    if (state == BluetoothAdapter.STATE_TURNING_OFF || state == BluetoothAdapter.STATE_OFF) {
+                        usersList.removeAll { !it.isHardcoded }
+                        merchantsList.removeAll { !it.isHardcoded }
+                        renderList()
+                    }
+                }
             }
         }
     }
@@ -150,6 +193,10 @@ class BluetoothActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        isActivityActive = true
+        pruneHandler.removeCallbacks(pruneRunnable)
+        pruneHandler.postDelayed(pruneRunnable, 3000L)
+
         val currentUser = sessionManager.getUser()
         BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
 
@@ -191,11 +238,15 @@ class BluetoothActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        isActivityActive = false
+        pruneHandler.removeCallbacks(pruneRunnable)
         stopActiveDiscovery()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        isActivityActive = false
+        pruneHandler.removeCallbacks(pruneRunnable)
         stopActiveDiscovery()
     }
 
@@ -318,7 +369,8 @@ class BluetoothActivity : AppCompatActivity() {
                             name = name,
                             categoryOrPhone = phone,
                             distanceMeters = dist,
-                            isMerchant = false
+                            isMerchant = false,
+                            isHardcoded = true
                         )
                     )
                 }
@@ -339,7 +391,7 @@ class BluetoothActivity : AppCompatActivity() {
                 if (peer.isMerchant) {
                     val mIdx = merchantsList.indexOfFirst { it.name.equals(peer.name, true) }
                     if (mIdx >= 0) {
-                        merchantsList[mIdx] = merchantsList[mIdx].copy(rawDevice = dev)
+                        merchantsList[mIdx] = merchantsList[mIdx].copy(rawDevice = dev, lastSeenTimestamp = System.currentTimeMillis())
                     } else {
                         merchantsList.add(
                             0,
@@ -349,7 +401,9 @@ class BluetoothActivity : AppCompatActivity() {
                                 categoryOrPhone = "Emergency Merchant",
                                 distanceMeters = 0.5,
                                 isMerchant = true,
-                                rawDevice = dev
+                                rawDevice = dev,
+                                lastSeenTimestamp = System.currentTimeMillis(),
+                                isHardcoded = false
                             )
                         )
                     }
@@ -363,7 +417,8 @@ class BluetoothActivity : AppCompatActivity() {
                             name = peer.name,
                             categoryOrPhone = peer.phone.ifEmpty { usersList[uIdx].categoryOrPhone },
                             rawDevice = dev,
-                            distanceMeters = 0.5
+                            distanceMeters = 0.5,
+                            lastSeenTimestamp = System.currentTimeMillis()
                         )
                     } else {
                         usersList.add(
@@ -374,7 +429,9 @@ class BluetoothActivity : AppCompatActivity() {
                                 categoryOrPhone = peer.phone,
                                 distanceMeters = 0.8,
                                 isMerchant = false,
-                                rawDevice = dev
+                                rawDevice = dev,
+                                lastSeenTimestamp = System.currentTimeMillis(),
+                                isHardcoded = false
                             )
                         )
                     }
@@ -391,11 +448,23 @@ class BluetoothActivity : AppCompatActivity() {
             val filter = IntentFilter().apply {
                 addAction(BluetoothDevice.ACTION_FOUND)
                 addAction(BluetoothDevice.ACTION_NAME_CHANGED)
+                addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+                addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+                addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
             }
             if (!isReceiverRegistered) {
                 registerReceiver(btDiscoveryReceiver, filter)
                 isReceiverRegistered = true
             }
+            triggerDiscovery()
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun triggerDiscovery() {
+        if (!BluetoothHelper.hasScanPermission(this)) return
+        try {
             val adapter = BluetoothAdapter.getDefaultAdapter()
             if (adapter?.isEnabled == true) {
                 if (adapter.isDiscovering) {
@@ -409,6 +478,7 @@ class BluetoothActivity : AppCompatActivity() {
     }
 
     private fun stopActiveDiscovery() {
+        restartDiscoveryHandler.removeCallbacksAndMessages(null)
         try {
             if (isReceiverRegistered) {
                 unregisterReceiver(btDiscoveryReceiver)
@@ -421,6 +491,24 @@ class BluetoothActivity : AppCompatActivity() {
         } catch (_: Exception) {}
     }
 
+    private fun handleDeviceDisconnected(device: BluetoothDevice) {
+        val addr = device.address
+        val removedUser = usersList.removeAll { !it.isHardcoded && it.rawDevice?.address == addr }
+        val removedMerchant = merchantsList.removeAll { !it.isHardcoded && it.rawDevice?.address == addr }
+        if (removedUser || removedMerchant) {
+            runOnUiThread { renderList() }
+        }
+    }
+
+    private fun pruneOutOfRangePeers() {
+        val now = System.currentTimeMillis()
+        val removedUsers = usersList.removeAll { !it.isHardcoded && (now - it.lastSeenTimestamp > PEER_TTL_MS) }
+        val removedMerchants = merchantsList.removeAll { !it.isHardcoded && (now - it.lastSeenTimestamp > PEER_TTL_MS) }
+        if (removedUsers || removedMerchants) {
+            runOnUiThread { renderList() }
+        }
+    }
+
     private fun handleDiscoveredDevice(device: BluetoothDevice, extraName: String? = null, rssi: Int? = null) {
         val peer = BluetoothHelper.parseEmPayPeer(this, device, extraName) ?: return
         val currentPhone = sessionManager.getUser().phone
@@ -428,11 +516,16 @@ class BluetoothActivity : AppCompatActivity() {
         if (peer.phone == currentPhone || peer.name.equals(currentName, true)) return
 
         val measuredDistance = calculateDistanceMeters(rssi)
+        val now = System.currentTimeMillis()
         var updated = false
         if (peer.isMerchant) {
             val mIdx = merchantsList.indexOfFirst { it.name.equals(peer.name, true) }
             if (mIdx >= 0) {
-                merchantsList[mIdx] = merchantsList[mIdx].copy(rawDevice = device, distanceMeters = measuredDistance)
+                merchantsList[mIdx] = merchantsList[mIdx].copy(
+                    rawDevice = device,
+                    distanceMeters = measuredDistance,
+                    lastSeenTimestamp = now
+                )
                 updated = true
             } else {
                 merchantsList.add(
@@ -443,7 +536,9 @@ class BluetoothActivity : AppCompatActivity() {
                         categoryOrPhone = "Emergency Merchant",
                         distanceMeters = measuredDistance,
                         isMerchant = true,
-                        rawDevice = device
+                        rawDevice = device,
+                        lastSeenTimestamp = now,
+                        isHardcoded = false
                     )
                 )
                 updated = true
@@ -458,7 +553,8 @@ class BluetoothActivity : AppCompatActivity() {
                     name = peer.name,
                     categoryOrPhone = peer.phone.ifEmpty { usersList[uIdx].categoryOrPhone },
                     rawDevice = device,
-                    distanceMeters = measuredDistance
+                    distanceMeters = measuredDistance,
+                    lastSeenTimestamp = now
                 )
                 updated = true
             } else {
@@ -470,7 +566,9 @@ class BluetoothActivity : AppCompatActivity() {
                         categoryOrPhone = peer.phone,
                         distanceMeters = measuredDistance,
                         isMerchant = false,
-                        rawDevice = device
+                        rawDevice = device,
+                        lastSeenTimestamp = now,
+                        isHardcoded = false
                     )
                 )
                 updated = true
