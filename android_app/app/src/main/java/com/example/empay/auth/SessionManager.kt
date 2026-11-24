@@ -105,7 +105,7 @@ class SessionManager private constructor(context: Context) {
     fun resetToDefaultDemoUser() {
         val defaultUser = UserSession(
             id = 1L,
-            name = "rabel",
+            name = "Rahul Sharma",
             phone = "9876543210",
             accountNumber = "ACC-9876543210-01",
             balance = 1250.0,

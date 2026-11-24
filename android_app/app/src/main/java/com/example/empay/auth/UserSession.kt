@@ -5,7 +5,7 @@ package com.example.empay.auth
  */
 data class UserSession(
     val id: Long = 1L,
-    val name: String = "rabel",
+    val name: String = "Rahul Sharma",
     val phone: String = "9876543210",
     val accountNumber: String = "ACC-9876543210-01",
     val balance: Double = 1250.0,
@@ -16,7 +16,7 @@ data class UserSession(
         val DEMO_USERS = listOf(
             UserSession(
                 id = 1L,
-                name = "rabel",
+                name = "Rahul Sharma",
                 phone = "9876543210",
                 accountNumber = "ACC-9876543210-01",
                 balance = 1250.0,

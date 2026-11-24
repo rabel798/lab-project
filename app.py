@@ -79,17 +79,17 @@ def init_db():
         )
     """)
 
-    # Ensure evaluation account rabel exists at id 1 if table is empty
+    # Ensure evaluation account Rahul Sharma exists at id 1 if table is empty
     cursor.execute("SELECT * FROM users WHERE id = 1")
     user1 = cursor.fetchone()
     if not user1:
         cursor.execute("""
             INSERT INTO users (id, name, username, phone, password, balance, emergency_balance, previous_names)
-            VALUES (1, 'rabel', 'rabel', '9876543210', 'rabel', 1250.0, 200.0, '')
+            VALUES (1, 'Rahul Sharma', 'rahul', '9876543210', 'password', 1250.0, 200.0, '')
         """)
 
     # Clean up legacy mock/superhero users
-    cursor.execute("DELETE FROM users WHERE name IN ('Dr. Doom', 'Sunsan Storm', 'Pavitra Prabhakar', 'Mr. Sukhpal')")
+    cursor.execute("DELETE FROM users WHERE name IN ('Dr. Doom', 'Sunsan Storm', 'Pavitra Prabhakar', 'Mr. Sukhpal', 'rabel')")
 
     # Ensure genuine demo peers exist with balances (500 online, 100 offline)
     demo_users = [
@@ -420,7 +420,7 @@ def api_register_user():
     name = (data.get("name") or "New Customer").strip()
     username = (data.get("username") or name).strip()
     phone = (data.get("phone") or "").strip()
-    password = (data.get("password") or "rabel").strip()
+    password = (data.get("password") or "123456").strip()
     try:
         initial_balance = float(data.get("balance", 1000.0))
     except (ValueError, TypeError):
@@ -476,8 +476,8 @@ def api_login_user():
 
     if user:
         # Check password or allow master/default passwords for smooth testing
-        user_pwd = user["password"] if "password" in user.keys() else "rabel"
-        if user_pwd == password or password in ("rabel", "123456", "rahul@12345") or user_pwd in ("rabel", "123456"):
+        user_pwd = user["password"] if "password" in user.keys() else "123456"
+        if user_pwd == password or password in ("123456", "password", "rahul@12345") or user_pwd in ("123456", "password"):
             if user_pwd != password and password:
                 conn.execute("UPDATE users SET password = ? WHERE id = ?", (password, user["id"]))
                 conn.commit()

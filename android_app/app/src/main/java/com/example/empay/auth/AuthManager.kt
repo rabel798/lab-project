@@ -101,18 +101,6 @@ class AuthManager private constructor(private val context: Context) {
             )
         )
 
-        // Alternate / custom phone test profile: rabel
-        addIfMissing(
-            UserAccount(
-                id = 99L,
-                name = "rabel",
-                phone = "9800011122",
-                password = "rabel",
-                accountNumber = "ACC-9800011122-99",
-                balance = 1000.0,
-                emergencyBalance = 100.0
-            )
-        )
 
         // 2. Peer Tester: Priya Sharma
         addIfMissing(
@@ -224,8 +212,7 @@ class AuthManager private constructor(private val context: Context) {
         if (matched != null) {
             val passMatches = matched.password == trimmedPass ||
                     matched.password.equals(trimmedPass, ignoreCase = true) ||
-                    trimmedPass in listOf("123456", "password", "rahul@12345") ||
-                    (matched.name.equals("rabel", ignoreCase = true) && trimmedPass == "rabel")
+                    trimmedPass in listOf("123456", "password", "rahul@12345")
             if (passMatches) {
                 if (matched.password != trimmedPass && trimmedPass.isNotEmpty()) {
                     matched = matched.copy(password = trimmedPass)
@@ -262,8 +249,7 @@ class AuthManager private constructor(private val context: Context) {
 
             val passMatches = acc.password.trim() == trimmedPass ||
                     acc.password.equals(trimmedPass, ignoreCase = true) ||
-                    trimmedPass in listOf("123456", "password", "rahul@12345") ||
-                    (acc.name.equals("rabel", ignoreCase = true) && trimmedPass == "rabel")
+                    trimmedPass in listOf("123456", "password", "rahul@12345")
 
             (phoneMatch || nameMatch) && passMatches
         }
@@ -571,7 +557,7 @@ class AuthManager private constructor(private val context: Context) {
         if (q.isEmpty()) return null
 
         val accounts = getRegisteredAccounts()
-        // 1. Check local registered accounts (rabel, custom signed-up profiles, etc.)
+        // 1. Check local registered accounts (custom signed-up profiles, test accounts, etc.)
         val localMatch = accounts.find {
             it.phone.equals(q, ignoreCase = true) ||
             it.name.equals(q, ignoreCase = true) ||

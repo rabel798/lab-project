@@ -177,7 +177,7 @@ class BluetoothActivity : AppCompatActivity() {
             loadBalances()
         }
 
-        // Pull latest registered users dynamically from bank server so any new user (Krrish, Rabel, etc.) appears immediately
+        // Pull latest registered users dynamically from bank server so any new peer appears immediately
         AuthManager.getInstance(this).syncAllRegisteredUsersFromBackend {
             populateKnownUsers()
             scanPairedAndNearbyDevices()

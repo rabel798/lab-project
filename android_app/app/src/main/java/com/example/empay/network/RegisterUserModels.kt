@@ -6,7 +6,7 @@ data class RegisterUserRequest(
     @SerializedName("name") val name: String,
     @SerializedName("phone") val phone: String,
     @SerializedName("username") val username: String = name,
-    @SerializedName("password") val password: String = "rabel",
+    @SerializedName("password") val password: String = "123456",
     @SerializedName("balance") val balance: Double = 1000.0,
     @SerializedName("emergency_balance") val emergencyBalance: Double = 100.0
 )

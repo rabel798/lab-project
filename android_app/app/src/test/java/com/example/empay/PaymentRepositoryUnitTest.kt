@@ -182,7 +182,7 @@ class PaymentRepositoryUnitTest {
         assertEquals("Must provide 5 configured demo profiles for multi-device testing", 5, demoUsers.size)
 
         val names = demoUsers.map { it.name }
-        assertTrue(names.contains("rabel") || names.contains("Rahul Sharma"))
+        assertTrue(names.contains("Rahul Sharma"))
         assertTrue(names.contains("Sukhpal Singh"))
         assertTrue(names.contains("Priya Sharma"))
         assertTrue(names.contains("Dr. Rohan Verma"))
