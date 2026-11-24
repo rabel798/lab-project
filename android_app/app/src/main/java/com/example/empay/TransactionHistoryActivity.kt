@@ -18,6 +18,7 @@ import com.example.empay.auth.SessionManager
 import com.example.empay.db.AppDatabase
 import com.example.empay.db.TransactionEntity
 import com.example.empay.network.BankApiClient
+import com.example.empay.network.BankRemoteTransaction
 import com.example.empay.network.NetworkManager
 import com.example.empay.sync.SyncManager
 import kotlinx.coroutines.Dispatchers
@@ -136,8 +137,55 @@ class TransactionHistoryActivity : AppCompatActivity() {
                             sessionManager.updateBalances(bankUser.balance, bankUser.emergencyBalance)
                             appDatabase.walletDao.updateBalance(bankUser.emergencyBalance)
                         }
+
+                        // 3. Fetch remote transactions to show incoming received payments in history
+                        val txResp = apiService.getAllTransactions()
+                        if (txResp.isSuccessful && txResp.body() != null) {
+                            val remoteList = txResp.body()!!
+                            val currentUser = sessionManager.getUser()
+                            val curIdStr = currentUser.id.toString()
+                            val curName = currentUser.name.trim()
+                            val curPhone = currentUser.phone.trim()
+
+                            remoteList.forEach { rt ->
+                                val rtTxId = rt.txId ?: "TX-${rt.id}"
+                                val sId = rt.senderId?.toString() ?: ""
+                                val rId = rt.receiverId?.toString() ?: ""
+                                val pName = rt.payee?.trim() ?: ""
+
+                                val isParticipant = sId == curIdStr || rId == curIdStr ||
+                                                    pName.equals(curName, true) || pName.equals(curPhone, true)
+
+                                if (isParticipant) {
+                                    val isOut = sId == curIdStr && !pName.equals(curName, true)
+                                    val direction = if (isOut) TransactionEntity.DIRECTION_SENT else TransactionEntity.DIRECTION_RECEIVED
+                                    val txChannel = rt.channel ?: if (rt.isOffline == 1) "Bluetooth" else "UPI"
+
+                                    val existing = appDatabase.transactionDao.getTransaction(rtTxId)
+                                    if (existing == null) {
+                                        val newTx = TransactionEntity(
+                                            txId = rtTxId,
+                                            senderId = sId,
+                                            senderName = if (isOut) curName else (if (pName.isNotEmpty() && !pName.equals(curName, true)) pName else "Sender"),
+                                            receiverId = rId,
+                                            receiverName = if (isOut) pName else curName,
+                                            amount = rt.amount,
+                                            timestamp = System.currentTimeMillis(),
+                                            nonce = "REMOTE",
+                                            signature = "VERIFIED",
+                                            status = TransactionEntity.STATUS_SYNCED,
+                                            direction = direction,
+                                            channel = txChannel
+                                        )
+                                        appDatabase.transactionDao.insertTransaction(newTx)
+                                    } else if (existing.status != TransactionEntity.STATUS_SYNCED) {
+                                        appDatabase.transactionDao.markAsSynced(rtTxId)
+                                    }
+                                }
+                            }
+                        }
                     } catch (_: Exception) {
-                        // Ignore individual profile poll failure
+                        // Ignore individual network poll failure
                     }
                 }
             }

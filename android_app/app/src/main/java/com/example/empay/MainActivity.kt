@@ -1107,13 +1107,21 @@ class MainActivity : AppCompatActivity() {
                         val tvStatus = itemView.findViewById<TextView>(R.id.tvTxStatusBadge)
 
                         val isOut = tx.direction == TransactionEntity.DIRECTION_SENT
-                        tvPayee.text = if (isOut) tx.receiverName.ifEmpty { tx.receiverId } else tx.senderName.ifEmpty { tx.senderId }
+                        val partyName = if (isOut) tx.receiverName.ifEmpty { tx.receiverId } else tx.senderName.ifEmpty { tx.senderId }
+                        tvPayee.text = if (isOut) "To: $partyName" else "From: $partyName"
                         tvAmount.text = String.format(Locale.US, if (isOut) "- ₹%.2f" else "+ ₹%.2f", tx.amount)
+                        if (isOut) {
+                            tvAmount.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                        } else {
+                            tvAmount.setTextColor(android.graphics.Color.parseColor("#15803D"))
+                            tvAmount.paint.isFakeBoldText = true
+                        }
 
                         val dateStr = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(tx.timestamp))
                         val isOnlineTx = tx.isOnline
                         val channelLabel = if (isOnlineTx) "UPI" else "Bluetooth"
-                        tvId.text = "$channelLabel • $dateStr"
+                        val dirLabel = if (isOut) "Sent" else "Received"
+                        tvId.text = "$channelLabel • $dirLabel • $dateStr"
 
                         if (isOnlineTx) {
                             ivIcon.setImageResource(R.drawable.ic_bank)

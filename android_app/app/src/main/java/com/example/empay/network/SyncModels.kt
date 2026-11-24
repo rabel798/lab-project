@@ -35,3 +35,18 @@ data class SyncTransactionsResponse(
     @SerializedName("emergency_balance") val emergencyBalance: Double
 )
 
+data class BankRemoteTransaction(
+    @SerializedName("id") val id: Long? = null,
+    @SerializedName("tx_id") val txId: String? = null,
+    @SerializedName("sender_id") val senderId: Any? = null,
+    @SerializedName("receiver_id") val receiverId: Any? = null,
+    @SerializedName("payee") val payee: String? = null,
+    @SerializedName("amount") val amount: Double = 0.0,
+    @SerializedName("status") val status: String? = null,
+    @SerializedName("channel") val channel: String? = null,
+    @SerializedName("note") val note: String? = null,
+    @SerializedName("is_offline") val isOffline: Int? = null,
+    @SerializedName("method") val method: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null
+)
+

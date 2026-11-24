@@ -51,4 +51,7 @@ interface BankApiService {
     suspend fun syncTransactions(
         @Body request: SyncTransactionsRequest
     ): Response<SyncTransactionsResponse>
+
+    @GET("/api/transactions")
+    suspend fun getAllTransactions(): Response<List<BankRemoteTransaction>>
 }
