@@ -381,10 +381,16 @@ def api_user_detail(user_id):
         data = request.get_json(silent=True) or request.form
         name = data.get("name")
         phone = data.get("phone")
+        balance = data.get("balance")
+        emergency_balance = data.get("emergency_balance")
         if name:
             conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, resolved_id))
         if phone:
             conn.execute("UPDATE users SET phone = ? WHERE id = ?", (phone, resolved_id))
+        if balance is not None:
+            conn.execute("UPDATE users SET balance = ? WHERE id = ?", (float(balance), resolved_id))
+        if emergency_balance is not None:
+            conn.execute("UPDATE users SET emergency_balance = ? WHERE id = ?", (float(emergency_balance), resolved_id))
         conn.commit()
         user = conn.execute("SELECT * FROM users WHERE id = ?", (resolved_id,)).fetchone()
 
@@ -880,8 +886,18 @@ def api_transactions_sync():
                     direction == "SELF"
                 )
 
-                is_online_upi = "UPI" in note.upper() or "ONLINE" in note.upper() or t.get("channel") == "UPI" or "UPI" in str(t_id).upper()
-                channel_val = "UPI" if is_online_upi else t.get("channel", "Bluetooth")
+                is_bluetooth_offline = (
+                    "BLUETOOTH" in str(t.get("channel", "")).upper() or
+                    str(t_id).upper().startswith("BT-") or
+                    str(t_id).upper().startswith("OFF-") or
+                    t.get("is_offline") in (1, "1", True)
+                )
+                is_online_upi = not is_bluetooth_offline and (
+                    str(t.get("channel", "")).upper() == "UPI" or
+                    str(t_id).upper().startswith("UPI") or
+                    "UPI" in note.upper()
+                )
+                channel_val = "UPI" if is_online_upi else "Bluetooth"
                 method_val = "UPI" if is_online_upi else "BLUETOOTH"
                 is_offline_val = 0 if is_online_upi else 1
 
@@ -893,12 +909,11 @@ def api_transactions_sync():
                 reconciled_count += 1
                 if not is_self_transfer and amount > 0:
                     # Bilateral Balance Adjustment:
-                    # Debit sender's emergency balance
+                    # Debit sender's balance (online) or emergency balance (offline)
                     s_user = conn.execute("SELECT * FROM users WHERE id = ?", (sender_id,)).fetchone()
                     if s_user:
                         s_emg = float(s_user["emergency_balance"])
                         s_bal = float(s_user["balance"])
-                        is_online_upi = "UPI" in note.upper() or "ONLINE" in note.upper()
                         if is_online_upi:
                             s_bal = max(0.0, round(s_bal - amount, 2))
                         else:
@@ -914,7 +929,7 @@ def api_transactions_sync():
                     if receiver_user_id:
                         r_user = conn.execute("SELECT * FROM users WHERE id = ?", (receiver_user_id,)).fetchone()
                         if r_user:
-                            if "UPI" in note.upper() or "ONLINE" in note.upper():
+                            if is_online_upi:
                                 r_bal = round(float(r_user["balance"]) + amount, 2)
                                 conn.execute("UPDATE users SET balance = ? WHERE id = ?", (r_bal, receiver_user_id))
                             else:

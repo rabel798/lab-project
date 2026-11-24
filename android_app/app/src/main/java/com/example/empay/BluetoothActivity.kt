@@ -22,6 +22,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -49,6 +50,8 @@ class BluetoothActivity : AppCompatActivity() {
     private lateinit var tvTabBtUsersText: TextView
     private lateinit var indicatorBtUsers: View
     private lateinit var layoutBtDevicesList: LinearLayout
+    private lateinit var btnBtRefresh: ImageButton
+    private lateinit var tvBtScanStatus: TextView
 
     private var activeTab = "users" // Default to users tab so nearby registered accounts are immediately visible
     private var searchQuery = ""
@@ -109,6 +112,8 @@ class BluetoothActivity : AppCompatActivity() {
                 }
                 BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
                     pruneOutOfRangePeers()
+                    val count = (if (activeTab == "merchants") merchantsList else usersList).size
+                    tvBtScanStatus.text = if (count > 0) "$count Devices in Vicinity" else "Nearby Devices Detected"
                     if (isActivityActive) {
                         restartDiscoveryHandler.removeCallbacksAndMessages(null)
                         restartDiscoveryHandler.postDelayed({
@@ -124,6 +129,14 @@ class BluetoothActivity : AppCompatActivity() {
                         usersList.removeAll { !it.isHardcoded }
                         merchantsList.removeAll { !it.isHardcoded }
                         renderList()
+                        bluetoothEngine.stopMerchantServer()
+                        tvBtScanStatus.text = "Bluetooth is Turned Off"
+                    } else if (state == BluetoothAdapter.STATE_ON) {
+                        val currentUser = sessionManager.getUser()
+                        BluetoothHelper.broadcastEmPayIdentity(this@BluetoothActivity, currentUser.name, currentUser.phone)
+                        ensureDiscoverableAndStartServer()
+                        triggerDiscovery()
+                        tvBtScanStatus.text = "Scanning for Nearby EmPay Devices..."
                     }
                 }
             }
@@ -207,18 +220,7 @@ class BluetoothActivity : AppCompatActivity() {
             } catch (_: Exception) {}
         }
 
-        // Request Bluetooth Discoverability once so nearby peer devices running EmPay can discover this device
-        if (!hasRequestedDiscoverable) {
-            hasRequestedDiscoverable = true
-            try {
-                if (adapter != null && adapter.isEnabled && adapter.scanMode != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
-                    val discoverableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
-                        putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
-                    }
-                    startActivity(discoverableIntent)
-                }
-            } catch (_: Exception) {}
-        }
+        ensureDiscoverableAndStartServer()
 
         loadBalances()
         lifecycleScope.launch {
@@ -241,6 +243,7 @@ class BluetoothActivity : AppCompatActivity() {
         isActivityActive = false
         pruneHandler.removeCallbacks(pruneRunnable)
         stopActiveDiscovery()
+        bluetoothEngine.stopMerchantServer()
     }
 
     override fun onDestroy() {
@@ -248,6 +251,73 @@ class BluetoothActivity : AppCompatActivity() {
         isActivityActive = false
         pruneHandler.removeCallbacks(pruneRunnable)
         stopActiveDiscovery()
+        bluetoothEngine.stopMerchantServer()
+    }
+
+    private fun ensureDiscoverableAndStartServer() {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+        if (!adapter.isEnabled) return
+
+        try {
+            if (adapter.scanMode != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
+                val discoverableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+                }
+                startActivity(discoverableIntent)
+            }
+        } catch (_: Exception) {}
+
+        startPaymentServerListener()
+    }
+
+    private fun startPaymentServerListener() {
+        try {
+            bluetoothEngine.startMerchantServer(
+                onPaymentReceived = { packet, ack ->
+                    runOnUiThread {
+                        loadBalances()
+                        renderList()
+                        Toast.makeText(
+                            this@BluetoothActivity,
+                            "⚡ Received ₹${String.format(Locale.US, "%.2f", packet.amount)} from ${packet.senderName} via Bluetooth!",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                },
+                onStatusLog = { log ->
+                    android.util.Log.d("EmPayBT", log)
+                },
+                onError = { err ->
+                    android.util.Log.e("EmPayBT", err)
+                }
+            )
+        } catch (_: Exception) {}
+    }
+
+    private fun triggerRefreshRadar() {
+        val rotate = android.view.animation.RotateAnimation(
+            0f, 360f,
+            android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
+            android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f
+        ).apply {
+            duration = 800
+            repeatCount = 1
+        }
+        btnBtRefresh.startAnimation(rotate)
+        tvBtScanStatus.text = "Scanning for Nearby EmPay Devices..."
+
+        val currentUser = sessionManager.getUser()
+        BluetoothHelper.broadcastEmPayIdentity(this, currentUser.name, currentUser.phone)
+        ensureDiscoverableAndStartServer()
+        triggerDiscovery()
+
+        AuthManager.getInstance(this).syncAllRegisteredUsersFromBackend {
+            runOnUiThread {
+                populateKnownUsers()
+                renderList()
+            }
+        }
+        Toast.makeText(this, "Refreshing Bluetooth mesh radar...", Toast.LENGTH_SHORT).show()
     }
 
     private fun initViews() {
@@ -260,6 +330,8 @@ class BluetoothActivity : AppCompatActivity() {
         tvTabBtUsersText = findViewById(R.id.tvTabBtUsersText)
         indicatorBtUsers = findViewById(R.id.indicatorBtUsers)
         layoutBtDevicesList = findViewById(R.id.layoutBtDevicesList)
+        btnBtRefresh = findViewById(R.id.btnBtRefresh)
+        tvBtScanStatus = findViewById(R.id.tvBtScanStatus)
 
         // Bottom nav
         findViewById<View>(R.id.navBtHome).setOnClickListener {
@@ -281,6 +353,10 @@ class BluetoothActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        btnBtRefresh.setOnClickListener {
+            triggerRefreshRadar()
+        }
+
         findViewById<View>(R.id.tabBtMerchants).setOnClickListener {
             activeTab = "merchants"
             updateTabsUi()

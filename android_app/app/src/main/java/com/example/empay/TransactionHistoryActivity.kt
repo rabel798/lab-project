@@ -1,5 +1,6 @@
 package com.example.empay
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -213,20 +214,29 @@ class TransactionHistoryActivity : AppCompatActivity() {
             val tvStatus = itemView.findViewById<TextView>(R.id.tvTxStatusBadge)
 
             val isOut = tx.direction == TransactionEntity.DIRECTION_SENT
-            tvPayee.text = if (isOut) tx.receiverName.ifEmpty { tx.receiverId } else tx.senderName.ifEmpty { tx.senderId }
+            val partyName = if (isOut) tx.receiverName.ifEmpty { tx.receiverId } else tx.senderName.ifEmpty { tx.senderId }
+            tvPayee.text = if (isOut) "To: $partyName" else "From: $partyName"
             tvAmount.text = String.format(Locale.US, if (isOut) "- ₹%.2f" else "+ ₹%.2f", tx.amount)
+
+            if (isOut) {
+                tvAmount.setTextColor(Color.parseColor("#111827"))
+            } else {
+                tvAmount.setTextColor(Color.parseColor("#15803D")) // Crisp Forest Green for incoming money
+                tvAmount.paint.isFakeBoldText = true
+            }
 
             val dateStr = timeFormat.format(Date(tx.timestamp))
             val isOnlineTx = tx.isOnline
             val channelLabel = if (isOnlineTx) "UPI" else "Bluetooth"
-            tvId.text = "$channelLabel • $dateStr"
+            val dirLabel = if (isOut) "Sent" else "Received"
+            tvId.text = "$channelLabel • $dirLabel • $dateStr"
 
             if (isOnlineTx) {
                 ivIcon.setImageResource(R.drawable.ic_bank)
                 ivIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.primary)
             } else {
                 ivIcon.setImageResource(R.drawable.ic_bluetooth)
-                ivIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.primary)
+                ivIcon.imageTintList = ContextCompat.getColorStateList(this, if (isOut) R.color.primary else R.color.status_online_text)
             }
 
             when (tx.status) {

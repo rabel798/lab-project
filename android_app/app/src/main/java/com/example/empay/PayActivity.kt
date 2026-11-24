@@ -347,7 +347,17 @@ class PayActivity : AppCompatActivity() {
             val verification = authManager.verifyRecipient(payeeName)
 
             withContext(Dispatchers.Main) {
-                if (verification == null) {
+                val finalVerification = verification ?: if (!isOnlineMode || selectedChannel.equals("Bluetooth", true) || targetDeviceAddress.isNotEmpty()) {
+                    com.example.empay.auth.RecipientVerificationResult(
+                        isRegistered = true,
+                        displayName = payeeName,
+                        phone = targetPhone,
+                        isMerchant = false,
+                        details = "Offline Bluetooth Mesh Peer"
+                    )
+                } else null
+
+                if (finalVerification == null) {
                     Toast.makeText(
                         this@PayActivity,
                         "❌ Recipient Not Found: '$payeeName' is not registered in the bank database or verified merchants registry.",
@@ -357,7 +367,7 @@ class PayActivity : AppCompatActivity() {
                 }
 
                 // Recipient verified! Proceed to confirmation sheet
-                showConfirmationSheet(amount, verification.displayName, note, verification.details)
+                showConfirmationSheet(amount, finalVerification.displayName, note, finalVerification.details)
             }
         }
     }
@@ -534,10 +544,11 @@ class PayActivity : AppCompatActivity() {
                                     txId = txId,
                                     payee = payee,
                                     amount = amount,
-                                    note = "Bluetooth Payment (Online Instant Settlement)",
+                                    note = "Bluetooth Offline Payment",
                                     direction = TransactionEntity.DIRECTION_SENT,
                                     senderId = currentUser.id.toString(),
-                                    receiverId = receiverIdent
+                                    receiverId = receiverIdent,
+                                    channel = "Bluetooth"
                                 )
                             ),
                             userId = currentUser.id

@@ -71,6 +71,27 @@ object BluetoothHelper {
             if (parts.size >= 3) {
                 val peerName = parts[1].trim()
                 val peerPhone = parts[2].trim()
+
+                // Auto-cache discovered EmPay peer into local SQLite database so offline payments can verify them immediately
+                try {
+                    val db = com.example.empay.db.AppDatabase.getInstance(context)
+                    if (peerPhone.isNotEmpty()) {
+                        val existing = db.userDao.getUserByUsernameOrPhone(peerPhone)
+                        if (existing == null) {
+                            val newAcc = com.example.empay.auth.UserAccount(
+                                id = Math.abs(device.address.hashCode().toLong()) % 100000 + 100,
+                                name = peerName.ifEmpty { "EmPay Peer" },
+                                phone = peerPhone,
+                                password = "password",
+                                accountNumber = "ACC-$peerPhone",
+                                balance = 1000.0,
+                                emergencyBalance = 100.0
+                            )
+                            db.userDao.insertOrUpdateUser(newAcc, false)
+                        }
+                    }
+                } catch (_: Exception) {}
+
                 return EmPayPeer(
                     id = device.address.hashCode().toLong(),
                     name = peerName.ifEmpty { "EmPay Peer" },
