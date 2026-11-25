@@ -144,7 +144,18 @@ class ProfileActivity : AppCompatActivity() {
                 .setTitle("Log Out")
                 .setMessage("Are you sure you want to log out of ${sessionManager.getUser().name}?")
                 .setPositiveButton("Log Out") { _, _ ->
-                    AuthManager.getInstance(this).logout()
+                    val curUser = sessionManager.getUser()
+                    val auth = AuthManager.getInstance(this)
+                    val devId = auth.getDeviceId()
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            if (NetworkManager.isOnline(applicationContext)) {
+                                val api = BankApiClient.getApiService(applicationContext)
+                                api.logoutUser(com.example.empay.network.LogoutRequest(userId = curUser.id, phone = curUser.phone, deviceId = devId))
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    auth.logout()
                     val intent = Intent(this, LoginActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     }

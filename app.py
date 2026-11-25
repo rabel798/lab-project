@@ -46,6 +46,22 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN previous_names TEXT DEFAULT ''")
     except Exception:
         pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_logged_in INTEGER DEFAULT 0")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN active_device_id TEXT DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN session_token TEXT DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN last_active TIMESTAMP")
+    except Exception:
+        pass
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS merchants (
@@ -330,7 +346,7 @@ def api_get_user():
 @app.route("/api/users", methods=["GET"])
 def api_get_all_users():
     conn = get_db()
-    users = conn.execute("SELECT id, name, phone, balance, emergency_balance, previous_names FROM users ORDER BY name ASC").fetchall()
+    users = conn.execute("SELECT id, name, phone, balance, emergency_balance, previous_names, is_logged_in, active_device_id FROM users ORDER BY name ASC").fetchall()
     conn.close()
     return jsonify([dict(u) for u in users])
 
@@ -341,11 +357,11 @@ def api_users_search():
     conn = get_db()
     if q:
         rows = conn.execute(
-            "SELECT id, name, phone, balance, emergency_balance, previous_names FROM users WHERE name LIKE ? OR phone LIKE ? OR username LIKE ? ORDER BY name ASC",
+            "SELECT id, name, phone, balance, emergency_balance, previous_names, is_logged_in, active_device_id FROM users WHERE name LIKE ? OR phone LIKE ? OR username LIKE ? ORDER BY name ASC",
             (f"%{q}%", f"%{q}%", f"%{q}%")
         ).fetchall()
     else:
-        rows = conn.execute("SELECT id, name, phone, balance, emergency_balance, previous_names FROM users ORDER BY name ASC").fetchall()
+        rows = conn.execute("SELECT id, name, phone, balance, emergency_balance, previous_names, is_logged_in, active_device_id FROM users ORDER BY name ASC").fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -427,6 +443,7 @@ def api_register_user():
     username = (data.get("username") or name).strip()
     phone = (data.get("phone") or "").strip()
     password = (data.get("password") or "123456").strip()
+    device_id = (data.get("device_id") or "").strip()
     try:
         initial_balance = float(data.get("balance", 1000.0))
     except (ValueError, TypeError):
@@ -442,19 +459,29 @@ def api_register_user():
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE phone = ?", (phone,)).fetchone()
     if user:
+        is_logged_in = user["is_logged_in"] if "is_logged_in" in user.keys() else 0
+        active_dev = str(user["active_device_id"] or "").strip() if "active_device_id" in user.keys() else ""
+        if is_logged_in == 1 and active_dev and device_id and active_dev != device_id:
+            conn.close()
+            return jsonify({
+                "success": False,
+                "error_code": "SIMULTANEOUS_LOGIN_RESTRICTED",
+                "message": f"Security Alert: Account '{user['name']}' is already actively signed in on another device. Simultaneous logins are strictly prohibited. You must sign out from the other device first."
+            }), 403
+
         new_bal = max(float(user["balance"]), initial_balance)
         conn.execute(
-            "UPDATE users SET name = ?, username = ?, password = ?, balance = ? WHERE id = ?",
-            (name, username, password, new_bal, user["id"])
+            "UPDATE users SET name = ?, username = ?, password = ?, balance = ?, is_logged_in = 1, active_device_id = ?, last_active = CURRENT_TIMESTAMP WHERE id = ?",
+            (name, username, password, new_bal, device_id, user["id"])
         )
         conn.commit()
         updated = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
         conn.close()
-        return jsonify({"success": True, "message": "User updated", "user": dict(updated)})
+        return jsonify({"success": True, "message": "User updated and signed in", "user": dict(updated)})
     else:
         conn.execute(
-            "INSERT INTO users (name, username, phone, password, balance, emergency_balance) VALUES (?, ?, ?, ?, ?, ?)",
-            (name, username, phone, password, initial_balance, emergency_balance)
+            "INSERT INTO users (name, username, phone, password, balance, emergency_balance, is_logged_in, active_device_id, last_active) VALUES (?, ?, ?, ?, ?, ?, 1, ?, CURRENT_TIMESTAMP)",
+            (name, username, phone, password, initial_balance, emergency_balance, device_id)
         )
         conn.commit()
         created = conn.execute("SELECT * FROM users WHERE phone = ?", (phone,)).fetchone()
@@ -467,6 +494,7 @@ def api_login_user():
     data = request.get_json(silent=True) or request.form
     identifier = (data.get("username") or data.get("phone") or "").strip()
     password = (data.get("password") or "").strip()
+    device_id = (data.get("device_id") or "").strip()
 
     if not identifier or not password:
         return jsonify({"success": False, "message": "Username/phone and password are required"}), 400
@@ -487,13 +515,75 @@ def api_login_user():
             if user_pwd != password and password:
                 conn.execute("UPDATE users SET password = ? WHERE id = ?", (password, user["id"]))
                 conn.commit()
+
+            # SINGLE ACTIVE DEVICE ENFORCEMENT:
+            is_logged_in = user["is_logged_in"] if "is_logged_in" in user.keys() else 0
+            active_dev = str(user["active_device_id"] or "").strip() if "active_device_id" in user.keys() else ""
+
+            if is_logged_in == 1 and active_dev and device_id and active_dev != device_id:
+                conn.close()
+                return jsonify({
+                    "success": False,
+                    "error_code": "SIMULTANEOUS_LOGIN_RESTRICTED",
+                    "message": f"Security Alert: Account '{user['name']}' is already actively signed in on another device. Simultaneous logins are strictly prohibited to prevent duplicate spending. You must sign out from the other device first."
+                }), 403
+
+            new_session_token = str(uuid.uuid4())
+            conn.execute("""
+                UPDATE users 
+                SET is_logged_in = 1, active_device_id = ?, session_token = ?, last_active = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            """, (device_id, new_session_token, user["id"]))
+            conn.commit()
+
             user_dict = dict(user)
+            user_dict["is_logged_in"] = 1
+            user_dict["active_device_id"] = device_id
+            user_dict["session_token"] = new_session_token
             conn.close()
             return jsonify({"success": True, "message": "Login successful", "user": user_dict})
         else:
             conn.close()
             return jsonify({"success": False, "message": "Invalid password"}), 401
 
+    conn.close()
+    return jsonify({"success": False, "message": "User not found"}), 404
+
+
+@app.route("/api/user/logout", methods=["POST"])
+def api_logout_user():
+    data = request.get_json(silent=True) or request.form
+    raw_uid = data.get("user_id")
+    phone = (data.get("phone") or "").strip()
+    device_id = (data.get("device_id") or "").strip()
+
+    conn = get_db()
+    user_id = resolve_user_id(conn, raw_uid) if raw_uid else None
+    if not user_id and phone:
+        u = conn.execute("SELECT id FROM users WHERE phone = ?", (phone,)).fetchone()
+        if u:
+            user_id = u["id"]
+
+    if user_id:
+        conn.execute("UPDATE users SET is_logged_in = 0, active_device_id = '', session_token = '' WHERE id = ?", (user_id,))
+        conn.commit()
+    elif device_id:
+        conn.execute("UPDATE users SET is_logged_in = 0, active_device_id = '', session_token = '' WHERE active_device_id = ?", (device_id,))
+        conn.commit()
+
+    conn.close()
+    return jsonify({"success": True, "message": "User signed out. Device session released."})
+
+
+@app.route("/api/user/force-logout/<user_id>", methods=["POST"])
+def api_force_logout(user_id):
+    conn = get_db()
+    uid = resolve_user_id(conn, user_id)
+    if uid:
+        conn.execute("UPDATE users SET is_logged_in = 0, active_device_id = '', session_token = '' WHERE id = ?", (uid,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": f"Account #{uid} session force-unlocked."})
     conn.close()
     return jsonify({"success": False, "message": "User not found"}), 404
 

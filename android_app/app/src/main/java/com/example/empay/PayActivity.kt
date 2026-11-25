@@ -408,6 +408,20 @@ class PayActivity : AppCompatActivity() {
             return
         }
 
+        // If in offline Bluetooth mode, ensure Bluetooth is currently enabled
+        if (!isOnlineMode || selectedChannel.equals("Bluetooth", true)) {
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if (adapter == null || !adapter.isEnabled) {
+                AlertDialog.Builder(this)
+                    .setTitle("⚠️ Bluetooth Not Detected")
+                    .setMessage("Your Bluetooth is turned off. Please turn on Bluetooth to proceed with offline payment.")
+                    .setIcon(android.R.drawable.ic_dialog_alert)
+                    .setPositiveButton("OK", null)
+                    .show()
+                return
+            }
+        }
+
         val currentUser = paymentRepository.getCurrentUser()
         if (payeeName.equals(currentUser.phone.trim(), ignoreCase = true) ||
             payeeName.equals(currentUser.accountNumber.trim(), ignoreCase = true) ||
@@ -528,6 +542,19 @@ class PayActivity : AppCompatActivity() {
                     loadStateAndBalances()
                     return@PinAuthDialog
                 }
+                if (!isOnlineMode || selectedChannel.equals("Bluetooth", true)) {
+                    val adapter = BluetoothAdapter.getDefaultAdapter()
+                    if (adapter == null || !adapter.isEnabled) {
+                        AlertDialog.Builder(this)
+                            .setTitle("⚠️ Bluetooth Not Detected")
+                            .setMessage("Bluetooth was turned off. Offline payment cannot proceed.\n\nYour account balance has NOT been debited.")
+                            .setIcon(android.R.drawable.ic_dialog_alert)
+                            .setPositiveButton("OK", null)
+                            .show()
+                        loadStateAndBalances()
+                        return@PinAuthDialog
+                    }
+                }
                 executeTransfer(amount, payee, note)
             },
             onFailed = { error ->
@@ -627,30 +654,92 @@ class PayActivity : AppCompatActivity() {
             }
         } else {
             // Offline Bluetooth execution
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if (adapter == null || !adapter.isEnabled) {
+                AlertDialog.Builder(this)
+                    .setTitle("⚠️ Bluetooth Not Detected")
+                    .setMessage("Your Bluetooth is turned off. Please turn on Bluetooth to complete this offline payment.\n\nYour balance has NOT been debited.")
+                    .setIcon(android.R.drawable.ic_dialog_alert)
+                    .setPositiveButton("OK", null)
+                    .show()
+                loadStateAndBalances()
+                return
+            }
+
+            val isTargetingDevice = targetDeviceAddress.isNotEmpty()
+            val progressDialog = if (isTargetingDevice) {
+                @Suppress("DEPRECATION")
+                android.app.ProgressDialog(this).apply {
+                    setTitle("Bluetooth Payment")
+                    setMessage("Connecting to $payee over Bluetooth...")
+                    setCancelable(false)
+                    show()
+                }
+            } else null
+
             lifecycleScope.launch(Dispatchers.IO) {
-                // Deduct from offline wallet
+                var connectionOk = true
+                var failMessage = ""
+
+                if (isTargetingDevice) {
+                    val remoteDev: BluetoothDevice? = try {
+                        if (BluetoothAdapter.checkBluetoothAddress(targetDeviceAddress)) {
+                            adapter.getRemoteDevice(targetDeviceAddress)
+                        } else null
+                    } catch (_: Exception) { null }
+
+                    if (remoteDev == null) {
+                        connectionOk = false
+                        failMessage = "Target Bluetooth device is unreachable."
+                    } else {
+                        val latch = java.util.concurrent.CountDownLatch(1)
+                        paymentRepository.executeBluetoothPayment(
+                            device = remoteDev,
+                            receiverId = receiverIdent,
+                            receiverName = payee,
+                            amount = amount,
+                            onStatusLog = {},
+                            onSuccess = { _, _ ->
+                                connectionOk = true
+                                latch.countDown()
+                            },
+                            onError = { err ->
+                                connectionOk = false
+                                failMessage = err
+                                latch.countDown()
+                            }
+                        )
+                        val connected = latch.await(6, java.util.concurrent.TimeUnit.SECONDS)
+                        if (!connected || !connectionOk) {
+                            connectionOk = false
+                            if (failMessage.isEmpty()) {
+                                failMessage = "Connection timed out. Recipient's Bluetooth was turned off or out of range."
+                            }
+                        }
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    try { progressDialog?.dismiss() } catch (_: Exception) {}
+                }
+
+                if (!connectionOk) {
+                    withContext(Dispatchers.Main) {
+                        AlertDialog.Builder(this@PayActivity)
+                            .setTitle("⚠️ Bluetooth Not Detected")
+                            .setMessage("Payment locked: Could not connect to '$payee' via Bluetooth.\n\nThe recipient's Bluetooth is turned off or out of range.\n\nYour balance has NOT been debited.")
+                            .setIcon(android.R.drawable.ic_dialog_alert)
+                            .setPositiveButton("OK", null)
+                            .show()
+                        loadStateAndBalances()
+                    }
+                    return@launch
+                }
+
+                // Deduct from offline wallet ONLY after Bluetooth connection succeeds
                 appDatabase.walletDao.deductBalance(amount)
                 val newWalletBal = appDatabase.walletDao.getWallet()?.balance ?: 0.0
                 sessionManager.updateBalances(sessionManager.getUser().balance, newWalletBal)
-
-                // If paired or nearby Bluetooth device address is available, attempt real RFCOMM packet exchange
-                if (targetDeviceAddress.isNotEmpty()) {
-                    try {
-                        val adapter = BluetoothAdapter.getDefaultAdapter()
-                        if (adapter != null && BluetoothAdapter.checkBluetoothAddress(targetDeviceAddress)) {
-                            val remoteDev: BluetoothDevice = adapter.getRemoteDevice(targetDeviceAddress)
-                            paymentRepository.executeBluetoothPayment(
-                                device = remoteDev,
-                                receiverId = receiverIdent,
-                                receiverName = payee,
-                                amount = amount,
-                                onStatusLog = {},
-                                onSuccess = { _, _ -> },
-                                onError = {}
-                            )
-                        }
-                    } catch (_: Exception) {}
-                }
 
                 val signature = try {
                     val canonicalBytes = CryptoManager.getCanonicalBytes(

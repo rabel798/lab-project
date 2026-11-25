@@ -364,6 +364,50 @@ class AuthManager private constructor(private val context: Context) {
         return account
     }
 
+    fun getDeviceId(): String {
+        var devId = prefs.getString("device_unique_identifier", null)
+        if (devId.isNullOrEmpty()) {
+            val androidId = try {
+                android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+            } catch (_: Exception) { null }
+            devId = if (!androidId.isNullOrEmpty() && androidId != "9774d56d682e549c") {
+                androidId
+            } else {
+                java.util.UUID.randomUUID().toString()
+            }
+            prefs.edit().putString("device_unique_identifier", devId).apply()
+        }
+        return devId
+    }
+
+    fun saveOrUpdateServerUser(serverUser: com.example.empay.network.BankUserResponse, password: String, rememberMe: Boolean = true): UserAccount {
+        val db = AppDatabase.getInstance(context)
+        val cleanPhone = serverUser.phone.trim()
+        val account = UserAccount(
+            id = serverUser.id,
+            name = serverUser.name,
+            phone = cleanPhone,
+            password = password,
+            accountNumber = "ACC-$cleanPhone-${serverUser.id.toString().takeLast(2)}",
+            balance = serverUser.balance,
+            emergencyBalance = serverUser.emergencyBalance
+        )
+        db.userDao.insertOrUpdateUser(account, isRemembered = rememberMe)
+        if (rememberMe) {
+            db.userDao.setRemembered(account.id, true)
+            prefs.edit()
+                .putBoolean(KEY_DEVICE_REMEMBER_ME, true)
+                .putLong(KEY_REMEMBERED_USER_ID, account.id)
+                .apply()
+        }
+        val accounts = getRegisteredAccounts().toMutableList()
+        val idx = accounts.indexOfFirst { it.id == account.id || it.phone == account.phone }
+        if (idx >= 0) accounts[idx] = account else accounts.add(account)
+        saveAccountsList(accounts)
+        setActiveAccount(account)
+        return account
+    }
+
     fun setActiveAccount(account: UserAccount) {
         prefs.edit().putLong(KEY_LOGGED_IN_ID, account.id).apply()
 

@@ -9,9 +9,16 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.empay.auth.AuthManager
+import com.example.empay.network.BankApiClient
+import com.example.empay.network.LoginRequest
+import com.example.empay.network.NetworkManager
+import com.example.empay.network.RegisterUserRequest
+import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
@@ -94,35 +101,73 @@ class LoginActivity : AppCompatActivity() {
         btnTabSignUp.setOnClickListener { switchTab(isSignIn = false) }
 
         btnSubmitLogin.setOnClickListener {
-            try {
-                val phoneOrName = etLoginPhone.text.toString().trim()
-                val password = etLoginPassword.text.toString().trim()
-                val rememberMe = cbRememberMe.isChecked
+            val phoneOrName = etLoginPhone.text.toString().trim()
+            val password = etLoginPassword.text.toString().trim()
+            val rememberMe = cbRememberMe.isChecked
 
-                if (phoneOrName.isEmpty()) {
-                    Toast.makeText(this, "Please enter your username or phone number", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
+            if (phoneOrName.isEmpty()) {
+                Toast.makeText(this, "Please enter your username or phone number", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            if (password.isEmpty()) {
+                Toast.makeText(this, "Please enter your password", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            lifecycleScope.launch {
+                val isOnline = NetworkManager.isOnline(this@LoginActivity)
+                val deviceId = authManager.getDeviceId()
+
+                if (isOnline) {
+                    try {
+                        val api = BankApiClient.getApiService(applicationContext)
+                        val resp = api.loginUser(LoginRequest(phoneOrName, password, deviceId))
+                        if (!resp.isSuccessful) {
+                            val errBody = resp.errorBody()?.string() ?: ""
+                            if (resp.code() == 403 || errBody.contains("SIMULTANEOUS_LOGIN_RESTRICTED") || errBody.contains("actively signed in on another device")) {
+                                AlertDialog.Builder(this@LoginActivity)
+                                    .setTitle("⚠️ Simultaneous Login Restricted")
+                                    .setMessage("Security Alert: This account is already actively signed in on another device.\n\nSimultaneous logins are strictly prohibited to prevent duplicate spending. You must sign out from the other device first.")
+                                    .setIcon(android.R.drawable.ic_dialog_alert)
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                                return@launch
+                            } else {
+                                Toast.makeText(this@LoginActivity, "Invalid credentials. Please verify username/phone and password.", Toast.LENGTH_LONG).show()
+                                return@launch
+                            }
+                        }
+
+                        val body = resp.body()
+                        if (body != null && body.success && body.user != null) {
+                            val serverUser = body.user
+                            val localAccount = authManager.saveOrUpdateServerUser(serverUser, password, rememberMe)
+                            try {
+                                com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this@LoginActivity, localAccount.name, localAccount.phone)
+                            } catch (_: Exception) {}
+                            Toast.makeText(this@LoginActivity, "Welcome, ${localAccount.name}!", Toast.LENGTH_SHORT).show()
+                            startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                            finish()
+                            return@launch
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("LoginActivity", "Online login error: ${e.message}", e)
+                    }
                 }
 
-                if (password.isEmpty()) {
-                    Toast.makeText(this, "Please enter your password", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-
+                // Local offline login
                 val account = authManager.login(phoneOrName, password, rememberMe)
                 if (account != null) {
                     try {
-                        com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, account.name, account.phone)
+                        com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this@LoginActivity, account.name, account.phone)
                     } catch (_: Exception) {}
-                    Toast.makeText(this, "Welcome, ${account.name}!", Toast.LENGTH_SHORT).show()
-                    startActivity(Intent(this, MainActivity::class.java))
+                    Toast.makeText(this@LoginActivity, "Welcome, ${account.name}!", Toast.LENGTH_SHORT).show()
+                    startActivity(Intent(this@LoginActivity, MainActivity::class.java))
                     finish()
                 } else {
-                    Toast.makeText(this, "Invalid credentials. Please verify username/phone and password.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@LoginActivity, "Invalid credentials. Please verify username/phone and password.", Toast.LENGTH_LONG).show()
                 }
-            } catch (e: Throwable) {
-                android.util.Log.e("LoginActivity", "Login error: ${e.message}", e)
-                Toast.makeText(this, "Sign in failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
 
@@ -134,30 +179,56 @@ class LoginActivity : AppCompatActivity() {
         }
 
         btnSubmitSignUp.setOnClickListener {
-            try {
-                val name = etSignUpName.text.toString().trim()
-                val phone = etSignUpPhone.text.toString().trim()
-                val password = etSignUpPassword.text.toString().trim()
-                val balStr = etSignUpEmergencyBal.text.toString().trim()
-                val emergencyBal = balStr.toDoubleOrNull() ?: 100.0
+            val name = etSignUpName.text.toString().trim()
+            val phone = etSignUpPhone.text.toString().trim()
+            val password = etSignUpPassword.text.toString().trim()
+            val balStr = etSignUpEmergencyBal.text.toString().trim()
+            val emergencyBal = balStr.toDoubleOrNull() ?: 100.0
 
-                if (name.isEmpty() || phone.isEmpty() || password.isEmpty()) {
-                    Toast.makeText(this, "Please fill in all fields to create an account", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
+            if (name.isEmpty() || phone.isEmpty() || password.isEmpty()) {
+                Toast.makeText(this, "Please fill in all fields to create an account", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val rememberMe = cbRememberMe.isChecked
+            val deviceId = authManager.getDeviceId()
+
+            lifecycleScope.launch {
+                if (NetworkManager.isOnline(this@LoginActivity)) {
+                    try {
+                        val api = BankApiClient.getApiService(applicationContext)
+                        val resp = api.registerUser(
+                            RegisterUserRequest(
+                                name = name,
+                                phone = phone,
+                                username = name,
+                                password = password,
+                                emergencyBalance = emergencyBal,
+                                deviceId = deviceId
+                            )
+                        )
+                        if (!resp.isSuccessful) {
+                            val errBody = resp.errorBody()?.string() ?: ""
+                            if (resp.code() == 403 || errBody.contains("SIMULTANEOUS_LOGIN_RESTRICTED")) {
+                                AlertDialog.Builder(this@LoginActivity)
+                                    .setTitle("⚠️ Simultaneous Login Restricted")
+                                    .setMessage("Security Alert: An account with this phone number is already actively signed in on another device. You must sign out from that device first.")
+                                    .setIcon(android.R.drawable.ic_dialog_alert)
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                                return@launch
+                            }
+                        }
+                    } catch (_: Exception) {}
                 }
 
-                // Permanently registers account in SQLite & bank server, respecting Remember Me
-                val rememberMe = cbRememberMe.isChecked
                 val newAccount = authManager.signUp(name, phone, password, emergencyBal, rememberMe = rememberMe)
                 try {
-                    com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this, newAccount.name, newAccount.phone)
+                    com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(this@LoginActivity, newAccount.name, newAccount.phone)
                 } catch (_: Exception) {}
-                Toast.makeText(this, "Profile created for ${newAccount.name}!", Toast.LENGTH_LONG).show()
-                startActivity(Intent(this, MainActivity::class.java))
+                Toast.makeText(this@LoginActivity, "Profile created for ${newAccount.name}!", Toast.LENGTH_LONG).show()
+                startActivity(Intent(this@LoginActivity, MainActivity::class.java))
                 finish()
-            } catch (e: Throwable) {
-                android.util.Log.e("LoginActivity", "Sign up error: ${e.message}", e)
-                Toast.makeText(this, "Registration failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

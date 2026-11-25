@@ -80,13 +80,13 @@ class BluetoothActivity : AppCompatActivity() {
     private val usersList = mutableListOf<PeerItem>()
 
     private var isActivityActive = false
-    private val PEER_TTL_MS = 14000L // 14s TTL: if device moves out of range or turns off BT, it disappears
+    private val PEER_TTL_MS = 3000L // 3s TTL: device disappears as soon as it turns off BT or moves away
     private val pruneHandler = Handler(Looper.getMainLooper())
     private val pruneRunnable = object : Runnable {
         override fun run() {
             if (isActivityActive) {
                 pruneOutOfRangePeers()
-                pruneHandler.postDelayed(this, 3000L)
+                pruneHandler.postDelayed(this, 1000L) // Scan and purge stale signals every 1 second
             }
         }
     }
@@ -699,6 +699,34 @@ class BluetoothActivity : AppCompatActivity() {
             }
 
             val payAction = View.OnClickListener {
+                val adapter = BluetoothAdapter.getDefaultAdapter()
+                if (adapter == null || !adapter.isEnabled) {
+                    androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("⚠️ Bluetooth Not Detected")
+                        .setMessage("Your Bluetooth is turned off. Please turn on Bluetooth to connect and pay peers.")
+                        .setIcon(android.R.drawable.ic_dialog_alert)
+                        .setPositiveButton("OK", null)
+                        .show()
+                    return@OnClickListener
+                }
+
+                // If dynamic peer, verify signal was heard within the last 3 seconds
+                if (!item.isHardcoded) {
+                    val age = System.currentTimeMillis() - item.lastSeenTimestamp
+                    if (age > 3000L) {
+                        androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("⚠️ Bluetooth Not Detected")
+                            .setMessage("Bluetooth signal lost: '${item.name}' is no longer detected. Their Bluetooth was turned off or they moved out of range.")
+                            .setIcon(android.R.drawable.ic_dialog_alert)
+                            .setPositiveButton("OK", null)
+                            .show()
+                        usersList.removeAll { it.id == item.id }
+                        merchantsList.removeAll { it.id == item.id }
+                        renderList()
+                        return@OnClickListener
+                    }
+                }
+
                 val intent = Intent(this, PayActivity::class.java).apply {
                     putExtra("PAYEE_NAME", item.name)
                     if (!item.isMerchant) {

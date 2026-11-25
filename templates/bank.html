@@ -693,11 +693,12 @@
             <th>Online Balance</th>
             <th>Emergency Reserve</th>
             <th>Total Worth</th>
-            <th>Quick Allocation</th>
+            <th>Device Status</th>
+            <th>Quick Actions</th>
           </tr>
         </thead>
         <tbody id="usersTableBody">
-          <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading user ledger...</td></tr>
+          <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading user ledger...</td></tr>
         </tbody>
       </table>
     </div>
@@ -913,6 +914,11 @@
         selAdd.appendChild(opt2);
 
         // Populate Table Row
+        const isOnline = u.is_logged_in === 1 || u.is_logged_in === '1';
+        const statusBadge = isOnline 
+          ? `<span style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 2px 8px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700;">🟢 Active</span>`
+          : `<span style="background: rgba(148,163,184,0.1); color: #94a3b8; border: 1px solid rgba(148,163,184,0.2); padding: 2px 8px; border-radius: 9999px; font-size: 0.72rem;">⚪ Offline</span>`;
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td><span style="font-family: monospace; font-weight: 700; color: #94a3b8;">#${u.id}</span></td>
@@ -921,9 +927,11 @@
           <td><span style="color: #60a5fa; font-weight: 700;">₹ ${bal.toFixed(2)}</span></td>
           <td><span style="color: var(--accent); font-weight: 700;">₹ ${emg.toFixed(2)}</span></td>
           <td><strong>₹ ${total.toFixed(2)}</strong></td>
+          <td>${statusBadge}</td>
           <td>
             <button class="chip" onclick="quickReserve(${u.id}, 10)">Reserve ₹10</button>
             <button class="chip" onclick="quickAdd(${u.id}, 100)">+₹100</button>
+            ${isOnline ? `<button class="chip" style="color: #f43f5e; border-color: rgba(244,63,94,0.4);" onclick="forceLogout(${u.id})">Force Logout</button>` : ''}
           </td>
         `;
         tbody.appendChild(tr);
@@ -1076,6 +1084,23 @@
       document.getElementById('selAddUser').value = userId;
       document.getElementById('inpAddAmount').value = amount.toFixed(2);
       await executeAddFunds();
+    }
+
+    async function forceLogout(userId) {
+      if (!confirm(`Force unlock active session for user #${userId}? This will allow signing in on another device.`)) return;
+      try {
+        log('AUTH', `Admin force-releasing active device session for User #${userId}...`);
+        const res = await fetch(`/api/user/force-logout/${userId}`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Session Released', data.message, 'success', 'ri-lock-unlock-line');
+          loadBankData();
+        } else {
+          alert(data.message || 'Error releasing session');
+        }
+      } catch (e) {
+        log('ERROR', 'Force logout failed: ' + e.message, 'err');
+      }
     }
 
     async function executeSyncTransactions() {

@@ -47,6 +47,16 @@ interface BankApiService {
         @Body request: RegisterUserRequest
     ): Response<RegisterUserResponse>
 
+    @POST("/api/user/login")
+    suspend fun loginUser(
+        @Body request: LoginRequest
+    ): Response<LoginResponse>
+
+    @POST("/api/user/logout")
+    suspend fun logoutUser(
+        @Body request: LogoutRequest
+    ): Response<LogoutResponse>
+
     @POST("/api/transactions/sync")
     suspend fun syncTransactions(
         @Body request: SyncTransactionsRequest
