@@ -575,6 +575,36 @@ def api_logout_user():
     return jsonify({"success": True, "message": "User signed out. Device session released."})
 
 
+@app.route("/api/user/verify-session", methods=["GET", "POST"])
+def api_verify_session():
+    data = request.get_json(silent=True) or request.form or request.args
+    raw_uid = data.get("user_id")
+    device_id = (data.get("device_id") or "").strip()
+
+    conn = get_db()
+    user_id = resolve_user_id(conn, raw_uid)
+    if not user_id:
+        conn.close()
+        return jsonify({"valid": True})
+
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    if not user:
+        return jsonify({"valid": True})
+
+    is_logged_in = user["is_logged_in"] if "is_logged_in" in user.keys() else 0
+    active_dev = str(user["active_device_id"] or "").strip() if "active_device_id" in user.keys() else ""
+
+    # If active on another device, this session is INVALID
+    if is_logged_in == 1 and active_dev and device_id and active_dev != device_id:
+        return jsonify({
+            "valid": False,
+            "message": f"Account '{user['name']}' is active on another device. Simultaneous sessions are prohibited."
+        }), 403
+
+    return jsonify({"valid": True, "is_logged_in": is_logged_in, "active_device_id": active_dev})
+
+
 @app.route("/api/user/force-logout/<user_id>", methods=["POST"])
 def api_force_logout(user_id):
     conn = get_db()

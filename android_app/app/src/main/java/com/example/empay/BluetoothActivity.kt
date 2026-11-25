@@ -80,7 +80,7 @@ class BluetoothActivity : AppCompatActivity() {
     private val usersList = mutableListOf<PeerItem>()
 
     private var isActivityActive = false
-    private val PEER_TTL_MS = 3000L // 3s TTL: device disappears as soon as it turns off BT or moves away
+    private val PEER_TTL_MS = 2500L // 2.5s TTL: device disappears as soon as it turns off BT or moves away
     private val pruneHandler = Handler(Looper.getMainLooper())
     private val pruneRunnable = object : Runnable {
         override fun run() {
@@ -710,10 +710,10 @@ class BluetoothActivity : AppCompatActivity() {
                     return@OnClickListener
                 }
 
-                // If dynamic peer, verify signal was heard within the last 3 seconds
+                // If dynamic peer, verify signal was heard within the last 2.5 seconds
                 if (!item.isHardcoded) {
                     val age = System.currentTimeMillis() - item.lastSeenTimestamp
-                    if (age > 3000L) {
+                    if (age > 2500L) {
                         androidx.appcompat.app.AlertDialog.Builder(this)
                             .setTitle("⚠️ Bluetooth Not Detected")
                             .setMessage("Bluetooth signal lost: '${item.name}' is no longer detected. Their Bluetooth was turned off or they moved out of range.")
@@ -735,6 +735,7 @@ class BluetoothActivity : AppCompatActivity() {
                     if (item.rawDevice != null) {
                         putExtra("DEVICE_ADDRESS", item.rawDevice.address)
                     }
+                    putExtra("LAST_SEEN_MS", item.lastSeenTimestamp)
                     putExtra("CHANNEL", "Bluetooth")
                     putExtra("IS_OFFLINE", true)
                 }

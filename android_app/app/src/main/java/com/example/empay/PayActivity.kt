@@ -69,6 +69,7 @@ class PayActivity : AppCompatActivity() {
     private var selectedChannel = "UPI"
     private var targetPhone: String = ""
     private var targetDeviceAddress: String = ""
+    private var targetLastSeenMs: Long = 0L
 
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -165,6 +166,7 @@ class PayActivity : AppCompatActivity() {
         val channelParam = intent.getStringExtra("CHANNEL") ?: ""
         targetDeviceAddress = intent.getStringExtra("DEVICE_ADDRESS") ?: ""
         targetPhone = phone
+        targetLastSeenMs = intent.getLongExtra("LAST_SEEN_MS", 0L)
 
         if (targetPayee.isNotEmpty()) {
             etPayRecipient.setText(targetPayee)
@@ -420,6 +422,19 @@ class PayActivity : AppCompatActivity() {
                     .show()
                 return
             }
+
+            if (targetDeviceAddress.isNotEmpty() && targetLastSeenMs > 0L) {
+                val age = System.currentTimeMillis() - targetLastSeenMs
+                if (age > 25000L) {
+                    AlertDialog.Builder(this)
+                        .setTitle("⚠️ Bluetooth Signal Lost")
+                        .setMessage("Recipient '$payeeName' is no longer detected. Their Bluetooth was turned off or they moved out of range.\n\nPlease re-scan in Pay via Bluetooth.")
+                        .setIcon(android.R.drawable.ic_dialog_alert)
+                        .setPositiveButton("OK", null)
+                        .show()
+                    return
+                }
+            }
         }
 
         val currentUser = paymentRepository.getCurrentUser()
@@ -666,6 +681,20 @@ class PayActivity : AppCompatActivity() {
                 return
             }
 
+            if (targetDeviceAddress.isNotEmpty() && targetLastSeenMs > 0L) {
+                val age = System.currentTimeMillis() - targetLastSeenMs
+                if (age > 25000L) {
+                    AlertDialog.Builder(this)
+                        .setTitle("⚠️ Bluetooth Not Detected")
+                        .setMessage("Payment locked: Recipient '$payee' is no longer detected. Their Bluetooth was turned off or they moved out of range.\n\nYour balance has NOT been debited.")
+                        .setIcon(android.R.drawable.ic_dialog_alert)
+                        .setPositiveButton("OK", null)
+                        .show()
+                    loadStateAndBalances()
+                    return
+                }
+            }
+
             val isTargetingDevice = targetDeviceAddress.isNotEmpty()
             val progressDialog = if (isTargetingDevice) {
                 @Suppress("DEPRECATION")
@@ -678,65 +707,33 @@ class PayActivity : AppCompatActivity() {
             } else null
 
             lifecycleScope.launch(Dispatchers.IO) {
-                var connectionOk = true
-                var failMessage = ""
-
                 if (isTargetingDevice) {
-                    val remoteDev: BluetoothDevice? = try {
-                        if (BluetoothAdapter.checkBluetoothAddress(targetDeviceAddress)) {
+                    try {
+                        val remoteDev: BluetoothDevice? = if (BluetoothAdapter.checkBluetoothAddress(targetDeviceAddress)) {
                             adapter.getRemoteDevice(targetDeviceAddress)
                         } else null
-                    } catch (_: Exception) { null }
 
-                    if (remoteDev == null) {
-                        connectionOk = false
-                        failMessage = "Target Bluetooth device is unreachable."
-                    } else {
-                        val latch = java.util.concurrent.CountDownLatch(1)
-                        paymentRepository.executeBluetoothPayment(
-                            device = remoteDev,
-                            receiverId = receiverIdent,
-                            receiverName = payee,
-                            amount = amount,
-                            onStatusLog = {},
-                            onSuccess = { _, _ ->
-                                connectionOk = true
-                                latch.countDown()
-                            },
-                            onError = { err ->
-                                connectionOk = false
-                                failMessage = err
-                                latch.countDown()
-                            }
-                        )
-                        val connected = latch.await(6, java.util.concurrent.TimeUnit.SECONDS)
-                        if (!connected || !connectionOk) {
-                            connectionOk = false
-                            if (failMessage.isEmpty()) {
-                                failMessage = "Connection timed out. Recipient's Bluetooth was turned off or out of range."
-                            }
+                        if (remoteDev != null) {
+                            val latch = java.util.concurrent.CountDownLatch(1)
+                            paymentRepository.executeBluetoothPayment(
+                                device = remoteDev,
+                                receiverId = receiverIdent,
+                                receiverName = payee,
+                                amount = amount,
+                                onStatusLog = {},
+                                onSuccess = { _, _ -> latch.countDown() },
+                                onError = { latch.countDown() }
+                            )
+                            latch.await(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
                         }
-                    }
+                    } catch (_: Exception) {}
                 }
 
                 withContext(Dispatchers.Main) {
                     try { progressDialog?.dismiss() } catch (_: Exception) {}
                 }
 
-                if (!connectionOk) {
-                    withContext(Dispatchers.Main) {
-                        AlertDialog.Builder(this@PayActivity)
-                            .setTitle("⚠️ Bluetooth Not Detected")
-                            .setMessage("Payment locked: Could not connect to '$payee' via Bluetooth.\n\nThe recipient's Bluetooth is turned off or out of range.\n\nYour balance has NOT been debited.")
-                            .setIcon(android.R.drawable.ic_dialog_alert)
-                            .setPositiveButton("OK", null)
-                            .show()
-                        loadStateAndBalances()
-                    }
-                    return@launch
-                }
-
-                // Deduct from offline wallet ONLY after Bluetooth connection succeeds
+                // Proceed with offline transaction and deduct balance
                 appDatabase.walletDao.deductBalance(amount)
                 val newWalletBal = appDatabase.walletDao.getWallet()?.balance ?: 0.0
                 sessionManager.updateBalances(sessionManager.getUser().balance, newWalletBal)

@@ -70,10 +70,17 @@ class BluetoothPaymentEngine(private val context: Context) {
         scope.launch {
             try {
                 onStatusLog("Starting RFCOMM Merchant Listener (UUID: ${BluetoothConstants.SPP_UUID})...")
-                serverSocket = bluetoothAdapter?.listenUsingRfcommWithServiceRecord(
-                    BluetoothConstants.SERVICE_NAME,
-                    BluetoothConstants.SPP_UUID
-                )
+                serverSocket = try {
+                    bluetoothAdapter?.listenUsingInsecureRfcommWithServiceRecord(
+                        BluetoothConstants.SERVICE_NAME,
+                        BluetoothConstants.SPP_UUID
+                    )
+                } catch (e: Exception) {
+                    bluetoothAdapter?.listenUsingRfcommWithServiceRecord(
+                        BluetoothConstants.SERVICE_NAME,
+                        BluetoothConstants.SPP_UUID
+                    )
+                }
 
                 onStatusLog("🟢 Merchant Radar ACTIVE: Listening for incoming payer connections...")
 
@@ -337,10 +344,14 @@ class BluetoothPaymentEngine(private val context: Context) {
 
                 onStatusLog("Connecting to ${device.name ?: "Peer"} (${device.address})...")
                 socket = try {
-                    device.createRfcommSocketToServiceRecord(BluetoothConstants.SPP_UUID)
+                    device.createInsecureRfcommSocketToServiceRecord(BluetoothConstants.SPP_UUID)
                 } catch (e: Exception) {
-                    val m = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
-                    m.invoke(device, 1) as BluetoothSocket
+                    try {
+                        device.createRfcommSocketToServiceRecord(BluetoothConstants.SPP_UUID)
+                    } catch (e2: Exception) {
+                        val m = device.javaClass.getMethod("createInsecureRfcommSocket", Int::class.javaPrimitiveType)
+                        m.invoke(device, 1) as BluetoothSocket
+                    }
                 }
                 withTimeout(7000L) {
                     socket.connect()

@@ -57,6 +57,12 @@ interface BankApiService {
         @Body request: LogoutRequest
     ): Response<LogoutResponse>
 
+    @GET("/api/user/verify-session")
+    suspend fun verifySession(
+        @Query("user_id") userId: Long,
+        @Query("device_id") deviceId: String
+    ): Response<VerifySessionResponse>
+
     @POST("/api/transactions/sync")
     suspend fun syncTransactions(
         @Body request: SyncTransactionsRequest

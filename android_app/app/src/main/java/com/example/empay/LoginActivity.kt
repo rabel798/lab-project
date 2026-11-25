@@ -18,7 +18,9 @@ import com.example.empay.network.BankApiClient
 import com.example.empay.network.LoginRequest
 import com.example.empay.network.NetworkManager
 import com.example.empay.network.RegisterUserRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class LoginActivity : AppCompatActivity() {
 
@@ -46,19 +48,57 @@ class LoginActivity : AppCompatActivity() {
 
         authManager = AuthManager.getInstance(this)
 
-        // If user is already remembered/logged in, skip the login screen automatically!
+        // If user is already remembered/logged in, verify active session before entering
         if (authManager.isLoggedIn()) {
             val rememberedUser = authManager.getActiveAccount()
-            if (rememberedUser != null) {
+            val deviceId = authManager.getDeviceId()
+            if (rememberedUser != null && NetworkManager.isOnline(this)) {
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val api = BankApiClient.getApiService(applicationContext)
+                        val resp = api.verifySession(rememberedUser.id, deviceId)
+                        if (!resp.isSuccessful || resp.body()?.valid == false) {
+                            withContext(Dispatchers.Main) {
+                                authManager.logout()
+                                AlertDialog.Builder(this@LoginActivity)
+                                    .setTitle("⚠️ Session Terminated")
+                                    .setMessage("Security Alert: Account '${rememberedUser.name}' is currently active on another device.\n\nSimultaneous logins are prohibited. You have been logged out on this device.")
+                                    .setIcon(android.R.drawable.ic_dialog_alert)
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                                setContentView(R.layout.activity_login)
+                                initViews()
+                                setupListeners()
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) {
+                                com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(
+                                    this@LoginActivity,
+                                    rememberedUser.name,
+                                    rememberedUser.phone
+                                )
+                                startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                                finish()
+                            }
+                        }
+                    } catch (_: Exception) {
+                        withContext(Dispatchers.Main) {
+                            startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                            finish()
+                        }
+                    }
+                }
+                return
+            } else if (rememberedUser != null) {
                 com.example.empay.bluetooth.BluetoothHelper.broadcastEmPayIdentity(
                     this,
                     rememberedUser.name,
                     rememberedUser.phone
                 )
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+                return
             }
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
-            return
         }
 
         setContentView(R.layout.activity_login)

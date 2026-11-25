@@ -42,3 +42,8 @@ data class LogoutResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("message") val message: String
 )
+
+data class VerifySessionResponse(
+    @SerializedName("valid") val valid: Boolean,
+    @SerializedName("message") val message: String? = null
+)

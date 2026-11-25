@@ -1326,6 +1326,37 @@ class MainActivity : AppCompatActivity() {
             finish()
             return
         }
+
+        // Active Single-Device Verification: Verify this device holds the active session
+        if (NetworkManager.isOnline(this)) {
+            val curUser = sessionManager.getUser()
+            val devId = authManager.getDeviceId()
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val api = BankApiClient.getApiService(applicationContext)
+                    val resp = api.verifySession(curUser.id, devId)
+                    if (!resp.isSuccessful || resp.body()?.valid == false) {
+                        withContext(Dispatchers.Main) {
+                            authManager.logout()
+                            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                                .setTitle("⚠️ Session Terminated")
+                                .setMessage("This account was signed into on another device. Simultaneous logins are strictly prohibited.\n\nYou have been logged out on this device.")
+                                .setIcon(android.R.drawable.ic_dialog_alert)
+                                .setCancelable(false)
+                                .setPositiveButton("OK") { _, _ ->
+                                    val intent = Intent(this@MainActivity, LoginActivity::class.java).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    }
+                                    startActivity(intent)
+                                    finish()
+                                }
+                                .show()
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
         updateNetworkBadge(NetworkManager.isOnline(this))
         refreshLocalLedgerUI()
         val currentUser = sessionManager.getUser()
