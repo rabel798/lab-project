@@ -151,9 +151,10 @@ class TransactionHistoryActivity : AppCompatActivity() {
 
                             remoteList.forEach { rt ->
                                 val rtTxId = rt.txId ?: "TX-${rt.id}"
-                                val sId = rt.senderId?.toString() ?: ""
-                                val rId = rt.receiverId?.toString() ?: ""
+                                val sId = rt.senderId?.let { if (it is Number) it.toLong().toString() else it.toString().replace(".0", "").trim() } ?: ""
+                                val rId = rt.receiverId?.let { if (it is Number) it.toLong().toString() else it.toString().replace(".0", "").trim() } ?: ""
                                 val pName = rt.payee?.trim() ?: ""
+                                val senderNameFromRt = rt.senderName?.trim() ?: ""
 
                                 val isParticipant = sId == curIdStr || rId == curIdStr ||
                                                     pName.equals(curName, true) || pName.equals(curPhone, true)
@@ -163,14 +164,29 @@ class TransactionHistoryActivity : AppCompatActivity() {
                                     val direction = if (isOut) TransactionEntity.DIRECTION_SENT else TransactionEntity.DIRECTION_RECEIVED
                                     val txChannel = rt.channel ?: if (rt.isOffline == 1) "Bluetooth" else "UPI"
 
+                                    val finalSenderName = if (isOut) {
+                                        curName
+                                    } else {
+                                        if (senderNameFromRt.isNotEmpty()) {
+                                            senderNameFromRt
+                                        } else if (sId.isNotEmpty()) {
+                                            val u = appDatabase.userDao.getUser(sId.toLongOrNull() ?: -1L)
+                                            u?.name ?: "Navdeep"
+                                        } else {
+                                            "Sender"
+                                        }
+                                    }
+
+                                    val finalReceiverName = if (isOut) pName else curName
+
                                     val existing = appDatabase.transactionDao.getTransaction(rtTxId)
                                     if (existing == null) {
                                         val newTx = TransactionEntity(
                                             txId = rtTxId,
                                             senderId = sId,
-                                            senderName = if (isOut) curName else (if (pName.isNotEmpty() && !pName.equals(curName, true)) pName else "Sender"),
+                                            senderName = finalSenderName,
                                             receiverId = rId,
-                                            receiverName = if (isOut) pName else curName,
+                                            receiverName = finalReceiverName,
                                             amount = rt.amount,
                                             timestamp = System.currentTimeMillis(),
                                             nonce = "REMOTE",
@@ -180,8 +196,15 @@ class TransactionHistoryActivity : AppCompatActivity() {
                                             channel = txChannel
                                         )
                                         appDatabase.transactionDao.insertTransaction(newTx)
-                                    } else if (existing.status != TransactionEntity.STATUS_SYNCED) {
-                                        appDatabase.transactionDao.markAsSynced(rtTxId)
+                                    } else {
+                                        if (existing.status != TransactionEntity.STATUS_SYNCED) {
+                                            appDatabase.transactionDao.markAsSynced(rtTxId)
+                                        }
+                                        if (!isOut && (existing.senderName.isEmpty() || existing.senderName == "Sender") && finalSenderName != "Sender") {
+                                            // Update sender name if previously stored as generic
+                                            val updatedTx = existing.copy(senderName = finalSenderName, status = TransactionEntity.STATUS_SYNCED)
+                                            appDatabase.transactionDao.insertTransaction(updatedTx)
+                                        }
                                     }
                                 }
                             }

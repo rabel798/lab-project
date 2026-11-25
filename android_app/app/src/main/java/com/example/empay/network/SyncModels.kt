@@ -39,6 +39,7 @@ data class BankRemoteTransaction(
     @SerializedName("id") val id: Long? = null,
     @SerializedName("tx_id") val txId: String? = null,
     @SerializedName("sender_id") val senderId: Any? = null,
+    @SerializedName("sender_name") val senderName: String? = null,
     @SerializedName("receiver_id") val receiverId: Any? = null,
     @SerializedName("payee") val payee: String? = null,
     @SerializedName("amount") val amount: Double = 0.0,

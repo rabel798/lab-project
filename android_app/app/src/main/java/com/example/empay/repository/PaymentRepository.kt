@@ -340,6 +340,7 @@ class PaymentRepository private constructor(private val context: Context) {
         receiverId: String,
         receiverName: String,
         amount: Double,
+        customTxId: String = "",
         onStatusLog: (String) -> Unit,
         onSuccess: (PaymentPacket, AckPacket) -> Unit,
         onError: (String) -> Unit
@@ -349,6 +350,7 @@ class PaymentRepository private constructor(private val context: Context) {
             receiverId = receiverId,
             receiverName = receiverName,
             amount = amount,
+            customTxId = customTxId,
             onStatusLog = onStatusLog,
             onSuccess = { packet, ack ->
                 if (NetworkManager.isOnline(context)) {

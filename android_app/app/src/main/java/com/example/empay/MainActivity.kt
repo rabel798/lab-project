@@ -1366,6 +1366,35 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             paymentRepository.refreshAuthoritativeBalances()
         }
+        // 1. Start Bluetooth Receiver Radar on Main Screen if Bluetooth is on
+        try {
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if (adapter != null && adapter.isEnabled && BluetoothHelper.hasConnectPermission(this)) {
+                paymentRepository.startMerchantRadar(
+                    onPaymentReceived = { packet, ack ->
+                        runOnUiThread {
+                            lifecycleScope.launch {
+                                paymentRepository.refreshAuthoritativeBalances()
+                            }
+                            refreshLocalLedgerUI()
+                            Toast.makeText(
+                                this@MainActivity,
+                                "⚡ Received ₹${String.format(Locale.US, "%.2f", packet.amount)} from ${packet.senderName} via Bluetooth!",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    },
+                    onStatusLog = { log ->
+                        appendLog("BT-RADAR", log)
+                    },
+                    onError = { err ->
+                        appendLog("BT-RADAR", "Error: $err")
+                    }
+                )
+            }
+        } catch (_: Exception) {}
+
+        // 2. Synchronize transactions & balances with Central Bank
         if (NetworkManager.isOnline(this)) {
             lifecycleScope.launch(Dispatchers.IO) {
                 val pending = appDatabase.transactionDao.getPendingSyncTransactions()
@@ -1374,13 +1403,95 @@ class MainActivity : AppCompatActivity() {
                         appendLog("AUTO-SYNC", "App in foreground with ${pending.size} pending offline receipts. Auto-syncing with Central Bank...")
                     }
                     SyncManager.syncNow(this@MainActivity)
-                    paymentRepository.refreshAuthoritativeBalances()
+                }
+                syncIncomingTransactionsFromBank()
+                paymentRepository.refreshAuthoritativeBalances()
+                withContext(Dispatchers.Main) {
+                    refreshLocalLedgerUI()
+                }
+            }
+        }
+    }
+
+    private suspend fun syncIncomingTransactionsFromBank() = withContext(Dispatchers.IO) {
+        if (!NetworkManager.isOnline(this@MainActivity)) return@withContext
+        try {
+            val apiService = BankApiClient.getApiService(this@MainActivity)
+            val txResp = apiService.getAllTransactions()
+            if (txResp.isSuccessful && txResp.body() != null) {
+                val remoteList = txResp.body()!!
+                val currentUser = sessionManager.getUser()
+                val curIdStr = currentUser.id.toString()
+                val curName = currentUser.name.trim()
+                val curPhone = currentUser.phone.trim()
+
+                var newCount = 0
+                remoteList.forEach { rt ->
+                    val rtTxId = rt.txId ?: "TX-${rt.id}"
+                    val sIdRaw = rt.senderId?.let { if (it is Number) it.toLong().toString() else it.toString().replace(".0", "").trim() } ?: ""
+                    val rIdRaw = rt.receiverId?.let { if (it is Number) it.toLong().toString() else it.toString().replace(".0", "").trim() } ?: ""
+                    val pName = rt.payee?.trim() ?: ""
+                    val senderNameFromRt = rt.senderName?.trim() ?: ""
+
+                    val isParticipant = sIdRaw == curIdStr || rIdRaw == curIdStr ||
+                                        pName.equals(curName, true) || pName.equals(curPhone, true)
+
+                    if (isParticipant) {
+                        val isOut = sIdRaw == curIdStr && !pName.equals(curName, true)
+                        val direction = if (isOut) TransactionEntity.DIRECTION_SENT else TransactionEntity.DIRECTION_RECEIVED
+                        val txChannel = rt.channel ?: if (rt.isOffline == 1) "Bluetooth" else "UPI"
+
+                        val finalSenderName = if (isOut) {
+                            curName
+                        } else {
+                            if (senderNameFromRt.isNotEmpty()) {
+                                senderNameFromRt
+                            } else if (sIdRaw.isNotEmpty()) {
+                                val u = appDatabase.userDao.getUser(sIdRaw.toLongOrNull() ?: -1L)
+                                u?.name ?: "Navdeep"
+                            } else {
+                                "Sender"
+                            }
+                        }
+
+                        val finalReceiverName = if (isOut) pName else curName
+
+                        val existing = appDatabase.transactionDao.getTransaction(rtTxId)
+                        if (existing == null) {
+                            val newTx = TransactionEntity(
+                                txId = rtTxId,
+                                senderId = sIdRaw,
+                                senderName = finalSenderName,
+                                receiverId = rIdRaw,
+                                receiverName = finalReceiverName,
+                                amount = rt.amount,
+                                timestamp = System.currentTimeMillis(),
+                                nonce = "REMOTE",
+                                signature = "VERIFIED",
+                                status = TransactionEntity.STATUS_SYNCED,
+                                direction = direction,
+                                channel = txChannel
+                            )
+                            appDatabase.transactionDao.insertTransaction(newTx)
+                            newCount++
+                        } else {
+                            if (existing.status != TransactionEntity.STATUS_SYNCED) {
+                                appDatabase.transactionDao.markAsSynced(rtTxId)
+                            }
+                            if (!isOut && (existing.senderName.isEmpty() || existing.senderName == "Sender") && finalSenderName != "Sender") {
+                                val updatedTx = existing.copy(senderName = finalSenderName, status = TransactionEntity.STATUS_SYNCED)
+                                appDatabase.transactionDao.insertTransaction(updatedTx)
+                            }
+                        }
+                    }
+                }
+                if (newCount > 0) {
                     withContext(Dispatchers.Main) {
                         refreshLocalLedgerUI()
                     }
                 }
             }
-        }
+        } catch (_: Exception) {}
     }
 
     override fun onDestroy() {

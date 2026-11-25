@@ -315,6 +315,7 @@ class BluetoothPaymentEngine(private val context: Context) {
         receiverId: String,
         receiverName: String,
         amount: Double,
+        customTxId: String = "",
         onStatusLog: (String) -> Unit,
         onSuccess: (PaymentPacket, AckPacket) -> Unit,
         onError: (String) -> Unit
@@ -360,7 +361,7 @@ class BluetoothPaymentEngine(private val context: Context) {
 
                 // 3. Create & Sign PaymentPacket
                 val user = sessionManager.getUser()
-                val txId = CryptoManager.generateTxId()
+                val txId = if (customTxId.isNotEmpty()) customTxId else CryptoManager.generateTxId()
                 val nonce = CryptoManager.generateNonce()
                 val timestamp = System.currentTimeMillis()
 

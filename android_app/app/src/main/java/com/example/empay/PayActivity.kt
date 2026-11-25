@@ -720,11 +720,12 @@ class PayActivity : AppCompatActivity() {
                                 receiverId = receiverIdent,
                                 receiverName = payee,
                                 amount = amount,
+                                customTxId = txId,
                                 onStatusLog = {},
                                 onSuccess = { _, _ -> latch.countDown() },
                                 onError = { latch.countDown() }
                             )
-                            latch.await(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                            latch.await(4500, java.util.concurrent.TimeUnit.MILLISECONDS)
                         }
                     } catch (_: Exception) {}
                 }
