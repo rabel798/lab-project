@@ -3,9 +3,14 @@ package com.example.empay
 import android.app.Dialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -19,6 +24,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -64,6 +70,9 @@ class PayActivity : AppCompatActivity() {
     private var targetPhone: String = ""
     private var targetDeviceAddress: String = ""
 
+    private var connectivityManager: ConnectivityManager? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
     data class RecipientSuggestion(
         val name: String,
         val phone: String,
@@ -84,6 +93,7 @@ class PayActivity : AppCompatActivity() {
         initViews()
         setupListeners()
         setupRecipientAutoComplete()
+        registerNetworkMonitoring()
         loadStateAndBalances()
     }
 
@@ -95,6 +105,41 @@ class PayActivity : AppCompatActivity() {
             loadStateAndBalances()
         }
         com.example.empay.auth.AuthManager.getInstance(this).syncAllRegisteredUsersFromBackend()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            if (networkCallback != null && connectivityManager != null) {
+                connectivityManager?.unregisterNetworkCallback(networkCallback!!)
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun registerNetworkMonitoring() {
+        try {
+            connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+
+            networkCallback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    runOnUiThread {
+                        loadStateAndBalances()
+                    }
+                }
+
+                override fun onLost(network: Network) {
+                    runOnUiThread {
+                        loadStateAndBalances()
+                    }
+                }
+            }
+            connectivityManager?.registerNetworkCallback(request, networkCallback!!)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun initViews() {
@@ -260,6 +305,24 @@ class PayActivity : AppCompatActivity() {
         findViewById<Button>(R.id.chipAmount50).setOnClickListener { etPayAmountInput.setText("50.00") }
         findViewById<Button>(R.id.chipAmount100).setOnClickListener { etPayAmountInput.setText("100.00") }
 
+        findViewById<View>(R.id.layoutMethodCard).setOnClickListener {
+            val realOnline = NetworkManager.isOnline(this)
+            if (!isOnlineMode) {
+                if (!realOnline) {
+                    Toast.makeText(this, "Cannot switch to Online UPI: Device is offline.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                isOnlineMode = true
+                selectedChannel = "UPI"
+                Toast.makeText(this, "Switched to Online UPI Payment", Toast.LENGTH_SHORT).show()
+            } else {
+                isOnlineMode = false
+                selectedChannel = "Bluetooth"
+                Toast.makeText(this, "Switched to Offline Bluetooth Payment", Toast.LENGTH_SHORT).show()
+            }
+            loadStateAndBalances()
+        }
+
         btnPayCancel.setOnClickListener { finish() }
 
         btnSubmitPayment.setOnClickListener {
@@ -267,26 +330,46 @@ class PayActivity : AppCompatActivity() {
         }
     }
 
+    private fun switchToOfflineBluetoothMode() {
+        isOnlineMode = false
+        selectedChannel = "Bluetooth"
+        loadStateAndBalances()
+        Toast.makeText(this, "Switched to Offline Bluetooth Mode. Emergency reserve active.", Toast.LENGTH_LONG).show()
+    }
+
     private fun loadStateAndBalances() {
         val user = sessionManager.getUser()
         val wallet = appDatabase.walletDao.getWallet()
         val offlineBal = wallet?.balance ?: user.emergencyBalance
+        val realOnline = NetworkManager.isOnline(this)
 
         tvPayOnlineBalPreview.text = String.format(Locale.US, "₹ %.2f", user.balance)
         tvPayEmergencyBalPreview.text = String.format(Locale.US, "₹ %.2f", offlineBal)
 
         if (isOnlineMode) {
-            tvPayNetworkBadge.text = "● Online"
-            tvPayNetworkBadge.setTextColor(ContextCompat.getColor(this, R.color.status_online_text))
-            tvPayNetworkBadge.backgroundTintList = ContextCompat.getColorStateList(this, R.color.status_online_bg)
-            ivMethodIcon.setImageResource(R.drawable.ic_wallet_card)
-            ivMethodIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.primary)
-            tvMethodText.text = "UPI Payment (Online)"
-            tvPayExecutionMode.text = "UPI (Instant Online)"
-            btnSubmitPayment.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
-            btnSubmitPayment.text = "Authorize Payment 🔒"
+            if (realOnline) {
+                tvPayNetworkBadge.text = "● Online"
+                tvPayNetworkBadge.setTextColor(ContextCompat.getColor(this, R.color.status_online_text))
+                tvPayNetworkBadge.backgroundTintList = ContextCompat.getColorStateList(this, R.color.status_online_bg)
+                ivMethodIcon.setImageResource(R.drawable.ic_wallet_card)
+                ivMethodIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.primary)
+                tvMethodText.text = "UPI Payment (Online)"
+                tvPayExecutionMode.text = "UPI (Instant Online)"
+                btnSubmitPayment.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
+                btnSubmitPayment.text = "Authorize Payment 🔒"
+            } else {
+                tvPayNetworkBadge.text = "● Offline (No Internet)"
+                tvPayNetworkBadge.setTextColor(ContextCompat.getColor(this, R.color.emergency_dark))
+                tvPayNetworkBadge.backgroundTintList = ContextCompat.getColorStateList(this, R.color.emergency_bg)
+                ivMethodIcon.setImageResource(R.drawable.ic_wallet_card)
+                ivMethodIcon.imageTintList = ContextCompat.getColorStateList(this, R.color.emergency_dark)
+                tvMethodText.text = "UPI Payment (Offline - Internet Required)"
+                tvPayExecutionMode.text = "UPI (Offline - No Connection)"
+                btnSubmitPayment.backgroundTintList = ContextCompat.getColorStateList(this, R.color.text_secondary)
+                btnSubmitPayment.text = "Authorize Payment 🔒 (Offline)"
+            }
         } else {
-            tvPayNetworkBadge.text = "● Offline"
+            tvPayNetworkBadge.text = "● Offline Mode"
             tvPayNetworkBadge.setTextColor(ContextCompat.getColor(this, R.color.emergency_dark))
             tvPayNetworkBadge.backgroundTintList = ContextCompat.getColorStateList(this, R.color.emergency_bg)
             ivMethodIcon.setImageResource(R.drawable.ic_bluetooth)
@@ -308,6 +391,20 @@ class PayActivity : AppCompatActivity() {
 
         if (payeeName.isEmpty()) {
             Toast.makeText(this, "Please enter a valid recipient phone or UPI VPA", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // If in online payment mode but device is offline, prevent transaction
+        if (isOnlineMode && !NetworkManager.isOnline(this)) {
+            AlertDialog.Builder(this)
+                .setTitle("⚠️ Transaction Not Possible")
+                .setMessage("Transaction is not possible since your device is currently offline.\n\nOnline UPI transfers require an active internet connection to communicate with the Central Bank.\n\nWould you like to switch to Offline Bluetooth Payment instead?")
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .setPositiveButton("Switch to Bluetooth") { _, _ ->
+                    switchToOfflineBluetoothMode()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
             return
         }
 
@@ -418,6 +515,19 @@ class PayActivity : AppCompatActivity() {
             payee = "To: $payee",
             channel = if (isOnlineMode) "Via Online UPI Network" else "Via Bluetooth Mesh",
             onSuccess = {
+                if (isOnlineMode && !NetworkManager.isOnline(this)) {
+                    AlertDialog.Builder(this)
+                        .setTitle("⚠️ Transaction Not Possible")
+                        .setMessage("Transaction not possible since your device is currently offline.\n\nOnline UPI payments require an active internet connection.\n\nYour account balance has NOT been debited.")
+                        .setIcon(android.R.drawable.ic_dialog_alert)
+                        .setPositiveButton("Switch to Bluetooth") { _, _ ->
+                            switchToOfflineBluetoothMode()
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                    loadStateAndBalances()
+                    return@PinAuthDialog
+                }
                 executeTransfer(amount, payee, note)
             },
             onFailed = { error ->
@@ -438,9 +548,19 @@ class PayActivity : AppCompatActivity() {
         val receiverIdent = if (targetPhone.isNotEmpty()) targetPhone else payee
 
         if (isOnlineMode) {
+            if (!NetworkManager.isOnline(applicationContext)) {
+                AlertDialog.Builder(this)
+                    .setTitle("⚠️ Transaction Not Possible")
+                    .setMessage("Transaction not possible since your device is offline.\n\nPlease reconnect to the internet to complete this online transfer.\n\nYour account balance has NOT been debited.")
+                    .setIcon(android.R.drawable.ic_dialog_alert)
+                    .setPositiveButton("OK", null)
+                    .show()
+                loadStateAndBalances()
+                return
+            }
+
             // Online UPI execution
             lifecycleScope.launch(Dispatchers.IO) {
-                var newOnlineBal = currentUser.balance - amount
                 try {
                     val api = BankApiClient.getApiService(applicationContext)
                     val syncReq = SyncTransactionsRequest(
@@ -449,7 +569,7 @@ class PayActivity : AppCompatActivity() {
                                 txId = txId,
                                 payee = payee,
                                 amount = amount,
-                                note = "UPI Online Payment",
+                                note = note.ifEmpty { "UPI Online Payment" },
                                 direction = TransactionEntity.DIRECTION_SENT,
                                 senderId = currentUser.id.toString(),
                                 receiverId = receiverIdent
@@ -460,34 +580,49 @@ class PayActivity : AppCompatActivity() {
                     val resp = api.syncTransactions(syncReq)
                     if (resp.isSuccessful && resp.body()?.status == "success") {
                         val body = resp.body()!!
-                        newOnlineBal = body.balance
                         sessionManager.updateBalances(body.balance, body.emergencyBalance)
+
+                        // Insert into local DB
+                        val txEntity = TransactionEntity(
+                            txId = txId,
+                            senderId = currentUser.id.toString(),
+                            senderName = currentUser.name,
+                            receiverId = receiverIdent,
+                            receiverName = payee,
+                            amount = amount,
+                            timestamp = timestamp,
+                            nonce = nonce,
+                            signature = "UPI_VERIFIED_" + UUID.randomUUID().toString().take(8),
+                            status = TransactionEntity.STATUS_SYNCED,
+                            direction = TransactionEntity.DIRECTION_SENT,
+                            channel = TransactionEntity.CHANNEL_UPI
+                        )
+                        appDatabase.transactionDao.insertTransaction(txEntity)
+
+                        withContext(Dispatchers.Main) {
+                            navigateToReceipt(amount, payee, "UPI Online", txId, txEntity.signature, timestamp)
+                        }
                     } else {
-                        sessionManager.updateBalances(newOnlineBal, currentUser.emergencyBalance)
+                        val errMsg = resp.errorBody()?.string() ?: resp.message()
+                        withContext(Dispatchers.Main) {
+                            AlertDialog.Builder(this@PayActivity)
+                                .setTitle("Transaction Declined")
+                                .setMessage("Central Bank rejected the transaction: ${if (errMsg.isNullOrBlank()) "Unable to process payment." else errMsg}\n\nYour account balance has NOT been debited.")
+                                .setIcon(android.R.drawable.ic_dialog_alert)
+                                .setPositiveButton("OK", null)
+                                .show()
+                        }
                     }
-                } catch (_: Exception) {
-                    sessionManager.updateBalances(newOnlineBal, currentUser.emergencyBalance)
-                }
-
-                // Insert into local DB
-                val txEntity = TransactionEntity(
-                    txId = txId,
-                    senderId = currentUser.id.toString(),
-                    senderName = currentUser.name,
-                    receiverId = receiverIdent,
-                    receiverName = payee,
-                    amount = amount,
-                    timestamp = timestamp,
-                    nonce = nonce,
-                    signature = "UPI_VERIFIED_" + UUID.randomUUID().toString().take(8),
-                    status = TransactionEntity.STATUS_SYNCED,
-                    direction = TransactionEntity.DIRECTION_SENT,
-                    channel = TransactionEntity.CHANNEL_UPI
-                )
-                appDatabase.transactionDao.insertTransaction(txEntity)
-
-                withContext(Dispatchers.Main) {
-                    navigateToReceipt(amount, payee, "UPI Online", txId, txEntity.signature, timestamp)
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        AlertDialog.Builder(this@PayActivity)
+                            .setTitle("⚠️ Transaction Not Possible")
+                            .setMessage("Transaction not possible since you are offline or the connection to the Central Bank server was lost.\n\nYour account balance has NOT been debited.")
+                            .setIcon(android.R.drawable.ic_dialog_alert)
+                            .setPositiveButton("OK", null)
+                            .show()
+                        loadStateAndBalances()
+                    }
                 }
             }
         } else {
