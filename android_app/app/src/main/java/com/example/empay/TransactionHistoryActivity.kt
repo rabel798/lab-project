@@ -31,6 +31,7 @@ import java.util.Locale
 class TransactionHistoryActivity : AppCompatActivity() {
 
     private lateinit var appDatabase: AppDatabase
+    private lateinit var sessionManager: SessionManager
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var layoutHistoryContainer: LinearLayout
     private lateinit var tvEmptyState: TextView
@@ -52,6 +53,7 @@ class TransactionHistoryActivity : AppCompatActivity() {
         setContentView(R.layout.activity_transaction_history)
 
         appDatabase = AppDatabase.getInstance(this)
+        sessionManager = SessionManager.getInstance(this)
         initViews()
         setupListeners()
         loadTransactions()
@@ -191,8 +193,13 @@ class TransactionHistoryActivity : AppCompatActivity() {
             }
 
             // 3. Reload transactions from Room DB
+            val currentUser = sessionManager.getUser()
             val txs = withContext(Dispatchers.IO) {
-                appDatabase.transactionDao.getAllTransactions()
+                appDatabase.transactionDao.getTransactionsForUser(
+                    currentUser.id.toString(),
+                    currentUser.name,
+                    currentUser.phone
+                )
             }
             allTransactions = txs
             updateSummary(txs)

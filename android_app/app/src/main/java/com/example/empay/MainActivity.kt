@@ -1084,8 +1084,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshLocalLedgerUI() {
         lifecycleScope.launch(Dispatchers.IO) {
-            val transactions = appDatabase.transactionDao.getAllTransactions()
-            val pendingCount = appDatabase.transactionDao.getPendingSyncTransactions().size
+            val user = sessionManager.getUser()
+            val transactions = appDatabase.transactionDao.getTransactionsForUser(
+                user.id.toString(),
+                user.name,
+                user.phone
+            )
+            val pendingCount = transactions.count { it.status == TransactionEntity.STATUS_PENDING_SYNC }
 
             withContext(Dispatchers.Main) {
                 tvPendingTxBadge?.text = "$pendingCount Pending Sync"

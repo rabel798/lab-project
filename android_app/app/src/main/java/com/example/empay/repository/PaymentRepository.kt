@@ -164,11 +164,13 @@ class PaymentRepository private constructor(private val context: Context) {
     }
 
     suspend fun getAllTransactions(): List<TransactionEntity> = withContext(Dispatchers.IO) {
-        appDatabase.transactionDao.getAllTransactions()
+        val user = sessionManager.getUser()
+        appDatabase.transactionDao.getTransactionsForUser(user.id.toString(), user.name, user.phone)
     }
 
     suspend fun getPendingSyncCount(): Int = withContext(Dispatchers.IO) {
-        appDatabase.transactionDao.getPendingSyncTransactions().size
+        val user = sessionManager.getUser()
+        appDatabase.transactionDao.getPendingSyncTransactionsForUser(user.id.toString(), user.phone).size
     }
 
     /**

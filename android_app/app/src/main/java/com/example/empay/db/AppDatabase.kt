@@ -503,6 +503,41 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
             return list
         }
 
+        override fun getTransactionsForUser(userId: String, userName: String, userPhone: String): List<TransactionEntity> {
+            val db = readableDatabase
+            val list = mutableListOf<TransactionEntity>()
+            val uId = userId.trim()
+            val uName = userName.trim()
+            val uPhone = userPhone.trim().filter { it.isDigit() }.takeLast(10)
+
+            if (uId.isEmpty() && uName.isEmpty() && uPhone.isEmpty()) {
+                return emptyList()
+            }
+
+            val selection = """
+                (sender_id = ? OR receiver_id = ?) OR
+                (? != '' AND (LOWER(TRIM(sender_name)) = LOWER(TRIM(?)) OR LOWER(TRIM(receiver_name)) = LOWER(TRIM(?)))) OR
+                (? != '' AND (sender_id = ? OR receiver_id = ? OR sender_name LIKE '%' || ? || '%' OR receiver_name LIKE '%' || ? || '%'))
+            """.trimIndent()
+            val args = arrayOf(uId, uId, uName, uName, uName, uPhone, uPhone, uPhone, uPhone, uPhone)
+
+            val cursor = db.query(
+                TABLE_TRANSACTIONS,
+                null,
+                selection,
+                args,
+                null,
+                null,
+                "timestamp DESC"
+            )
+            cursor.use {
+                while (it.moveToNext()) {
+                    list.add(cursorToTransaction(it))
+                }
+            }
+            return list
+        }
+
         override fun getPendingSyncTransactions(): List<TransactionEntity> {
             val db = readableDatabase
             val list = mutableListOf<TransactionEntity>()
@@ -511,6 +546,40 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 null,
                 "status = ?",
                 arrayOf(TransactionEntity.STATUS_PENDING_SYNC),
+                null,
+                null,
+                "timestamp ASC"
+            )
+            cursor.use {
+                while (it.moveToNext()) {
+                    list.add(cursorToTransaction(it))
+                }
+            }
+            return list
+        }
+
+        override fun getPendingSyncTransactionsForUser(userId: String, userPhone: String): List<TransactionEntity> {
+            val db = readableDatabase
+            val list = mutableListOf<TransactionEntity>()
+            val uId = userId.trim()
+            val uPhone = userPhone.trim().filter { it.isDigit() }.takeLast(10)
+
+            if (uId.isEmpty() && uPhone.isEmpty()) {
+                return emptyList()
+            }
+
+            val selection = """
+                status = ? AND (
+                    sender_id = ? OR (? != '' AND sender_id = ?)
+                )
+            """.trimIndent()
+            val args = arrayOf(TransactionEntity.STATUS_PENDING_SYNC, uId, uPhone, uPhone)
+
+            val cursor = db.query(
+                TABLE_TRANSACTIONS,
+                null,
+                selection,
+                args,
                 null,
                 null,
                 "timestamp ASC"

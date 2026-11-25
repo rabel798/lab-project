@@ -29,7 +29,8 @@ class SyncWorker(
         val sessionManager = SessionManager.getInstance(applicationContext)
         val transactionDao = appDatabase.transactionDao
 
-        val pendingTxs = transactionDao.getPendingSyncTransactions()
+        val user = sessionManager.getUser()
+        val pendingTxs = transactionDao.getPendingSyncTransactionsForUser(user.id.toString(), user.phone)
         if (pendingTxs.isEmpty()) {
             return@withContext Result.success(workDataOf("reconciled_count" to 0))
         }

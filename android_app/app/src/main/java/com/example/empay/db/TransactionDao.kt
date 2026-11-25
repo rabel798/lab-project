@@ -4,7 +4,9 @@ interface TransactionDao {
     fun insertTransaction(tx: TransactionEntity): Boolean
     fun getTransaction(txId: String): TransactionEntity?
     fun getAllTransactions(): List<TransactionEntity>
+    fun getTransactionsForUser(userId: String, userName: String = "", userPhone: String = ""): List<TransactionEntity>
     fun getPendingSyncTransactions(): List<TransactionEntity>
+    fun getPendingSyncTransactionsForUser(userId: String, userPhone: String = ""): List<TransactionEntity>
     fun markAsSynced(txId: String): Boolean
     fun markAsRejected(txId: String): Boolean
     fun isNonceUsed(nonce: String): Boolean

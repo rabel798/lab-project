@@ -379,25 +379,20 @@ class AuthManager private constructor(private val context: Context) {
         )
         SessionManager.getInstance(context).updateUser(session)
 
-        // Sync with local offline SQLite Wallet
+        // Sync with local offline SQLite Wallet for the active account
         val db = AppDatabase.getInstance(context)
-        val wallet = db.walletDao.getWallet()
-        if (wallet == null) {
-            db.walletDao.saveWallet(
-                WalletEntity(
-                    id = 1,
-                    userId = account.id.toString(),
-                    userName = account.name,
-                    balance = account.emergencyBalance,
-                    offlineMaxLimit = 5000.0,
-                    emergencyThreshold = 50.0,
-                    bankPublicKey = "PUB_KEY_DEMO",
-                    lastSyncTimestamp = System.currentTimeMillis()
-                )
+        db.walletDao.saveWallet(
+            WalletEntity(
+                id = 1,
+                userId = account.id.toString(),
+                userName = account.name,
+                balance = account.emergencyBalance,
+                offlineMaxLimit = 5000.0,
+                emergencyThreshold = 50.0,
+                bankPublicKey = "PUB_KEY_DEMO",
+                lastSyncTimestamp = System.currentTimeMillis()
             )
-        } else {
-            db.walletDao.updateBalance(account.emergencyBalance)
-        }
+        )
     }
 
     fun getActiveAccount(): UserAccount? {

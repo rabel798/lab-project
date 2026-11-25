@@ -89,7 +89,8 @@ object SyncManager {
         val sessionManager = SessionManager.getInstance(context)
         val transactionDao = appDatabase.transactionDao
 
-        val pendingTxs = transactionDao.getPendingSyncTransactions()
+        val user = sessionManager.getUser()
+        val pendingTxs = transactionDao.getPendingSyncTransactionsForUser(user.id.toString(), user.phone)
         if (pendingTxs.isEmpty()) {
             return@withContext true
         }
