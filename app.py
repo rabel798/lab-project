@@ -871,7 +871,12 @@ def api_transactions():
         conn.close()
         return jsonify({"status": "success", "data": dict(tx)})
 
-    txs = conn.execute("SELECT * FROM transactions ORDER BY created_at DESC").fetchall()
+    txs = conn.execute("""
+        SELECT t.*, u.name as sender_name, u.phone as sender_phone
+        FROM transactions t
+        LEFT JOIN users u ON (t.sender_id = u.id OR CAST(t.sender_id AS INTEGER) = u.id)
+        ORDER BY t.created_at DESC
+    """).fetchall()
     conn.close()
     return jsonify([dict(t) for t in txs])
 
@@ -1074,7 +1079,12 @@ def api_transactions_sync():
 
     conn.commit()
 
-    all_txs = conn.execute("SELECT * FROM transactions ORDER BY created_at DESC").fetchall()
+    all_txs = conn.execute("""
+        SELECT t.*, u.name as sender_name, u.phone as sender_phone
+        FROM transactions t
+        LEFT JOIN users u ON (t.sender_id = u.id OR CAST(t.sender_id AS INTEGER) = u.id)
+        ORDER BY t.created_at DESC
+    """).fetchall()
     updated_user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
 
