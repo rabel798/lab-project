@@ -170,7 +170,7 @@ class TransactionHistoryActivity : AppCompatActivity() {
                                         if (senderNameFromRt.isNotEmpty()) {
                                             senderNameFromRt
                                         } else if (sId.isNotEmpty()) {
-                                            val u = appDatabase.userDao.getUser(sId.toLongOrNull() ?: -1L)
+                                            val u = appDatabase.userDao.getUserById(sId.toLongOrNull() ?: -1L)
                                             u?.name ?: "Navdeep"
                                         } else {
                                             "Sender"

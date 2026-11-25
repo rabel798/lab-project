@@ -1447,7 +1447,7 @@ class MainActivity : AppCompatActivity() {
                             if (senderNameFromRt.isNotEmpty()) {
                                 senderNameFromRt
                             } else if (sIdRaw.isNotEmpty()) {
-                                val u = appDatabase.userDao.getUser(sIdRaw.toLongOrNull() ?: -1L)
+                                val u = appDatabase.userDao.getUserById(sIdRaw.toLongOrNull() ?: -1L)
                                 u?.name ?: "Navdeep"
                             } else {
                                 "Sender"
